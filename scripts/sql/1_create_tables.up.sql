@@ -58,3 +58,6 @@ CREATE TABLE IF NOT EXISTS ci_pipeline_material
 ALTER TABLE ci_pipeline_material ADD COLUMN commit_history text;
 ALTER TABLE ci_pipeline_material ADD COLUMN errored boolean;
 ALTER TABLE ci_pipeline_material ADD COLUMN error_msg text;
+
+INSERT INTO "public"."git_provider" ("id", "name", "url", "user_name", "password", "ssh_key", "access_token", "auth_mode", "active") VALUES
+('1', 'Github Public', 'github.com', NULL, NULL, NULL, NULL, 'ANONYMOUS', 't');
