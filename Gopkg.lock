@@ -10,14 +10,6 @@
   version = "v0.3.1"
 
 [[projects]]
-  digest = "1:96dc6502d8879e1ad595dcfd6b5f96e223727545c8f23df926fcd7369fbd301d"
-  name = "github.com/TheZeroSlave/zapsentry"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "1c396b683080e695f49a24730aad630413e8e7ed"
-  version = "v1.3.0"
-
-[[projects]]
   digest = "1:d6afaeed1502aa28e80a4ed0981d570ad91b2579193404256ce672ed0a609e0d"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
@@ -63,14 +55,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "019d125201abcf1a535142d07591da5c4be74bd6"
-
-[[projects]]
-  digest = "1:9fde49eaa3ee34e80f2ce31bd3ed0695ec048321dfe02c60a46c22e5b8e3968e"
-  name = "github.com/getsentry/sentry-go"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "93b68f59e483f3eede43c3212220a9f6689f8812"
-  version = "v0.5.1"
 
 [[projects]]
   digest = "1:0a2260bcfa15237979ef496f03fb6af215c247ad998881a4d039992228876ae3"
@@ -590,10 +574,8 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/TheZeroSlave/zapsentry",
     "github.com/caarlos0/env",
     "github.com/gammazero/workerpool",
-    "github.com/getsentry/sentry-go",
     "github.com/go-pg/pg",
     "github.com/go-pg/pg/orm",
     "github.com/google/wire",
@@ -605,7 +587,6 @@
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "go.uber.org/zap",
-    "go.uber.org/zap/zapcore",
     "gopkg.in/robfig/cron.v3",
     "gopkg.in/src-d/go-git.v4",
     "gopkg.in/src-d/go-git.v4/plumbing",
