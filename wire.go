@@ -1,4 +1,3 @@
-
 //+build wireinject
 
 /*
@@ -53,6 +52,7 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
 		internal.NewRepositoryLocker,
 		internal.NewNatsConnection,
+		git.NewGitUtil,
 	)
 	return &App{}, nil
 }

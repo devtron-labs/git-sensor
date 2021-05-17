@@ -17,11 +17,10 @@
 package git
 
 import (
-	"context"
+	"github.com/caarlos0/env"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/caarlos0/env"
 	"github.com/gammazero/workerpool"
 	//"github.com/devtron-labs/git-sensor/pkg"
 	"encoding/json"
@@ -203,19 +202,13 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 }
 
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
-
-	auth, err := GetAuthMethod(material.GitProvider)
-	if err != nil {
-		impl.logger.Errorw("error in fetching auth detail ", "url", material.Url, "err", err)
-		return err
-	}
+	userName, password, err := GetUserNamePassword(material.GitProvider)
 	location, err := GetLocationForMaterial(material)
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-	timeoutContext, _ := context.WithTimeout(context.Background(), FETCH_TIMEOUT_SEC*time.Second)
-	updated, repo, err := impl.repositoryManager.fetch(auth, material.Url, location, timeoutContext)
+	updated, repo, err := impl.repositoryManager.fetch(userName, password, material.Url, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		return err

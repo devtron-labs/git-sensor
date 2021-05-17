@@ -17,8 +17,8 @@
 package main
 
 import (
-	"github.com/devtron-labs/git-sensor/util"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/util"
 	"log"
 	"os"
 	"os/signal"
