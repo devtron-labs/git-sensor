@@ -41,7 +41,7 @@ const (
 
 func GetLocationForMaterial(material *sql.GitMaterial) (location string, err error) {
 	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
-	gitRegex := `https.*\.git`
+	gitRegex := `^https.*`
 	matched, err := regexp.MatchString(gitRegex, material.Url)
 	if matched {
 		location := strings.ReplaceAll(material.Url, "https://", "")
