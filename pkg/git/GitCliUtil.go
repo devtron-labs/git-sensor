@@ -20,7 +20,7 @@ func NewGitUtil(logger *zap.SugaredLogger) *GitUtil {
 	}
 }
 
-const GIT_AKS_PASS = "/git-ask-pass.sh"
+const GIT_ASK_PASS = "/git-ask-pass.sh"
 
 func (impl *GitUtil) Fetch(rootDir string, username string, password string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
@@ -31,16 +31,16 @@ func (impl *GitUtil) Fetch(rootDir string, username string, password string) (re
 }
 
 func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg string, err error) {
-	impl.logger.Debugw("git fetch ", "location", rootDir)
+	impl.logger.Debugw("git checkout ", "location", rootDir)
 	cmd := exec.Command("git", "-C", rootDir, "checkout", branch, "--force")
 	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, nil
 }
 
 func (impl *GitUtil) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("GIT_ASKPASS=%s", GIT_AKS_PASS),
+		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
