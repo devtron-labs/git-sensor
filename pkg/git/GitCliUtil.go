@@ -27,7 +27,7 @@ func (impl *GitUtil) Fetch(rootDir string, username string, password string) (re
 	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	output, errMsg, err := impl.runCommandWithCred(cmd, username, password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, "", nil
+	return output, errMsg, nil
 }
 
 func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg string, err error) {
@@ -35,14 +35,14 @@ func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg s
 	cmd := exec.Command("git", "-C", rootDir, "checkout", branch, "--force")
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, "", nil
+	return output, errMsg, nil
 }
 
 func (impl *GitUtil) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("GIT_ASKPASS=%s", GIT_AKS_PASS),
-		fmt.Sprintf("GIT_USERNAME=%s", userName), // ignored
-		fmt.Sprintf("GIT_PASSWORD=%s", password), // this value is used
+		fmt.Sprintf("GIT_USERNAME=%s", userName),
+		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
 	return impl.runCommand(cmd)
 }
@@ -64,7 +64,6 @@ func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err err
 }
 
 func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
-
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
