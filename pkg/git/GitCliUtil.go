@@ -22,14 +22,32 @@ func NewGitUtil(logger *zap.SugaredLogger) *GitUtil {
 
 const GIT_AKS_PASS = "/git-ask-pass.sh"
 
-func (impl *GitUtil) fetch(rootDir string, username string, password string) (response, errMsg string, err error) {
+func (impl *GitUtil) Fetch(rootDir string, username string, password string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
 	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	output, errMsg, err := impl.runCommandWithCred(cmd, username, password)
+	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, "", nil
+}
+
+func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg string, err error) {
+	impl.logger.Debugw("git fetch ", "location", rootDir)
+	cmd := exec.Command("git", "-C", rootDir, "checkout", branch, "--force")
+	output, errMsg, err := impl.runCommand(cmd)
+	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, "", nil
+}
+
+func (impl *GitUtil) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("GIT_ASKPASS=%s", GIT_AKS_PASS),
-		fmt.Sprintf("GIT_USERNAME=%s", username), // ignored
+		fmt.Sprintf("GIT_USERNAME=%s", userName), // ignored
 		fmt.Sprintf("GIT_PASSWORD=%s", password), // this value is used
 	)
+	return impl.runCommand(cmd)
+}
+
+func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
@@ -40,14 +58,12 @@ func (impl *GitUtil) fetch(rootDir string, username string, password string) (re
 		errOutput := string(exErr.Stderr)
 		return "", errOutput, err
 	}
-	// Trims off a single newline for user convenience
 	output := string(outBytes)
 	output = strings.TrimSpace(output)
-	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output)
 	return output, "", nil
 }
 
-func (impl *GitUtil) Init(rootDir string, remoteUrl string) error {
+func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 
 	//-----------------
 
@@ -55,7 +71,7 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string) error {
 	if err != nil {
 		return err
 	}
-	repo, err := git.PlainInit(rootDir, true)
+	repo, err := git.PlainInit(rootDir, isBare)
 	if err != nil {
 		return err
 	}

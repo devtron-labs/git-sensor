@@ -60,12 +60,12 @@ func (impl RepositoryManagerImpl) Add(location string, url string, userName, pas
 		impl.logger.Errorw("error in cleaning checkoutpath", "err", err)
 		return err
 	}
-	err = impl.gitUtil.Init(location, url)
+	err = impl.gitUtil.Init(location, url, true)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
 	}
-	opt, errormag, err := impl.gitUtil.fetch(location, userName, password)
+	opt, errormag, err := impl.gitUtil.Fetch(location, userName, password)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errormsg", errormag, "err", err)
 		return err
@@ -101,7 +101,7 @@ func (impl RepositoryManagerImpl) fetch(userName, password string, url string, l
 	if err != nil {
 		return false, nil, err
 	}
-	res, errorMsg, err := impl.gitUtil.fetch(location, userName, password)
+	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
