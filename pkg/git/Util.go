@@ -17,8 +17,8 @@
 package git
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/sql"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internal/sql"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
 	"path"
@@ -41,11 +41,11 @@ const (
 
 func GetLocationForMaterial(material *sql.GitMaterial) (location string, err error) {
 	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
-	gitRegex := `https.*\.git`
+	gitRegex := `^https.*`
 	matched, err := regexp.MatchString(gitRegex, material.Url)
 	if matched {
 		location := strings.ReplaceAll(material.Url, "https://", "")
-		checkoutPath:=path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), location)
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), location)
 		return checkoutPath, nil
 	}
 	return "", fmt.Errorf("unsupported format url %s", material.Url)
@@ -69,4 +69,20 @@ func GetAuthMethod(gitProvider *sql.GitProvider) (transport.AuthMethod, error) {
 		return nil, fmt.Errorf("unsupported %s", gitProvider.AuthMode)
 	}
 	return auth, nil
+}
+
+func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password string, err error) {
+	switch gitProvider.AuthMode {
+	case sql.AUTH_MODE_USERNAME_PASSWORD:
+		return gitProvider.UserName, gitProvider.Password, nil
+	case sql.AUTH_MODE_ACCESS_TOKEN:
+
+		return gitProvider.UserName, gitProvider.AccessToken, nil
+	case sql.AUTH_MODE_ANONYMOUS:
+		return "", "", nil
+	case sql.AUTH_MODE_SSH:
+		return "", "", fmt.Errorf("ssh not supported")
+	default:
+		return "", "", fmt.Errorf("unsupported %s", gitProvider.AuthMode)
+	}
 }

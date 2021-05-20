@@ -17,11 +17,11 @@
 package pkg
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg/git"
-	"encoding/json"
-	"fmt"
 	"go.uber.org/zap"
 	_ "gopkg.in/robfig/cron.v3"
 )
@@ -278,7 +278,7 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
-	auth, err := git.GetAuthMethod(gitProvider)
+	userName, password, err := git.GetUserNamePassword(gitProvider)
 	if err != nil {
 		return material, nil
 	}
@@ -286,7 +286,7 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
-	err = impl.repositoryManager.Add(checkoutPath, material.Url, auth)
+	err = impl.repositoryManager.Add(checkoutPath, material.Url, userName, password)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true
@@ -466,7 +466,7 @@ func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	gitChanges, err := impl.repositoryManager.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit, )
+	gitChanges, err := impl.repositoryManager.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
 	if err != nil {
 		impl.logger.Errorw("error in computing changes", "req", request, "err", err)
 	} else {

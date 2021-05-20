@@ -27,7 +27,8 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	materialRepositoryImpl := sql.NewMaterialRepositoryImpl(db)
-	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger)
+	gitUtil := git.NewGitUtil(sugaredLogger)
+	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internal.NewRepositoryLocker(sugaredLogger)

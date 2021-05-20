@@ -18,9 +18,9 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -34,9 +34,9 @@ import (
 )
 
 type RepositoryManager interface {
-	fetch(auth transport.AuthMethod, url string, location string, ctx context.Context) (updated bool, repo *git.Repository, err error)
+	fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
 	headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error)
-	Add(location, url string, auth transport.AuthMethod) error
+	Add(location, url string, userName, password string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
 	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -46,24 +46,31 @@ type RepositoryManager interface {
 }
 
 type RepositoryManagerImpl struct {
-	logger *zap.SugaredLogger
+	logger  *zap.SugaredLogger
+	gitUtil *GitUtil
 }
 
-func NewRepositoryManagerImpl(logger *zap.SugaredLogger) *RepositoryManagerImpl {
-	return &RepositoryManagerImpl{logger: logger}
+func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil) *RepositoryManagerImpl {
+	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil}
 }
 
-func (impl RepositoryManagerImpl) Add(location string, url string, auth transport.AuthMethod) error {
+func (impl RepositoryManagerImpl) Add(location string, url string, userName, password string) error {
 	err := os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkoutpath", "err", err)
 		return err
 	}
-	_, err = impl.clone(auth, location, url)
+	err = impl.gitUtil.Init(location, url, true)
 	if err != nil {
-		impl.logger.Errorw("error in cloning repo", "err", err)
+		impl.logger.Errorw("err in git init", "err", err)
 		return err
 	}
+	opt, errormag, err := impl.gitUtil.Fetch(location, userName, password)
+	if err != nil {
+		impl.logger.Errorw("error in cloning repo", "errormsg", errormag, "err", err)
+		return err
+	}
+	impl.logger.Debugw("opt msg", "opt", opt)
 	return nil
 }
 
@@ -87,27 +94,26 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) fetch(auth transport.AuthMethod, url string, location string, ctx context.Context) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
 	if err != nil {
 		return false, nil, err
 	}
-
-	err = r.FetchContext(ctx, &git.FetchOptions{RemoteName: "origin", Auth: auth})
-	if err == nil {
+	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
-		middleware.GitPullDuration.WithLabelValues( "true", "true").Observe(time.Since(start).Seconds())
+		middleware.GitPullDuration.WithLabelValues("true", "true").Observe(time.Since(start).Seconds())
 		return true, r, nil
-	} else if err == git.NoErrAlreadyUpToDate {
+	} else if err == nil && len(res) == 0 {
 		impl.logger.Debugw("no update for ", "path", url)
-		middleware.GitPullDuration.WithLabelValues( "true", "false").Observe(time.Since(start).Seconds())
+		middleware.GitPullDuration.WithLabelValues("true", "false").Observe(time.Since(start).Seconds())
 		return false, r, nil
 	} else {
-		impl.logger.Errorw("error in updating repository", "err", err, "location", url)
-		middleware.GitPullDuration.WithLabelValues( "false", "false").Observe(time.Since(start).Seconds())
+		impl.logger.Errorw("error in updating repository", "err", err, "location", url, "error msg", errorMsg)
+		middleware.GitPullDuration.WithLabelValues("false", "false").Observe(time.Since(start).Seconds())
 		return false, r, err
 	}
 
