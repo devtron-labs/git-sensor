@@ -27,7 +27,7 @@ func (impl *GitUtil) Fetch(rootDir string, username string, password string) (re
 	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	output, errMsg, err := impl.runCommandWithCred(cmd, username, password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, errMsg, nil
+	return output, errMsg, err
 }
 
 func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg string, err error) {
@@ -35,7 +35,7 @@ func (impl *GitUtil) Checkout(rootDir string, branch string) (response, errMsg s
 	cmd := exec.Command("git", "-C", rootDir, "checkout", branch, "--force")
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, errMsg, nil
+	return output, errMsg, err
 }
 
 func (impl *GitUtil) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
@@ -51,9 +51,10 @@ func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err err
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
+		impl.logger.Error("error in git cli operation", "msg", string(outBytes), "err", err)
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
-			return "", "", err
+			return "", string(outBytes), err
 		}
 		errOutput := string(exErr.Stderr)
 		return "", errOutput, err
