@@ -40,6 +40,11 @@ type RepoManager interface {
 	GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error)
 	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
+
+	SaveWebhookEventJson(webhookEventJson *sql.WebhookEventJson) error
+	GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*sql.WebhookPRDataEvent, error)
+	SaveWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error
+	UpdateWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error
 }
 
 type RepoManagerImpl struct {
@@ -50,6 +55,7 @@ type RepoManagerImpl struct {
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
 	locker                       *internal.RepositoryLocker
 	gitWatcher                   git.GitWatcher
+	webhookEventRepository       sql.WebhookEventRepository
 }
 
 func NewRepoManagerImpl(
@@ -59,7 +65,7 @@ func NewRepoManagerImpl(
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	gitWatcher git.GitWatcher,
+	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                       logger,
@@ -69,6 +75,7 @@ func NewRepoManagerImpl(
 		ciPipelineMaterialRepository: ciPipelineMaterialRepository,
 		locker:                       locker,
 		gitWatcher:                   gitWatcher,
+		webhookEventRepository:       webhookEventRepository,
 	}
 }
 
@@ -498,4 +505,43 @@ func (impl RepoManagerImpl) RefreshGitMaterial(req *git.RefreshGitMaterialReques
 		res.LastFetchTime = material.LastFetchTime
 	}
 	return res, err
+}
+
+func (impl RepoManagerImpl) SaveWebhookEventJson(webhookEventJson *sql.WebhookEventJson) error {
+	err := impl.webhookEventRepository.SaveJson(webhookEventJson)
+	if err != nil {
+		impl.logger.Errorw("error in saving webhook event json in db","err", err)
+		return err
+	}
+	return nil
+}
+
+func (impl RepoManagerImpl) GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*sql.WebhookPRDataEvent, error) {
+	impl.logger.Debugw("fetching pr event data for ","gitHostName", gitHostName, "prId", prId)
+	webhookEventData ,err := impl.webhookEventRepository.GetPrEventDataByGitHostNameAndPrId(gitHostName, prId)
+	if err != nil {
+		impl.logger.Errorw("getting error while fetching pr event data ","err", err)
+		return nil, err
+	}
+	return webhookEventData, nil
+}
+
+func (impl RepoManagerImpl) SaveWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error {
+	impl.logger.Debug("saving pr event data")
+	err := impl.webhookEventRepository.SavePrEventData(webhookPRDataEvent)
+	if err != nil {
+		impl.logger.Errorw("error while saving pr event data ","err", err)
+		return err
+	}
+	return nil
+}
+
+func (impl RepoManagerImpl) UpdateWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error {
+	impl.logger.Debugw("updating pr event data for id : ", webhookPRDataEvent.Id)
+	err := impl.webhookEventRepository.UpdatePrEventData(webhookPRDataEvent)
+	if err != nil {
+		impl.logger.Errorw("error while updating pr event data ","err", err)
+		return err
+	}
+	return nil
 }

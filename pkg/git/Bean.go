@@ -22,6 +22,11 @@ import (
 	"time"
 )
 
+const (
+	GIT_HOST_NAME_GITHUB string = "Github"
+	GIT_HOST_NAME_BITBUCKET_CLOUD string = "Bitbucket Cloud"
+)
+
 type FetchScmChangesRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	From               string `json:"from"`
@@ -71,4 +76,18 @@ type RefreshGitMaterialResponse struct {
 	Message       string    `json:"message"`
 	ErrorMsg      string    `json:"errorMsg"`
 	LastFetchTime time.Time `json:"lastFetchTime"`
+}
+
+type GitHostType string
+
+type WebhookEventType string
+
+type WebhookEvent struct {
+	RequestPayloadJson string `json:"requestPayloadJson"`
+	GitHostType GitHostType `json:"gitHostType"`
+	WebhookEventType WebhookEventType `json:"webhookEventType"`
+}
+
+type WebhookEventResponse struct {
+	success bool
 }

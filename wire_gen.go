@@ -30,6 +30,7 @@ func InitializeApp() (*App, error) {
 	gitUtil := git.NewGitUtil(sugaredLogger)
 	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
+	webhookEventRepositoryImpl := sql.NewWebhookEventRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internal.NewRepositoryLocker(sugaredLogger)
 	conn, err := internal.NewNatsConnection()
@@ -40,8 +41,10 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl)
-	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger)
+	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl)
+	webhookHandlerGithubImpl := api.NewWebhookHandlerGithubImpl(sugaredLogger, repoManagerImpl)
+	webhookHandlerBitbucketImpl := api.NewWebhookHandlerBitbucketImpl(sugaredLogger)
+	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger, webhookHandlerGithubImpl, webhookHandlerBitbucketImpl)
 	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
 	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, conn)
 	return app, nil

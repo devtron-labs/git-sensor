@@ -18,10 +18,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
-	"fmt"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
 	"github.com/nats-io/stan"
