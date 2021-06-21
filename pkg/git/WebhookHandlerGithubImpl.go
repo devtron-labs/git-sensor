@@ -15,12 +15,10 @@
  *
  */
 
-package api
+package git
 
 import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/pkg"
-	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"time"
@@ -28,19 +26,19 @@ import (
 
 type WebhookHandlerGithubImpl struct {
 	logger *zap.SugaredLogger
-	repositoryManager pkg.RepoManager
+	webhookEventRepoManager WebhookEventRepoManager
 }
 
-func NewWebhookHandlerGithubImpl(logger *zap.SugaredLogger, repositoryManager pkg.RepoManager) *WebhookHandlerGithubImpl {
+func NewWebhookHandlerGithubImpl(logger *zap.SugaredLogger, webhookEventRepoManager WebhookEventRepoManager) *WebhookHandlerGithubImpl {
 	return &WebhookHandlerGithubImpl{
 		logger: logger,
-		repositoryManager: repositoryManager,
+		webhookEventRepoManager: webhookEventRepoManager,
 	}
 }
 
 func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson string) error{
 
-	gitHostName := git.GIT_HOST_NAME_GITHUB
+	gitHostName := GIT_HOST_NAME_GITHUB
 
 	// store in webhook_event_json table
 	webhookEventJson := &sql.WebhookEventJson{
@@ -49,7 +47,7 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 		CreatedOn: time.Now(),
 	}
 
-	err := impl.repositoryManager.SaveWebhookEventJson(webhookEventJson)
+	err := impl.webhookEventRepoManager.SaveWebhookEventJson(webhookEventJson)
 	if err != nil{
 		impl.logger.Errorw("error in saving webhook event json in db","err", err)
 		return err
@@ -72,7 +70,7 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 	authorName := gjson.Get(requestPayloadJson, "sender.login").String()
 
 	// get current pull request data from DB
-	webhookEventGetData, err := impl.repositoryManager.GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName, prId)
+	webhookEventGetData, err := impl.webhookEventRepoManager.GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName, prId)
 
 	// add/update latest information
 	webhookEventSaveData := &sql.WebhookPRDataEvent{
@@ -96,10 +94,10 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 		webhookEventSaveData.Id = webhookEventGetData.Id
 		webhookEventSaveData.CreatedOn = webhookEventGetData.CreatedOn
 		webhookEventSaveData.UpdatedOn = time.Now()
-		impl.repositoryManager.UpdateWebhookPrEventData(webhookEventSaveData)
+		impl.webhookEventRepoManager.UpdateWebhookPrEventData(webhookEventSaveData)
 	}else{
 		webhookEventSaveData.CreatedOn = time.Now()
-		impl.repositoryManager.SaveWebhookPrEventData(webhookEventSaveData)
+		impl.webhookEventRepoManager.SaveWebhookPrEventData(webhookEventSaveData)
 	}
 
 

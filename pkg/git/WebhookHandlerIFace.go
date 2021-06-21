@@ -15,22 +15,8 @@
  *
  */
 
-package api
+package git
 
-import (
-	"go.uber.org/zap"
-)
-
-type WebhookHandlerBitbucketImpl struct {
-	logger *zap.SugaredLogger
-}
-
-func NewWebhookHandlerBitbucketImpl(logger *zap.SugaredLogger) *WebhookHandlerBitbucketImpl {
-	return &WebhookHandlerBitbucketImpl{
-		logger: logger,
-	}
-}
-
-func (impl WebhookHandlerBitbucketImpl) HandleWebhookEvent(requestPayloadJson string) error{
-	return nil
+type WebhookHandlerIFace interface {
+	HandleWebhookEvent(requestPayloadJson string) error
 }

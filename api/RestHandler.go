@@ -40,19 +40,15 @@ type RestHandler interface {
 	GetChangesInRelease(w http.ResponseWriter, r *http.Request)
 	GetCommitInfoForTag(w http.ResponseWriter, r *http.Request)
 	RefreshGitMaterial(w http.ResponseWriter, r *http.Request)
-	HandleWebhookEvent(w http.ResponseWriter, r *http.Request)
 }
 
-func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, webhookHandlerGithubImpl WebhookHandlerIFace,
-	webhookHandlerBitbucketImpl WebhookHandlerIFace) *RestHandlerImpl {
-	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger, webhookHandlerGithubImpl:webhookHandlerGithubImpl, webhookHandlerBitbucketImpl:webhookHandlerBitbucketImpl}
+func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *RestHandlerImpl {
+	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger}
 }
 
 type RestHandlerImpl struct {
 	repositoryManager pkg.RepoManager
 	logger            *zap.SugaredLogger
-	webhookHandlerGithubImpl WebhookHandlerIFace
-	webhookHandlerBitbucketImpl WebhookHandlerIFace
 }
 
 type Response struct {
@@ -303,24 +299,4 @@ func (handler RestHandlerImpl) RefreshGitMaterial(w http.ResponseWriter, r *http
 	} else {
 		handler.writeJsonResp(w, err, resp, http.StatusOK)
 	}
-}
-
-func (handler RestHandlerImpl) HandleWebhookEvent(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	request := &git.WebhookEvent{}
-	err := decoder.Decode(request)
-	if err != nil {
-		handler.logger.Error(err)
-		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
-		return
-	}
-
-	if request.GitHostType == git.GitHostType(git.GIT_HOST_NAME_GITHUB){
-		handler.webhookHandlerGithubImpl.HandleWebhookEvent(request.RequestPayloadJson)
-	}else if request.GitHostType == git.GitHostType(git.GIT_HOST_NAME_BITBUCKET_CLOUD){
-		handler.webhookHandlerBitbucketImpl.HandleWebhookEvent(request.RequestPayloadJson)
-	}
-
-	resp := &git.WebhookEventResponse{}
-	handler.writeJsonResp(w, err, resp, http.StatusOK)
 }

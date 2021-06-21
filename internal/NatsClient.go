@@ -26,6 +26,7 @@ import (
 const (
 	NEW_CI_MATERIAL_TOPIC = "GIT-SENSOR.NEW-CI-MATERIAL" //{publisher-app-name}-{topic-name}
 	POLL_CI_TOPIC ="GIT-SENSOR.PULL"
+	WEBHOOK_EVENT_TOPIC = "ORCHESTRATOR.WEBHOOK_EVENT"
 )
 
 type PubSubConfig struct {
