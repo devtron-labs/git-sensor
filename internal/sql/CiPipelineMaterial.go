@@ -38,6 +38,10 @@ type CiPipelineMaterial struct {
 	ErrorMsg      string     `sql:"error_msg,notnull"`
 }
 
+type PullRequestSourceTypeValue struct {
+	SourceBranchRegex string	`json:"sourceBranchRegex,omitempty"`
+	TargetBranchRegex string	`json:"targetBranchRegex,omitempty"`
+}
 
 type CiPipelineMaterialRepository interface {
 	FindByGitMaterialId(gitMaterialId int) ([]*CiPipelineMaterial, error)

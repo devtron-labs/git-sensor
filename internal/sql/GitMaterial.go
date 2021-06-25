@@ -58,6 +58,7 @@ type MaterialRepository interface {
 	Save(material *GitMaterial) error
 	FindActive() ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
+	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
 }
 type MaterialRepositoryImpl struct {
 	dbConnection *pg.DB
@@ -108,4 +109,16 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 		Where("git_material.deleted =? ", false).
 		Select()
 	return &material, err
+}
+
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
+	var materials []*GitMaterial
+	err := repo.dbConnection.Model(&materials).
+		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
+			return q.Where("active IS TRUE"), nil
+		}).
+		Where("deleted =? ", false).
+		Where("url in (?) ", pg.In(urls)).
+		Select()
+	return materials, err
 }

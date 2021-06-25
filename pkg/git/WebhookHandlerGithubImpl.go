@@ -26,13 +26,13 @@ import (
 
 type WebhookHandlerGithubImpl struct {
 	logger *zap.SugaredLogger
-	webhookEventRepoManager WebhookEventRepoManager
+	webhookEventService WebhookEventService
 }
 
-func NewWebhookHandlerGithubImpl(logger *zap.SugaredLogger, webhookEventRepoManager WebhookEventRepoManager) *WebhookHandlerGithubImpl {
+func NewWebhookHandlerGithubImpl(logger *zap.SugaredLogger, webhookEventService WebhookEventService) *WebhookHandlerGithubImpl {
 	return &WebhookHandlerGithubImpl{
 		logger: logger,
-		webhookEventRepoManager: webhookEventRepoManager,
+		webhookEventService: webhookEventService,
 	}
 }
 
@@ -47,7 +47,7 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 		CreatedOn: time.Now(),
 	}
 
-	err := impl.webhookEventRepoManager.SaveWebhookEventJson(webhookEventJson)
+	err := impl.webhookEventService.SaveWebhookEventJson(webhookEventJson)
 	if err != nil{
 		impl.logger.Errorw("error in saving webhook event json in db","err", err)
 		return err
@@ -70,7 +70,7 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 	authorName := gjson.Get(requestPayloadJson, "sender.login").String()
 
 	// get current pull request data from DB
-	webhookEventGetData, err := impl.webhookEventRepoManager.GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName, prId)
+	webhookEventGetData, err := impl.webhookEventService.GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName, prId)
 
 	// add/update latest information
 	webhookEventSaveData := &sql.WebhookPRDataEvent{
@@ -94,12 +94,18 @@ func (impl WebhookHandlerGithubImpl) HandleWebhookEvent(requestPayloadJson strin
 		webhookEventSaveData.Id = webhookEventGetData.Id
 		webhookEventSaveData.CreatedOn = webhookEventGetData.CreatedOn
 		webhookEventSaveData.UpdatedOn = time.Now()
-		impl.webhookEventRepoManager.UpdateWebhookPrEventData(webhookEventSaveData)
+		impl.webhookEventService.UpdateWebhookPrEventData(webhookEventSaveData)
 	}else{
 		webhookEventSaveData.CreatedOn = time.Now()
-		impl.webhookEventRepoManager.SaveWebhookPrEventData(webhookEventSaveData)
+		impl.webhookEventService.SaveWebhookPrEventData(webhookEventSaveData)
 	}
 
+
+	err = impl.webhookEventService.HandlePostSavePrWebhook(webhookEventSaveData)
+	if err != nil{
+		impl.logger.Errorw("error in handling pr webhook after db save","err", err)
+		return err
+	}
 
 	return nil
 }

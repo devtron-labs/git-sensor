@@ -42,12 +42,20 @@ type WebhookPRDataEvent struct {
 	TargetBranchHash        string   `sql:"target_branch_hash,notnull"`
 	RepositoryUrl	        string   `sql:"repository_url,notnull"`
 	AuthorName		        string   `sql:"author_name,notnull"`
-	IsOpen					bool	 `sql:"is_open"`
-	ActualState				string	 `sql:"actual_state"`
+	IsOpen					bool	 `sql:"is_open,notnull"`
+	ActualState				string	 `sql:"actual_state,notnull"`
+	LastCommitMessage		string	 `sql:"last_commit_message"`
 	PrCreatedOn   			time.Time `sql:"pr_created_on,notnull"`
 	PrUpdatedOn   			time.Time `sql:"pr_updated_on"`
 	CreatedOn   			time.Time `sql:"created_on,notnull"`
 	UpdatedOn   			time.Time `sql:"updated_on"`
+}
+
+type CiPipelineMaterialPrWebhookMapping struct {
+	tableName   			struct{} `sql:"ci_pipeline_material_pr_webhook_mapping"`
+	Id						int 	 `sql:"id,pk"`
+	CiPipelineMaterialId    int 	 `sql:"ci_pipeline_material_id"`
+	PrWebhookDataId         int 	 `sql:"pr_webhook_data_id"`
 }
 
 type WebhookEventRepository interface {
@@ -55,6 +63,10 @@ type WebhookEventRepository interface {
 	GetPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*WebhookPRDataEvent, error)
 	SavePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
 	UpdatePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
+	CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId int, prWebhookDataId int) (bool, error)
+	SaveCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialPrWebhookMapping *CiPipelineMaterialPrWebhookMapping) error
+	GetCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialId int)  ([]*CiPipelineMaterialPrWebhookMapping, error)
+	GetOpenPrEventDataByIds(ids []int, limit int) ([]*WebhookPRDataEvent, error)
 }
 
 type WebhookEventRepositoryImpl struct {
@@ -84,4 +96,39 @@ func (impl WebhookEventRepositoryImpl) SavePrEventData(webhookPRDataEvent *Webho
 func (impl WebhookEventRepositoryImpl) UpdatePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error {
 	_, err := impl.dbConnection.Model(webhookPRDataEvent).WherePK().Update()
 	return err
+}
+
+func (impl WebhookEventRepositoryImpl) CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId int, prWebhookDataId int) (bool, error) {
+	mapping := &CiPipelineMaterialPrWebhookMapping{}
+	exists, err := impl.dbConnection.
+		Model(mapping).
+		Where("ci_pipeline_material_id = ?", ciPipelineMaterialId).
+		Where("pr_webhook_data_id = ?", prWebhookDataId).
+		Exists()
+	return exists, err
+}
+
+func (impl WebhookEventRepositoryImpl) SaveCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialPrWebhookMapping *CiPipelineMaterialPrWebhookMapping) error {
+	_, err := impl.dbConnection.Model(ciPipelineMaterialPrWebhookMapping).Insert()
+	return err
+}
+
+func (impl WebhookEventRepositoryImpl) GetCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialId int)  ([]*CiPipelineMaterialPrWebhookMapping, error) {
+	var pipelineMaterials []*CiPipelineMaterialPrWebhookMapping
+	err := impl.dbConnection.Model(&pipelineMaterials).
+		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
+		Column("pr_webhook_data_id").
+		Select()
+	return pipelineMaterials, err
+}
+
+func (impl WebhookEventRepositoryImpl) GetOpenPrEventDataByIds(ids []int, limit int) ([]*WebhookPRDataEvent, error) {
+	var webhookPrEventData []*WebhookPRDataEvent
+	err := impl.dbConnection.Model(&webhookPrEventData).
+		Where("id in (?) ", pg.In(ids)).
+		Where("is_open =? ", true).
+		Order("pr_updated_on Desc").
+		Limit(limit).
+		Select()
+	return webhookPrEventData, err
 }

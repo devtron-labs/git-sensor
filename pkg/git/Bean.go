@@ -61,7 +61,23 @@ type GitCommit struct {
 	Message   string
 	Changes   []string          `json:",omitempty"`
 	FileStats *object.FileStats `json:",omitempty"`
+	PrData	  *PrData			`json:"prData"`
 }
+
+type PrData struct {
+	PrTitle        		string  `json:"prTitle"`
+	PrUrl        		string	`json:"prUrl"`
+	SourceBranchName    string	`json:"sourceBranchName"`
+	SourceBranchHash    string	`json:"sourceBranchHash"`
+	TargetBranchName    string	`json:"targetBranchName"`
+	TargetBranchHash    string	`json:"targetBranchHash"`
+	AuthorName		    string	`json:"authorName"`
+	LastCommitMessage	string	`json:"lastCommitMessage"`
+	PrCreatedOn   		time.Time `json:"prCreatedOn"`
+	PrUpdatedOn   		time.Time `json:"prUpdatedOn"`
+}
+
+
 type CommitMetadataRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	GitHash            string `json:"gitHash"`

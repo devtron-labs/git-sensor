@@ -50,6 +50,7 @@ type RepoManagerImpl struct {
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
 	locker                       *internal.RepositoryLocker
 	gitWatcher                   git.GitWatcher
+	webhookEventRepository		 sql.WebhookEventRepository
 }
 
 func NewRepoManagerImpl(
@@ -59,7 +60,7 @@ func NewRepoManagerImpl(
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	gitWatcher git.GitWatcher,
+	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                       logger,
@@ -69,6 +70,7 @@ func NewRepoManagerImpl(
 		ciPipelineMaterialRepository: ciPipelineMaterialRepository,
 		locker:                       locker,
 		gitWatcher:                   gitWatcher,
+		webhookEventRepository: 	  webhookEventRepository,
 	}
 }
 
@@ -372,6 +374,18 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	if err != nil {
 		return nil, err
 	}
+
+	if  pipelineMaterial.Type != sql.SOURCE_TYPE_PULL_REQUEST {
+		return impl.FetchGitCommitsForOtherThanPrType(pipelineMaterial, gitMaterial)
+	}else{
+		return impl.FetchGitCommitsForPrType(pipelineMaterial)
+	}
+
+	return nil, nil
+}
+
+
+func (impl RepoManagerImpl) FetchGitCommitsForOtherThanPrType(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 	response.LastFetchTime = gitMaterial.LastFetchTime
 	if pipelineMaterial.Errored {
@@ -387,14 +401,69 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 		return response, nil
 	}
 	commits := make([]*git.GitCommit, 0)
-	err = json.Unmarshal([]byte(pipelineMaterial.CommitHistory), &commits)
+	err := json.Unmarshal([]byte(pipelineMaterial.CommitHistory), &commits)
 	if err != nil {
 		return nil, err
 	}
 	response.Commits = commits
 	return response, nil
-
 }
+
+
+func (impl RepoManagerImpl) FetchGitCommitsForPrType(pipelineMaterial *sql.CiPipelineMaterial) (*git.MaterialChangeResp, error) {
+	response := &git.MaterialChangeResp{}
+
+	pipelineMaterialId := pipelineMaterial.Id
+
+	webhookMappings, err := impl.webhookEventRepository.GetCiPipelineMaterialPrWebhookMapping(pipelineMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook mapping for pipelineId ", "id", pipelineMaterialId, "errMsg", err)
+		return nil, err
+	}
+
+	if len(webhookMappings) == 0 {
+		impl.logger.Infow("no webhook mapping for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
+		return nil, err
+	}
+
+	var prWebhookEventIds []int
+	for _, webhookMapping := range webhookMappings {
+		prWebhookEventIds = append(prWebhookEventIds, webhookMapping.PrWebhookDataId)
+	}
+
+	prWebhookEvents, err := impl.webhookEventRepository.GetOpenPrEventDataByIds(prWebhookEventIds, 15)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook for ids ", "ids", prWebhookEventIds, "errMsg", err)
+		return nil, err
+	}
+
+	if len(prWebhookEvents) == 0 {
+		impl.logger.Infow("no webhooks for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
+		return nil, err
+	}
+
+	commits := make([]*git.GitCommit, 0)
+	for _, webhookPRDataEvent := range prWebhookEvents {
+		gitCommit := &git.GitCommit{
+			PrData: &git.PrData{
+				PrTitle : webhookPRDataEvent.PrTitle,
+				PrUrl: webhookPRDataEvent.PrUrl,
+				SourceBranchName: webhookPRDataEvent.SourceBranchName,
+				TargetBranchName: webhookPRDataEvent.TargetBranchName,
+				SourceBranchHash: webhookPRDataEvent.SourceBranchHash,
+				TargetBranchHash: webhookPRDataEvent.TargetBranchHash,
+				AuthorName: webhookPRDataEvent.AuthorName,
+				LastCommitMessage: webhookPRDataEvent.LastCommitMessage,
+				PrCreatedOn: webhookPRDataEvent.PrCreatedOn,
+				PrUpdatedOn: webhookPRDataEvent.PrUpdatedOn,
+			},
+		}
+		commits = append(commits, gitCommit)
+	}
+	response.Commits = commits
+	return response, nil
+}
+
 
 func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.PipelineMaterialId)

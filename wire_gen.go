@@ -31,20 +31,20 @@ func InitializeApp() (*App, error) {
 	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	webhookEventRepositoryImpl := sql.NewWebhookEventRepositoryImpl(db)
-	webhookEventRepositoryManagerImpl := git.NewWebhookEventRepoManagerImpl(sugaredLogger, webhookEventRepositoryImpl)
-	webhookHandlerGithubImpl := git.NewWebhookHandlerGithubImpl(sugaredLogger, webhookEventRepositoryManagerImpl)
-	webhookHandlerBitbucketImpl := git.NewWebhookHandlerBitbucketImpl(sugaredLogger)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internal.NewRepositoryLocker(sugaredLogger)
 	conn, err := internal.NewNatsConnection()
 	if err != nil {
 		return nil, err
 	}
+	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, materialRepositoryImpl, conn)
+	webhookHandlerGithubImpl := git.NewWebhookHandlerGithubImpl(sugaredLogger, webhookEventServiceImpl)
+	webhookHandlerBitbucketImpl := git.NewWebhookHandlerBitbucketImpl(sugaredLogger)
 	gitWatcherImpl, err := git.NewGitWatcherImpl(repositoryManagerImpl, materialRepositoryImpl, sugaredLogger, ciPipelineMaterialRepositoryImpl, repositoryLocker, conn, webhookHandlerGithubImpl, webhookHandlerBitbucketImpl)
 	if err != nil {
 		return nil, err
 	}
-	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl)
+	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl)
 	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger)
 	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
 	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, conn)
