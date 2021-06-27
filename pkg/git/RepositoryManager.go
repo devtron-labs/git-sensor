@@ -34,15 +34,17 @@ import (
 )
 
 type RepositoryManager interface {
-	fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
+	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
 	headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error)
 	Add(location, url string, userName, password string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
 	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
+	GetCommitMetadataForRepository(repository *git.Repository, commitHash string) (*GitCommit, error)
 	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
+	GetLatestCommitForBranch(repository *git.Repository, branchName string) (*GitCommit, error)
 }
 
 type RepositoryManagerImpl struct {
@@ -94,7 +96,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
@@ -205,6 +207,31 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	}
 	return gitCommit, nil
 }
+
+
+func (impl RepositoryManagerImpl) GetCommitMetadataForRepository(repository *git.Repository, commitHash string) (*GitCommit, error) {
+	commit, err := repository.CommitObject(plumbing.NewHash(commitHash))
+	if err != nil {
+		impl.logger.Errorw("error in fetching commit", "hash", commitHash, "err", err)
+		return nil, err
+	}
+	gitCommit := &GitCommit{
+		Author:  commit.Author.String(),
+		Commit:  commit.Hash.String(),
+		Date:    commit.Author.When,
+		Message: commit.Message,
+	}
+	fs, err := commit.Stats()
+	if err != nil {
+		impl.logger.Errorw("error in getting fs",  "err", err)
+		return nil, err
+	}
+	for _, f := range fs {
+		gitCommit.Changes = append(gitCommit.Changes, f.Name)
+	}
+	return gitCommit, nil
+}
+
 
 //from -> old commit
 //to -> new commit
@@ -495,4 +522,45 @@ func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
 		}
 	}
 	return
+}
+
+
+func (impl RepositoryManagerImpl) GetLatestCommitForBranch(repository *git.Repository, branchName string) (*GitCommit, error) {
+	it, err := repository.References()
+	if err != nil {
+		return nil, err
+	}
+
+	remoteBranchRef := "refs/remotes/origin/" + branchName
+
+	for {
+		ref, err := it.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		// loop continue if branch not match
+		if remoteBranchRef != ref.Name().String() {
+			continue
+		}
+
+		// get commit object
+		commit, err := repository.CommitObject(ref.Hash())
+		if err != nil {
+			return nil, err
+		}
+		gitCommit := &GitCommit{
+			Author:  commit.Author.String(),
+			Commit:  commit.Hash.String(),
+			Date:    commit.Author.When,
+			Message: commit.Message,
+		}
+		return gitCommit, nil
+
+	}
+	return nil, nil
 }

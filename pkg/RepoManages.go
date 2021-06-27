@@ -40,6 +40,8 @@ type RepoManager interface {
 	GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error)
 	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
+
+	GetPrEventDataById(id int) (*git.PrData, error)
 }
 
 type RepoManagerImpl struct {
@@ -446,6 +448,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForPrType(pipelineMaterial *sql.CiPip
 	for _, webhookPRDataEvent := range prWebhookEvents {
 		gitCommit := &git.GitCommit{
 			PrData: &git.PrData{
+				Id : webhookPRDataEvent.Id,
 				PrTitle : webhookPRDataEvent.PrTitle,
 				PrUrl: webhookPRDataEvent.PrUrl,
 				SourceBranchName: webhookPRDataEvent.SourceBranchName,
@@ -567,4 +570,30 @@ func (impl RepoManagerImpl) RefreshGitMaterial(req *git.RefreshGitMaterialReques
 		res.LastFetchTime = material.LastFetchTime
 	}
 	return res, err
+}
+
+
+func (impl RepoManagerImpl) GetPrEventDataById(id int) (*git.PrData, error) {
+	webhookPRDataEvent, err := impl.webhookEventRepository.GetPrEventDataById(id)
+
+	if err != nil {
+		impl.logger.Errorw("error in getting pr event for Id ", "Id", id, "err", err)
+		return nil, err
+	}
+
+	PrData := &git.PrData{
+		Id : webhookPRDataEvent.Id,
+		PrTitle : webhookPRDataEvent.PrTitle,
+		PrUrl: webhookPRDataEvent.PrUrl,
+		SourceBranchName: webhookPRDataEvent.SourceBranchName,
+		TargetBranchName: webhookPRDataEvent.TargetBranchName,
+		SourceBranchHash: webhookPRDataEvent.SourceBranchHash,
+		TargetBranchHash: webhookPRDataEvent.TargetBranchHash,
+		AuthorName: webhookPRDataEvent.AuthorName,
+		LastCommitMessage: webhookPRDataEvent.LastCommitMessage,
+		PrCreatedOn: webhookPRDataEvent.PrCreatedOn,
+		PrUpdatedOn: webhookPRDataEvent.PrUpdatedOn,
+	}
+
+	return PrData, nil
 }

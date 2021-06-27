@@ -41,16 +41,19 @@ type WebhookEventServiceImpl struct {
 	webhookEventRepository       sql.WebhookEventRepository
 	materialRepository           sql.MaterialRepository
 	nats                         stan.Conn
+	gitOperationService			 GitOperationService
 }
 
 func NewWebhookEventServiceImpl (
 	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, materialRepository sql.MaterialRepository, nats stan.Conn,
+	gitOperationService GitOperationService,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
 		logger:                       logger,
 		webhookEventRepository:       webhookEventRepository,
 		materialRepository: 		  materialRepository,
 		nats: nats,
+		gitOperationService: gitOperationService,
 	}
 }
 
@@ -136,6 +139,14 @@ func (impl WebhookEventServiceImpl) HandlePostSavePrWebhook(webhookPRDataEvent *
 				continue
 			}
 
+			// fetch commit info and update in DB
+			commit, err := impl.gitOperationService.FetchAndGetCommitInfo(ciPipelineMaterial.Id, webhookPRDataEvent.SourceBranchHash)
+			if err == nil{
+				webhookPRDataEvent.AuthorName = commit.Author
+				webhookPRDataEvent.LastCommitMessage = commit.Message
+				impl.UpdateWebhookPrEventData(webhookPRDataEvent)
+			}
+
 			// if open PR, then notify for auto CI
 			if webhookPRDataEvent.IsOpen {
 				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookPRDataEvent))
@@ -188,6 +199,7 @@ func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.
 		Active:        ciPipelineMaterial.Active,
 		GitCommit:     &GitCommit{
 			PrData: &PrData{
+				Id : webhookPRDataEvent.Id,
 				PrTitle : webhookPRDataEvent.PrTitle,
 				PrUrl: webhookPRDataEvent.PrUrl,
 				SourceBranchName: webhookPRDataEvent.SourceBranchName,

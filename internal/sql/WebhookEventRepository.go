@@ -61,6 +61,7 @@ type CiPipelineMaterialPrWebhookMapping struct {
 type WebhookEventRepository interface {
 	SaveJson(webhookEventJson *WebhookEventJson) error
 	GetPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*WebhookPRDataEvent, error)
+	GetPrEventDataById(id int) (*WebhookPRDataEvent, error)
 	SavePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
 	UpdatePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
 	CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId int, prWebhookDataId int) (bool, error)
@@ -85,6 +86,12 @@ func (impl WebhookEventRepositoryImpl) SaveJson(webhookEventJson *WebhookEventJs
 func (impl WebhookEventRepositoryImpl) GetPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*WebhookPRDataEvent, error) {
 	var webhookPRDataEvent WebhookPRDataEvent
 	err := impl.dbConnection.Model(&webhookPRDataEvent).Where("git_host_name =? ", gitHostName).Where("pr_id =? ", prId).Select()
+	return &webhookPRDataEvent, err
+}
+
+func (impl WebhookEventRepositoryImpl) GetPrEventDataById(id int) (*WebhookPRDataEvent, error) {
+	var webhookPRDataEvent WebhookPRDataEvent
+	err := impl.dbConnection.Model(&webhookPRDataEvent).Where("id =? ", id).Select()
 	return &webhookPRDataEvent, err
 }
 

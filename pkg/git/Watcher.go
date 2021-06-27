@@ -213,7 +213,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-	updated, repo, err := impl.repositoryManager.fetch(userName, password, material.Url, location)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		return err

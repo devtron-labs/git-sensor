@@ -65,6 +65,7 @@ type GitCommit struct {
 }
 
 type PrData struct {
+	Id					int 	`json:"id"`
 	PrTitle        		string  `json:"prTitle"`
 	PrUrl        		string	`json:"prUrl"`
 	SourceBranchName    string	`json:"sourceBranchName"`
@@ -82,6 +83,15 @@ type CommitMetadataRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	GitHash            string `json:"gitHash"`
 	GitTag             string `json:"gitTag"`
+}
+
+type LatestCommitMetadataRequest struct {
+	PipelineMaterialId int    `json:"pipelineMaterialId"`
+	BranchName         string `json:"branchName"`
+}
+
+type PrDataRequest struct {
+	Id int `json:"id"`
 }
 
 type RefreshGitMaterialRequest struct {

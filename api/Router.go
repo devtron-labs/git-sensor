@@ -63,6 +63,7 @@ func (r MuxRouter) Init() {
 	r.Router.Path("/git-changes").HandlerFunc(r.restHandler.FetchChanges).Methods("POST")
 	r.Router.Path("/git-head").HandlerFunc(r.restHandler.GetHeadForPipelineMaterials).Methods("POST")
 	r.Router.Path("/commit-metadata").HandlerFunc(r.restHandler.GetCommitMetadata).Methods("POST")
+	r.Router.Path("/latest-commit-metadata").HandlerFunc(r.restHandler.GetLatestCommitMetadata).Methods("POST")
 	r.Router.Path("/tag-commit-metadata").HandlerFunc(r.restHandler.GetCommitInfoForTag).Methods("POST")
 	r.Router.Path("/git-repo/refresh").HandlerFunc(r.restHandler.RefreshGitMaterial).Methods("POST")
 
@@ -70,4 +71,6 @@ func (r MuxRouter) Init() {
 	r.Router.Path("/admin/reload/{materialId}").HandlerFunc(r.restHandler.ReloadMaterial).Methods("POST")
 
 	r.Router.Path("/release/changes").HandlerFunc(r.restHandler.GetChangesInRelease).Methods("POST")
+
+	r.Router.Path("/pr-data").HandlerFunc(r.restHandler.GetPrData).Methods("POST")
 }

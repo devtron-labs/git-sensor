@@ -40,15 +40,18 @@ type RestHandler interface {
 	GetChangesInRelease(w http.ResponseWriter, r *http.Request)
 	GetCommitInfoForTag(w http.ResponseWriter, r *http.Request)
 	RefreshGitMaterial(w http.ResponseWriter, r *http.Request)
+	GetLatestCommitMetadata(w http.ResponseWriter, r *http.Request)
+	GetPrData(w http.ResponseWriter, r *http.Request)
 }
 
-func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *RestHandlerImpl {
-	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger}
+func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, gitOperationService git.GitOperationService) *RestHandlerImpl {
+	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger, gitOperationService: gitOperationService}
 }
 
 type RestHandlerImpl struct {
 	repositoryManager pkg.RepoManager
 	logger            *zap.SugaredLogger
+	gitOperationService git.GitOperationService
 }
 
 type Response struct {
@@ -298,5 +301,44 @@ func (handler RestHandlerImpl) RefreshGitMaterial(w http.ResponseWriter, r *http
 		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {
 		handler.writeJsonResp(w, err, resp, http.StatusOK)
+	}
+}
+
+func (handler RestHandlerImpl) GetLatestCommitMetadata(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	request := &git.LatestCommitMetadataRequest{}
+	err := decoder.Decode(request)
+	if err != nil {
+		handler.logger.Error(err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("latest commit detail request", "req", request)
+	commits, err := handler.gitOperationService.GetLatestCommitForBranch(request.PipelineMaterialId, request.BranchName)
+
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+	} else {
+		handler.writeJsonResp(w, err, commits, http.StatusOK)
+	}
+}
+
+
+func (handler RestHandlerImpl) GetPrData(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	request := &git.PrDataRequest{}
+	err := decoder.Decode(request)
+	if err != nil {
+		handler.logger.Error(err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("pr data request", "req", request)
+	prData, err := handler.repositoryManager.GetPrEventDataById(request.Id)
+
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+	} else {
+		handler.writeJsonResp(w, err, prData, http.StatusOK)
 	}
 }
