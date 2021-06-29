@@ -39,9 +39,9 @@ func InitializeApp() (*App, error) {
 	}
 	gitOperationServiceImpl := git.NewGitOperationServiceImpl(sugaredLogger, materialRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, repositoryManagerImpl)
 	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, materialRepositoryImpl, conn, gitOperationServiceImpl)
-	webhookHandlerGithubImpl := git.NewWebhookHandlerGithubImpl(sugaredLogger, webhookEventServiceImpl)
-	webhookHandlerBitbucketImpl := git.NewWebhookHandlerBitbucketImpl(sugaredLogger)
-	gitWatcherImpl, err := git.NewGitWatcherImpl(repositoryManagerImpl, materialRepositoryImpl, sugaredLogger, ciPipelineMaterialRepositoryImpl, repositoryLocker, conn, webhookHandlerGithubImpl, webhookHandlerBitbucketImpl)
+	webhookEventParserImpl := git.NewWebhookEventParserImpl(sugaredLogger)
+	webhookHandlerImpl := git.NewWebhookHandlerImpl(sugaredLogger, webhookEventServiceImpl, webhookEventParserImpl)
+	gitWatcherImpl, err := git.NewGitWatcherImpl(repositoryManagerImpl, materialRepositoryImpl, sugaredLogger, ciPipelineMaterialRepositoryImpl, repositoryLocker, conn, webhookHandlerImpl)
 	if err != nil {
 		return nil, err
 	}

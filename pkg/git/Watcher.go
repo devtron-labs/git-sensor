@@ -40,8 +40,7 @@ type GitWatcherImpl struct {
 	nats                         stan.Conn
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
-	webhookHandlerGithubImpl 	 WebhookHandlerIFace
-	webhookHandlerBitbucketImpl  WebhookHandlerIFace
+	webhookHandler 	 			 WebhookHandler
 }
 
 type GitWatcher interface {
@@ -58,7 +57,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	nats stan.Conn, webhookHandlerGithubImpl WebhookHandlerIFace, webhookHandlerBitbucketImpl WebhookHandlerIFace) (*GitWatcherImpl, error) {
+	nats stan.Conn, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -81,8 +80,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		locker:                       locker,
 		nats:                         nats,
 		pollConfig:                   cfg,
-		webhookHandlerGithubImpl:     webhookHandlerGithubImpl,
-		webhookHandlerBitbucketImpl:  webhookHandlerBitbucketImpl,
+		webhookHandler:     		  webhookHandler,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -315,13 +313,7 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 			impl.logger.Infow("err in reading msg", "err", err)
 			return
 		}
-		if webhookEvent.GitHostType == GitHostType(GIT_HOST_NAME_GITHUB){
-			impl.webhookHandlerGithubImpl.HandleWebhookEvent(webhookEvent.RequestPayloadJson)
-		}else if webhookEvent.GitHostType == GitHostType(GIT_HOST_NAME_BITBUCKET_CLOUD){
-			impl.webhookHandlerBitbucketImpl.HandleWebhookEvent(webhookEvent.RequestPayloadJson)
-		}else{
-			impl.logger.Warnw("unsupported githost type to handle webhook", "gitHostType", webhookEvent.GitHostType)
-		}
+		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
 	}, stan.SetManualAckMode(), stan.AckWait(aw))
 	return err
 }
