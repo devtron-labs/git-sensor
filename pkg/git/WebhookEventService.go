@@ -25,15 +25,15 @@ import (
 	"go.uber.org/zap"
 	_ "gopkg.in/robfig/cron.v3"
 	"regexp"
-	"strings"
 )
 
 type WebhookEventService interface {
-	SaveWebhookEventJson(webhookEventJson *sql.WebhookEventJson) error
-	GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*sql.WebhookPRDataEvent, error)
-	SaveWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error
-	UpdateWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error
-	HandlePostSavePrWebhook(webhookPRDataEvent *sql.WebhookPRDataEvent) error
+	GetAllGitHostWebhookEventByGitHostId(gitHostId int)	([]*sql.GitHostWebhookEvent, error)
+	SaveWebhookEventData(webhookEventData *sql.WebhookEventData) error
+	GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error)
+	SaveWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
+	UpdateWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
+	MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData) error
 }
 
 type WebhookEventServiceImpl struct {
@@ -42,11 +42,12 @@ type WebhookEventServiceImpl struct {
 	materialRepository           sql.MaterialRepository
 	nats                         stan.Conn
 	gitOperationService			 GitOperationService
+	webhookEventBeanConverter    WebhookEventBeanConverter
 }
 
 func NewWebhookEventServiceImpl (
 	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, materialRepository sql.MaterialRepository, nats stan.Conn,
-	gitOperationService GitOperationService,
+	gitOperationService GitOperationService, webhookEventBeanConverter WebhookEventBeanConverter,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
 		logger:                       logger,
@@ -54,57 +55,76 @@ func NewWebhookEventServiceImpl (
 		materialRepository: 		  materialRepository,
 		nats: nats,
 		gitOperationService: gitOperationService,
+		webhookEventBeanConverter: webhookEventBeanConverter,
 	}
 }
 
 
-func (impl WebhookEventServiceImpl) SaveWebhookEventJson(webhookEventJson *sql.WebhookEventJson) error {
-	err := impl.webhookEventRepository.SaveJson(webhookEventJson)
+func (impl WebhookEventServiceImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*sql.GitHostWebhookEvent, error) {
+	return impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+}
+
+func (impl WebhookEventServiceImpl) SaveWebhookEventData(webhookEventData *sql.WebhookEventData) error {
+	err := impl.webhookEventRepository.SaveWebhookEventData(webhookEventData)
 	if err != nil {
-		impl.logger.Errorw("error in saving webhook event json in db","err", err)
+		impl.logger.Errorw("error in saving webhook event data in db","err", err)
 		return err
 	}
 	return nil
 }
 
-func (impl WebhookEventServiceImpl) GetWebhookPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*sql.WebhookPRDataEvent, error) {
-	impl.logger.Debugw("fetching pr event data for ","gitHostName", gitHostName, "prId", prId)
-	webhookEventData ,err := impl.webhookEventRepository.GetPrEventDataByGitHostNameAndPrId(gitHostName, prId)
+func (impl WebhookEventServiceImpl) GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error) {
+	impl.logger.Debugw("fetching webhook event parsed data for ","eventId", eventId, "uniqueId", uniqueId)
+
+	if len(uniqueId) == 0{
+		return nil, nil
+	}
+
+	webhookEventParsedData ,err := impl.webhookEventRepository.GetWebhookParsedEventDataByEventIdAndUniqueId(eventId, uniqueId)
 	if err != nil {
-		impl.logger.Errorw("getting error while fetching pr event data ","err", err)
+		impl.logger.Errorw("getting error while fetching webhook event parsed data ","err", err)
 		return nil, err
 	}
-	return webhookEventData, nil
+
+	return webhookEventParsedData, nil
 }
 
-func (impl WebhookEventServiceImpl) SaveWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error {
-	impl.logger.Debug("saving pr event data")
-	err := impl.webhookEventRepository.SavePrEventData(webhookPRDataEvent)
+func (impl WebhookEventServiceImpl) SaveWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error {
+	impl.logger.Debug("saving webhook parsed event data")
+	err := impl.webhookEventRepository.SaveWebhookParsedEventData(webhookEventParsedData)
 	if err != nil {
-		impl.logger.Errorw("error while saving pr event data ","err", err)
+		impl.logger.Errorw("error while saving webhook parsed event data ","err", err)
 		return err
 	}
 	return nil
 }
 
-func (impl WebhookEventServiceImpl) UpdateWebhookPrEventData(webhookPRDataEvent *sql.WebhookPRDataEvent) error {
-	impl.logger.Debugw("updating pr event data for id : ", webhookPRDataEvent.Id)
-	err := impl.webhookEventRepository.UpdatePrEventData(webhookPRDataEvent)
+func (impl WebhookEventServiceImpl) UpdateWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error {
+	impl.logger.Debugw("updating webhook parsed event data for id : ", webhookEventParsedData.Id)
+	err := impl.webhookEventRepository.UpdateWebhookParsedEventData(webhookEventParsedData)
 	if err != nil {
-		impl.logger.Errorw("error while updating pr event data ","err", err)
+		impl.logger.Errorw("error while updating webhook parsed event data ","err", err)
 		return err
 	}
 	return nil
 }
 
-func (impl WebhookEventServiceImpl) HandlePostSavePrWebhook(webhookPRDataEvent *sql.WebhookPRDataEvent) error {
 
-	impl.logger.Debug("Checking for auto CI in case of PR event")
+func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData) error {
+
+	repositoryUrl := webhookEventParsedData.Data[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
+
+	if len(repositoryUrl) == 0{
+		impl.logger.Warn("repository url is blank. so skipping matching condition")
+		return nil
+	}
+
+	impl.logger.Debug("Checking for auto CI in case of webhook event")
 
 	// get materials by Urls
 	var repoUrls []string
-	repoUrls = append(repoUrls, webhookPRDataEvent.RepositoryUrl)
-	repoUrls = append(repoUrls, fmt.Sprintf("%s%s", webhookPRDataEvent.RepositoryUrl, ".git"))
+	repoUrls = append(repoUrls, repositoryUrl)
+	repoUrls = append(repoUrls, fmt.Sprintf("%s%s", repositoryUrl, ".git"))
 	materials, err := impl.materialRepository.FindAllActiveByUrls(repoUrls)
 
 	if err != nil {
@@ -113,7 +133,7 @@ func (impl WebhookEventServiceImpl) HandlePostSavePrWebhook(webhookPRDataEvent *
 	}
 
 	if len(materials) == 0 {
-		impl.logger.Infow("no materials found skipping.")
+		impl.logger.Info("no materials found skipping.")
 		return nil
 	}
 
@@ -127,36 +147,24 @@ func (impl WebhookEventServiceImpl) HandlePostSavePrWebhook(webhookPRDataEvent *
 		for _, ciPipelineMaterial := range ciPipelineMaterials {
 
 			// ignore if type does not match
-			if ciPipelineMaterial.Type != sql.SOURCE_TYPE_PULL_REQUEST {
+			if ciPipelineMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
 				continue
 			}
 
 			//MatchFilter
-			match := impl.MatchFilter(webhookPRDataEvent, ciPipelineMaterial.Value)
+			match := impl.MatchFilter(event, webhookEventParsedData, ciPipelineMaterial.Value)
 
-			// if does not match, then skip
-			if !match {
-				continue
-			}
 
-			// fetch commit info and update in DB
-			commit, err := impl.gitOperationService.FetchAndGetCommitInfo(ciPipelineMaterial.Id, webhookPRDataEvent.SourceBranchHash)
-			if err == nil{
-				webhookPRDataEvent.AuthorName = commit.Author
-				webhookPRDataEvent.LastCommitMessage = commit.Message
-				impl.UpdateWebhookPrEventData(webhookPRDataEvent)
-			}
-
-			// if open PR, then notify for auto CI
-			if webhookPRDataEvent.IsOpen {
-				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookPRDataEvent))
-			}
-
-			// insert mapping into DB
-			err = impl.InsertMaterialWebhookMappingIntoDb(ciPipelineMaterial.Id, webhookPRDataEvent.Id)
+			// insert/update mapping into DB
+			err = impl.HandleMaterialWebhookMappingIntoDb(ciPipelineMaterial.Id, webhookEventParsedData.Id, match)
 			if err != nil {
-				impl.logger.Error("err in saving mapping", "err", err)
+				impl.logger.Errorw("err in saving mapping", "err", err)
 				return err
+			}
+
+			// if condition is match, then notify for CI
+			if match {
+				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData))
 			}
 		}
 	}
@@ -165,31 +173,63 @@ func (impl WebhookEventServiceImpl) HandlePostSavePrWebhook(webhookPRDataEvent *
 }
 
 
-func (impl WebhookEventServiceImpl) MatchFilter(webhookPRDataEvent *sql.WebhookPRDataEvent, ciPipelineMaterialJsonValue string) bool {
-	pullRequestSourceTypeValue := sql.PullRequestSourceTypeValue{}
-	err := json.Unmarshal([]byte(ciPipelineMaterialJsonValue), &pullRequestSourceTypeValue)
+func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData, ciPipelineMaterialJsonValue string) bool {
+	webhookSourceTypeValue := WebhookSourceTypeValue{}
+	err := json.Unmarshal([]byte(ciPipelineMaterialJsonValue), &webhookSourceTypeValue)
 
 	if err != nil {
 		impl.logger.Errorw("error in json parsing", "err", err)
 		return false
 	}
 
-	sourceBranchRegex := pullRequestSourceTypeValue.SourceBranchRegex
-	targetBranchRegex := pullRequestSourceTypeValue.TargetBranchRegex
+	// match event Id
+	if webhookEventParsedData.EventId != webhookSourceTypeValue.EventId {
+		return false
+	}
+
+	// match condition
+
+	// if no condition found then assume it matched
+	condition := webhookSourceTypeValue.Condition
+	if len(condition) == 0 {
+		return true
+	}
 
 	match := true
-	if len(strings.TrimSpace(sourceBranchRegex)) != 0 {
-		match, err = regexp.MatchString(sourceBranchRegex, webhookPRDataEvent.SourceBranchName)
-	}
-	if !match && len(strings.TrimSpace(targetBranchRegex)) != 0 {
-		match, err = regexp.MatchString(targetBranchRegex, webhookPRDataEvent.TargetBranchName)
+
+	// loop in all selectors and match condition
+	for _, selector := range event.Selectors {
+
+		// if selector is not active, then don't consider it
+		if !selector.IsActive {
+			continue
+		}
+
+		selectorId := selector.Id
+		conditionRegexValue := condition[selectorId]
+		if len(conditionRegexValue) == 0 {
+			continue
+		}
+
+		actualValue := webhookEventParsedData.Data[selector.Name]
+
+		match, err = regexp.MatchString(conditionRegexValue, actualValue)
+		if err != nil{
+			impl.logger.Errorw("err in matching regex condition", "err", err)
+			return false
+		}
+
+		if !match {
+			break
+		}
+
 	}
 
 	return match
 }
 
 
-func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookPRDataEvent *sql.WebhookPRDataEvent) *CiPipelineMaterialBean {
+func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData) *CiPipelineMaterialBean {
 
 	notifyObject := &CiPipelineMaterialBean{
 		Id:            ciPipelineMaterial.Id,
@@ -198,24 +238,10 @@ func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.
 		Type:          ciPipelineMaterial.Type,
 		Active:        ciPipelineMaterial.Active,
 		GitCommit:     &GitCommit{
-			PrData: &PrData{
-				Id : webhookPRDataEvent.Id,
-				PrTitle : webhookPRDataEvent.PrTitle,
-				PrUrl: webhookPRDataEvent.PrUrl,
-				SourceBranchName: webhookPRDataEvent.SourceBranchName,
-				TargetBranchName: webhookPRDataEvent.TargetBranchName,
-				SourceBranchHash: webhookPRDataEvent.SourceBranchHash,
-				TargetBranchHash: webhookPRDataEvent.TargetBranchHash,
-				AuthorName: webhookPRDataEvent.AuthorName,
-				LastCommitMessage: webhookPRDataEvent.LastCommitMessage,
-				PrCreatedOn: webhookPRDataEvent.PrCreatedOn,
-				PrUpdatedOn: webhookPRDataEvent.PrUpdatedOn,
-			},
+			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventParsedData),
 		},
 	}
-
 	return notifyObject
-
 }
 
 
@@ -238,25 +264,30 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 }
 
 
-func (impl WebhookEventServiceImpl) InsertMaterialWebhookMappingIntoDb(ciPipelineMaterialId int, webhookPREventDataId int) error {
-	exists, err := impl.webhookEventRepository.CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId, webhookPREventDataId)
+func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelineMaterialId int, webhookParsedDataId int, conditionMatched bool) error {
+	mapping, err := impl.webhookEventRepository.GetCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialId, webhookParsedDataId)
 	if err != nil {
-		impl.logger.Error("err in getting mapping", "err", err)
+		impl.logger.Errorw("err in getting ci-pipeline vs webhook data mapping", "err", err)
 		return err
 	}
-	if exists {
-		return nil
-	}
 
-	ciPipelineMaterialPrWebhookMapping := &sql.CiPipelineMaterialPrWebhookMapping{
+	ciPipelineMaterialWebhookDataMapping := &sql.CiPipelineMaterialWebhookDataMapping{
 		CiPipelineMaterialId: ciPipelineMaterialId,
-		PrWebhookDataId: webhookPREventDataId,
+		WebhookDataId: webhookParsedDataId,
+		ConditionMatched: conditionMatched,
 	}
 
-	err = impl.webhookEventRepository.SaveCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialPrWebhookMapping)
+	if mapping == nil {
+		// insert into DB
+		err = impl.webhookEventRepository.SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
+	}else{
+		// update DB
+		ciPipelineMaterialWebhookDataMapping.Id = mapping.Id
+		err = impl.webhookEventRepository.UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
+	}
 
 	if err != nil {
-		impl.logger.Error("err in saving mapping", "err", err)
+		impl.logger.Errorw("err in saving ci-pipeline vs webhook data mapping", "err", err)
 		return err
 	}
 

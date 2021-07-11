@@ -22,10 +22,6 @@ import (
 	"time"
 )
 
-const (
-	GIT_HOST_NAME_GITHUB string = "Github"
-	GIT_HOST_NAME_BITBUCKET_CLOUD string = "Bitbucket Cloud"
-)
 
 type FetchScmChangesRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
@@ -33,6 +29,7 @@ type FetchScmChangesRequest struct {
 	To                 string `json:"to"`
 	Count              int    `json:"count"`
 }
+
 type HeadRequest struct {
 	MaterialIds []int `json:"materialIds"`
 }
@@ -54,28 +51,20 @@ type MaterialChangeResp struct {
 	IsBranchError  bool         `json:"isBranchError"`
 	BranchErrorMsg string       `json:"branchErrorMsg"`
 }
+
 type GitCommit struct {
 	Commit    string
 	Author    string
 	Date      time.Time
 	Message   string
-	Changes   []string          `json:",omitempty"`
-	FileStats *object.FileStats `json:",omitempty"`
-	PrData	  *PrData			`json:"prData"`
+	Changes   []string          	`json:",omitempty"`
+	FileStats *object.FileStats 	`json:",omitempty"`
+	WebhookData	  *WebhookData		`json:"webhookData"`
 }
 
-type PrData struct {
-	Id					int 	`json:"id"`
-	PrTitle        		string  `json:"prTitle"`
-	PrUrl        		string	`json:"prUrl"`
-	SourceBranchName    string	`json:"sourceBranchName"`
-	SourceBranchHash    string	`json:"sourceBranchHash"`
-	TargetBranchName    string	`json:"targetBranchName"`
-	TargetBranchHash    string	`json:"targetBranchHash"`
-	AuthorName		    string	`json:"authorName"`
-	LastCommitMessage	string	`json:"lastCommitMessage"`
-	PrCreatedOn   		time.Time `json:"prCreatedOn"`
-	PrUpdatedOn   		time.Time `json:"prUpdatedOn"`
+type WebhookData struct {
+	Id					int 				`json:"id"`
+	Data        		map[string]string	`json:"data"`
 }
 
 
@@ -83,15 +72,16 @@ type CommitMetadataRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	GitHash            string `json:"gitHash"`
 	GitTag             string `json:"gitTag"`
-}
-
-type LatestCommitMetadataRequest struct {
-	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	BranchName         string `json:"branchName"`
 }
 
-type PrDataRequest struct {
+type WebhookDataRequest struct {
 	Id int `json:"id"`
+}
+
+type WebhookEventConfigRequest struct {
+	GitHostId int `json:"gitHostId"`
+	EventId   int `json:"eventId"`
 }
 
 type RefreshGitMaterialRequest struct {
@@ -104,16 +94,45 @@ type RefreshGitMaterialResponse struct {
 	LastFetchTime time.Time `json:"lastFetchTime"`
 }
 
-type GitHostType string
-
-type WebhookEventType string
 
 type WebhookEvent struct {
 	RequestPayloadJson string `json:"requestPayloadJson"`
-	GitHostType GitHostType `json:"gitHostType"`
-	WebhookEventType WebhookEventType `json:"webhookEventType"`
+	GitHostId int `json:"gitHostId"`
+	EventType string `json:"eventType"`
 }
 
 type WebhookEventResponse struct {
 	success bool
+}
+
+
+type WebhookEventConfig struct {
+	Id          int      `json:"id"`
+	GitHostId   int      `json:"gitHostId"`
+	Name        string   `json:"name"`
+	EventTypesCsv string `json:"eventTypesCsv"`
+	ActionType  string 	 `json:"actionType"`
+	IsActive	bool	 `json:"isActive"`
+	CreatedOn   time.Time `json:"createdOn"`
+	UpdatedOn   time.Time `json:"updatedOn"`
+
+	Selectors   []*WebhookEventSelectors  `json:"selectors"`
+}
+
+type WebhookEventSelectors struct {
+	Id          int      `json:"id"`
+	EventId     int 	 `json:"eventId"`
+	Name        string   `json:"name"`
+	Selector    string   `json:"selector"`
+	ToShow		bool	 `json:"toShow"`
+	PossibleValues string `json:"possibleValues"`
+	IsActive	bool	 `json:"isActive"`
+	CreatedOn   time.Time `json:"createdOn"`
+	UpdatedOn   time.Time `json:"updatedOn"`
+}
+
+// key in condition is selectorId
+type WebhookSourceTypeValue struct {
+	EventId   int				`json:"eventId,omitempty"`
+	Condition map[int]string	`json:"condition,omitempty"`
 }

@@ -40,8 +40,9 @@ type RestHandler interface {
 	GetChangesInRelease(w http.ResponseWriter, r *http.Request)
 	GetCommitInfoForTag(w http.ResponseWriter, r *http.Request)
 	RefreshGitMaterial(w http.ResponseWriter, r *http.Request)
-	GetLatestCommitMetadata(w http.ResponseWriter, r *http.Request)
-	GetPrData(w http.ResponseWriter, r *http.Request)
+	GetWebhookData(w http.ResponseWriter, r *http.Request)
+	GetAllWebhookEventConfigForHost(w http.ResponseWriter, r *http.Request)
+	GetWebhookEventConfig(w http.ResponseWriter, r *http.Request)
 }
 
 func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, gitOperationService git.GitOperationService) *RestHandlerImpl {
@@ -239,7 +240,9 @@ func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.
 	var commits *git.GitCommit
 	if len(material.GitTag) > 0 {
 		commits, err = handler.repositoryManager.GetCommitInfoForTag(material)
-	} else {
+	} else if len(material.BranchName) > 0 {
+		commits, err = handler.gitOperationService.GetLatestCommitForBranch(material.PipelineMaterialId, material.BranchName)
+	}else{
 		commits, err = handler.repositoryManager.GetCommitMetadata(material.PipelineMaterialId, material.GitHash)
 	}
 	if err != nil {
@@ -304,41 +307,65 @@ func (handler RestHandlerImpl) RefreshGitMaterial(w http.ResponseWriter, r *http
 	}
 }
 
-func (handler RestHandlerImpl) GetLatestCommitMetadata(w http.ResponseWriter, r *http.Request) {
+
+func (handler RestHandlerImpl) GetWebhookData(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	request := &git.LatestCommitMetadataRequest{}
+	request := &git.WebhookDataRequest{}
 	err := decoder.Decode(request)
 	if err != nil {
 		handler.logger.Error(err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	handler.logger.Infow("latest commit detail request", "req", request)
-	commits, err := handler.gitOperationService.GetLatestCommitForBranch(request.PipelineMaterialId, request.BranchName)
+	handler.logger.Infow("webhook data request ", "req", request)
+	webhookData, err := handler.repositoryManager.GetWebhookDataById(request.Id)
 
 	if err != nil {
-		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {
-		handler.writeJsonResp(w, err, commits, http.StatusOK)
+		handler.writeJsonResp(w, err, webhookData, http.StatusOK)
 	}
 }
 
 
-func (handler RestHandlerImpl) GetPrData(w http.ResponseWriter, r *http.Request) {
+func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	request := &git.PrDataRequest{}
+	request := &git.WebhookEventConfigRequest{}
 	err := decoder.Decode(request)
 	if err != nil {
 		handler.logger.Error(err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	handler.logger.Infow("pr data request", "req", request)
-	prData, err := handler.repositoryManager.GetPrEventDataById(request.Id)
+	handler.logger.Infow("webhook event config request ", "req", request)
 
+	webhookEventConfigArr, err := handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
 	if err != nil {
-		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {
-		handler.writeJsonResp(w, err, prData, http.StatusOK)
+		handler.writeJsonResp(w, err, webhookEventConfigArr, http.StatusOK)
 	}
 }
+
+
+func (handler RestHandlerImpl) GetWebhookEventConfig(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	request := &git.WebhookEventConfigRequest{}
+	err := decoder.Decode(request)
+	if err != nil {
+		handler.logger.Error(err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("webhook event config request ", "req", request)
+
+	webhookEventConfig, err := handler.repositoryManager.GetWebhookEventConfig(request.EventId)
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+	} else {
+		handler.writeJsonResp(w, err, webhookEventConfig, http.StatusOK)
+	}
+
+}
+
+

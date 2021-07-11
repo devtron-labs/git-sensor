@@ -41,7 +41,9 @@ type RepoManager interface {
 	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
-	GetPrEventDataById(id int) (*git.PrData, error)
+	GetWebhookDataById(id int) (*git.WebhookData, error)
+	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
+	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 }
 
 type RepoManagerImpl struct {
@@ -53,6 +55,7 @@ type RepoManagerImpl struct {
 	locker                       *internal.RepositoryLocker
 	gitWatcher                   git.GitWatcher
 	webhookEventRepository		 sql.WebhookEventRepository
+	webhookEventBeanConverter    git.WebhookEventBeanConverter
 }
 
 func NewRepoManagerImpl(
@@ -62,7 +65,7 @@ func NewRepoManagerImpl(
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
+	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository, webhookEventBeanConverter git.WebhookEventBeanConverter,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                       logger,
@@ -73,6 +76,7 @@ func NewRepoManagerImpl(
 		locker:                       locker,
 		gitWatcher:                   gitWatcher,
 		webhookEventRepository: 	  webhookEventRepository,
+		webhookEventBeanConverter: 	  webhookEventBeanConverter,
 	}
 }
 
@@ -377,17 +381,17 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 		return nil, err
 	}
 
-	if  pipelineMaterial.Type != sql.SOURCE_TYPE_PULL_REQUEST {
-		return impl.FetchGitCommitsForOtherThanPrType(pipelineMaterial, gitMaterial)
+	if  pipelineMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
+		return impl.FetchGitCommitsForOtherThanWebhookType(pipelineMaterial, gitMaterial)
 	}else{
-		return impl.FetchGitCommitsForPrType(pipelineMaterial)
+		return impl.FetchGitCommitsForWebhookType(pipelineMaterial)
 	}
 
 	return nil, nil
 }
 
 
-func (impl RepoManagerImpl) FetchGitCommitsForOtherThanPrType(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchGitCommitsForOtherThanWebhookType(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 	response.LastFetchTime = gitMaterial.LastFetchTime
 	if pipelineMaterial.Errored {
@@ -412,12 +416,12 @@ func (impl RepoManagerImpl) FetchGitCommitsForOtherThanPrType(pipelineMaterial *
 }
 
 
-func (impl RepoManagerImpl) FetchGitCommitsForPrType(pipelineMaterial *sql.CiPipelineMaterial) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchGitCommitsForWebhookType(pipelineMaterial *sql.CiPipelineMaterial) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 
 	pipelineMaterialId := pipelineMaterial.Id
 
-	webhookMappings, err := impl.webhookEventRepository.GetCiPipelineMaterialPrWebhookMapping(pipelineMaterialId)
+	webhookMappings, err := impl.webhookEventRepository.GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook mapping for pipelineId ", "id", pipelineMaterialId, "errMsg", err)
 		return nil, err
@@ -425,41 +429,31 @@ func (impl RepoManagerImpl) FetchGitCommitsForPrType(pipelineMaterial *sql.CiPip
 
 	if len(webhookMappings) == 0 {
 		impl.logger.Infow("no webhook mapping for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
-		return nil, err
+		return nil, nil
 	}
 
-	var prWebhookEventIds []int
+	var webhookDataIds []int
 	for _, webhookMapping := range webhookMappings {
-		prWebhookEventIds = append(prWebhookEventIds, webhookMapping.PrWebhookDataId)
+		if webhookMapping.ConditionMatched {
+			webhookDataIds = append(webhookDataIds, webhookMapping.WebhookDataId)
+		}
 	}
 
-	prWebhookEvents, err := impl.webhookEventRepository.GetOpenPrEventDataByIds(prWebhookEventIds, 15)
+	webhookEventDataArr, err := impl.webhookEventRepository.GetWebhookEventParsedDataByIds(webhookDataIds, 15)
 	if err != nil {
-		impl.logger.Errorw("error in getting webhook for ids ", "ids", prWebhookEventIds, "errMsg", err)
+		impl.logger.Errorw("error in getting webhook data for ids ", "ids", webhookDataIds, "errMsg", err)
 		return nil, err
 	}
 
-	if len(prWebhookEvents) == 0 {
-		impl.logger.Infow("no webhooks for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
-		return nil, err
+	if len(webhookEventDataArr) == 0 {
+		impl.logger.Infow("no webhooks data found for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
+		return nil, nil
 	}
 
-	commits := make([]*git.GitCommit, 0)
-	for _, webhookPRDataEvent := range prWebhookEvents {
+	var commits []*git.GitCommit
+	for _, webhookEventData := range webhookEventDataArr {
 		gitCommit := &git.GitCommit{
-			PrData: &git.PrData{
-				Id : webhookPRDataEvent.Id,
-				PrTitle : webhookPRDataEvent.PrTitle,
-				PrUrl: webhookPRDataEvent.PrUrl,
-				SourceBranchName: webhookPRDataEvent.SourceBranchName,
-				TargetBranchName: webhookPRDataEvent.TargetBranchName,
-				SourceBranchHash: webhookPRDataEvent.SourceBranchHash,
-				TargetBranchHash: webhookPRDataEvent.TargetBranchHash,
-				AuthorName: webhookPRDataEvent.AuthorName,
-				LastCommitMessage: webhookPRDataEvent.LastCommitMessage,
-				PrCreatedOn: webhookPRDataEvent.PrCreatedOn,
-				PrUpdatedOn: webhookPRDataEvent.PrUpdatedOn,
-			},
+			WebhookData:  impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventData),
 		}
 		commits = append(commits, gitCommit)
 	}
@@ -573,27 +567,45 @@ func (impl RepoManagerImpl) RefreshGitMaterial(req *git.RefreshGitMaterialReques
 }
 
 
-func (impl RepoManagerImpl) GetPrEventDataById(id int) (*git.PrData, error) {
-	webhookPRDataEvent, err := impl.webhookEventRepository.GetPrEventDataById(id)
+func (impl RepoManagerImpl) GetWebhookDataById(id int) (*git.WebhookData, error) {
+	webhookDataFromDb, err := impl.webhookEventRepository.GetWebhookEventParsedDataById(id)
 
 	if err != nil {
-		impl.logger.Errorw("error in getting pr event for Id ", "Id", id, "err", err)
+		impl.logger.Errorw("error in getting webhook data for Id ", "Id", id, "err", err)
 		return nil, err
 	}
 
-	PrData := &git.PrData{
-		Id : webhookPRDataEvent.Id,
-		PrTitle : webhookPRDataEvent.PrTitle,
-		PrUrl: webhookPRDataEvent.PrUrl,
-		SourceBranchName: webhookPRDataEvent.SourceBranchName,
-		TargetBranchName: webhookPRDataEvent.TargetBranchName,
-		SourceBranchHash: webhookPRDataEvent.SourceBranchHash,
-		TargetBranchHash: webhookPRDataEvent.TargetBranchHash,
-		AuthorName: webhookPRDataEvent.AuthorName,
-		LastCommitMessage: webhookPRDataEvent.LastCommitMessage,
-		PrCreatedOn: webhookPRDataEvent.PrCreatedOn,
-		PrUpdatedOn: webhookPRDataEvent.PrUpdatedOn,
+	webhookData := impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookDataFromDb)
+	return webhookData, nil
+}
+
+func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error) {
+	webhookEventsFromDb, err := impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
+		return nil, err
 	}
 
-	return PrData, nil
+	// build events
+	var webhookEvents []*git.WebhookEventConfig
+	for _, webhookEventFromDb := range webhookEventsFromDb {
+		webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)
+		webhookEvents = append(webhookEvents, webhookEvent)
+	}
+
+	return webhookEvents, nil
+}
+
+func (impl RepoManagerImpl) GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error) {
+	webhookEventFromDb, err := impl.webhookEventRepository.GetWebhookEventConfigByEventId(eventId)
+
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook event ", "eventId", eventId, "err", err)
+		return nil, err
+	}
+
+	webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)
+
+	return webhookEvent, nil
 }

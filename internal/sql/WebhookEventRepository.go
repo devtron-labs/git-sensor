@@ -17,57 +17,80 @@
 package sql
 
 import (
+	"github.com/devtron-labs/git-sensor/util"
 	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/orm"
 	"time"
 )
 
-type WebhookEventJson struct {
-	tableName   struct{} `sql:"webhook_event_json"`
+type GitHostWebhookEvent struct {
+	tableName   struct{} `sql:"git_host_webhook_event" pg:",discard_unknown_columns"`
 	Id          int      `sql:"id,pk"`
-	GitHostName string   `sql:"git_host_name,notnull"`
+	GitHostId   int      `sql:"git_host_id,notnull"`
+	Name        string   `sql:"name,notnull"`
+	EventTypesCsv string `sql:"event_types_csv,notnull"`
+	ActionType  string 	 `sql:"action_type,notnull"`
+	IsActive	bool	 `sql:"is_active,notnull"`
+	CreatedOn   time.Time `sql:"created_on,notnull"`
+	UpdatedOn   time.Time `sql:"updated_on"`
+
+	Selectors   []*GitHostWebhookEventSelectors  `pg:"fk:event_id"`
+}
+
+type GitHostWebhookEventSelectors struct {
+	tableName   struct{} `sql:"git_host_webhook_event_selectors" pg:",discard_unknown_columns"`
+	Id          int      `sql:"id,pk"`
+	EventId     int 	 `sql:"event_id,notnull"`
+	Name        string   `sql:"name,notnull"`
+	Selector    string   `sql:"selector,notnull"`
+	ToShow		bool	 `sql:"to_show,notnull"`
+	PossibleValues string `sql:"possible_values"`
+	IsActive	bool	 `sql:"is_active,notnull"`
+	CreatedOn   time.Time `sql:"created_on,notnull"`
+	UpdatedOn   time.Time `sql:"updated_on"`
+}
+
+
+type WebhookEventData struct {
+	tableName   struct{} `sql:"webhook_event_data"`
+	Id          int      `sql:"id,pk"`
+	EventId     int 	 `sql:"event_id,notnull"`
 	PayloadJson string   `sql:"payload_json,notnull"`
 	CreatedOn   time.Time `sql:"created_on,notnull"`
 }
 
-type WebhookPRDataEvent struct {
-	tableName   			struct{} `sql:"webhook_event_pr_data"`
-	Id          			int      `sql:"id,pk"`
-	GitHostName 			string   `sql:"git_host_name,notnull"`
-	PrId        			string   `sql:"pr_id,notnull"`
-	PrTitle        			string   `sql:"pr_title,notnull"`
-	PrUrl        			string   `sql:"pr_url,notnull"`
-	SourceBranchName        string   `sql:"source_branch_name,notnull"`
-	SourceBranchHash        string   `sql:"source_branch_hash,notnull"`
-	TargetBranchName        string   `sql:"target_branch_name,notnull"`
-	TargetBranchHash        string   `sql:"target_branch_hash,notnull"`
-	RepositoryUrl	        string   `sql:"repository_url,notnull"`
-	AuthorName		        string   `sql:"author_name,notnull"`
-	IsOpen					bool	 `sql:"is_open,notnull"`
-	ActualState				string	 `sql:"actual_state,notnull"`
-	LastCommitMessage		string	 `sql:"last_commit_message"`
-	PrCreatedOn   			time.Time `sql:"pr_created_on,notnull"`
-	PrUpdatedOn   			time.Time `sql:"pr_updated_on"`
-	CreatedOn   			time.Time `sql:"created_on,notnull"`
-	UpdatedOn   			time.Time `sql:"updated_on"`
+
+type WebhookEventParsedData struct {
+	tableName   			struct{} 			`sql:"webhook_event_parsed_data"`
+	Id          			int      			`sql:"id,pk"`
+	EventId     			int 	 			`sql:"event_id,notnull"`
+	UniqueId				string 	 			`sql:"unique_id"`
+	Data					map[string]string   `sql:"data,notnull"`
+	CreatedOn   			time.Time 			`sql:"created_on,notnull"`
+	UpdatedOn   			time.Time 			`sql:"updated_on"`
 }
 
-type CiPipelineMaterialPrWebhookMapping struct {
-	tableName   			struct{} `sql:"ci_pipeline_material_pr_webhook_mapping"`
+type CiPipelineMaterialWebhookDataMapping struct {
+	tableName   			struct{} `sql:"ci_pipeline_material_webhook_data_mapping"`
 	Id						int 	 `sql:"id,pk"`
 	CiPipelineMaterialId    int 	 `sql:"ci_pipeline_material_id"`
-	PrWebhookDataId         int 	 `sql:"pr_webhook_data_id"`
+	WebhookDataId	        int 	 `sql:"webhook_data_id"`
+	ConditionMatched	    bool 	 `sql:"condition_matched,notnull"`
 }
 
 type WebhookEventRepository interface {
-	SaveJson(webhookEventJson *WebhookEventJson) error
-	GetPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*WebhookPRDataEvent, error)
-	GetPrEventDataById(id int) (*WebhookPRDataEvent, error)
-	SavePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
-	UpdatePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error
-	CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId int, prWebhookDataId int) (bool, error)
-	SaveCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialPrWebhookMapping *CiPipelineMaterialPrWebhookMapping) error
-	GetCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialId int)  ([]*CiPipelineMaterialPrWebhookMapping, error)
-	GetOpenPrEventDataByIds(ids []int, limit int) ([]*WebhookPRDataEvent, error)
+	GetAllGitHostWebhookEventByGitHostId(gitHostId int)	([]*GitHostWebhookEvent, error)
+	SaveWebhookEventData(webhookEventData *WebhookEventData) error
+	GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*WebhookEventParsedData, error)
+	SaveWebhookParsedEventData(webhookEventParsedData *WebhookEventParsedData) error
+	UpdateWebhookParsedEventData(webhookEventParsedData *WebhookEventParsedData) error
+	GetCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
+	SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
+	UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
+	GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int)  ([]*CiPipelineMaterialWebhookDataMapping, error)
+	GetWebhookEventParsedDataByIds(ids []int, limit int) ([]*WebhookEventParsedData, error)
+	GetWebhookEventParsedDataById(id int) (*WebhookEventParsedData, error)
+	GetWebhookEventConfigByEventId(eventId int) (*GitHostWebhookEvent, error)
 }
 
 type WebhookEventRepositoryImpl struct {
@@ -78,64 +101,126 @@ func NewWebhookEventRepositoryImpl(dbConnection *pg.DB) *WebhookEventRepositoryI
 	return &WebhookEventRepositoryImpl{dbConnection: dbConnection}
 }
 
-func (impl WebhookEventRepositoryImpl) SaveJson(webhookEventJson *WebhookEventJson) error {
-	_, err := impl.dbConnection.Model(webhookEventJson).Insert()
+
+func (impl WebhookEventRepositoryImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*GitHostWebhookEvent, error) {
+	var gitHostWebhookEvents []*GitHostWebhookEvent
+	err := impl.dbConnection.Model(&gitHostWebhookEvents).
+		Column("git_host_webhook_event.*").
+		Relation("Selectors", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
+		Where("git_host_id =? ", gitHostId).
+		Where("is_active = TRUE ").
+		Select()
+	return gitHostWebhookEvents, err
+}
+
+
+func (impl WebhookEventRepositoryImpl) SaveWebhookEventData(webhookEventData *WebhookEventData) error {
+	_, err := impl.dbConnection.Model(webhookEventData).Insert()
 	return err
 }
 
-func (impl WebhookEventRepositoryImpl) GetPrEventDataByGitHostNameAndPrId(gitHostName string, prId string) (*WebhookPRDataEvent, error) {
-	var webhookPRDataEvent WebhookPRDataEvent
-	err := impl.dbConnection.Model(&webhookPRDataEvent).Where("git_host_name =? ", gitHostName).Where("pr_id =? ", prId).Select()
-	return &webhookPRDataEvent, err
+func (impl WebhookEventRepositoryImpl) GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*WebhookEventParsedData, error) {
+	var webhookEventParsedData WebhookEventParsedData
+	err := impl.dbConnection.Model(&webhookEventParsedData).Where("event_id =? ", eventId).Where("unique_id =? ", uniqueId).Select()
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &webhookEventParsedData, nil
 }
 
-func (impl WebhookEventRepositoryImpl) GetPrEventDataById(id int) (*WebhookPRDataEvent, error) {
-	var webhookPRDataEvent WebhookPRDataEvent
-	err := impl.dbConnection.Model(&webhookPRDataEvent).Where("id =? ", id).Select()
-	return &webhookPRDataEvent, err
-}
-
-func (impl WebhookEventRepositoryImpl) SavePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error {
-	_, err := impl.dbConnection.Model(webhookPRDataEvent).Insert()
+func (impl WebhookEventRepositoryImpl) SaveWebhookParsedEventData(webhookEventParsedData *WebhookEventParsedData) error {
+	_, err := impl.dbConnection.Model(webhookEventParsedData).Insert()
 	return err
 }
 
-func (impl WebhookEventRepositoryImpl) UpdatePrEventData(webhookPRDataEvent *WebhookPRDataEvent) error {
-	_, err := impl.dbConnection.Model(webhookPRDataEvent).WherePK().Update()
+func (impl WebhookEventRepositoryImpl) UpdateWebhookParsedEventData(webhookEventParsedData *WebhookEventParsedData) error {
+	_, err := impl.dbConnection.Model(webhookEventParsedData).WherePK().Update()
 	return err
 }
 
-func (impl WebhookEventRepositoryImpl) CiPipelineMaterialPrWebhookMappingExists(ciPipelineMaterialId int, prWebhookDataId int) (bool, error) {
-	mapping := &CiPipelineMaterialPrWebhookMapping{}
-	exists, err := impl.dbConnection.
-		Model(mapping).
-		Where("ci_pipeline_material_id = ?", ciPipelineMaterialId).
-		Where("pr_webhook_data_id = ?", prWebhookDataId).
-		Exists()
-	return exists, err
+func (impl WebhookEventRepositoryImpl) GetCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error) {
+	var mapping CiPipelineMaterialWebhookDataMapping
+	err := impl.dbConnection.Model(&mapping).
+		   Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
+		   Where("webhook_data_id =? ", webhookParsedDataId).
+		   Select()
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &mapping, nil
 }
 
-func (impl WebhookEventRepositoryImpl) SaveCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialPrWebhookMapping *CiPipelineMaterialPrWebhookMapping) error {
-	_, err := impl.dbConnection.Model(ciPipelineMaterialPrWebhookMapping).Insert()
+func (impl WebhookEventRepositoryImpl) SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error {
+	_, err := impl.dbConnection.Model(ciPipelineMaterialWebhookDataMapping).Insert()
 	return err
 }
 
-func (impl WebhookEventRepositoryImpl) GetCiPipelineMaterialPrWebhookMapping(ciPipelineMaterialId int)  ([]*CiPipelineMaterialPrWebhookMapping, error) {
-	var pipelineMaterials []*CiPipelineMaterialPrWebhookMapping
+func (impl WebhookEventRepositoryImpl) UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error {
+	_, err := impl.dbConnection.Model(ciPipelineMaterialWebhookDataMapping).WherePK().Update()
+	return err
+}
+
+func (impl WebhookEventRepositoryImpl) GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int)  ([]*CiPipelineMaterialWebhookDataMapping, error) {
+	var pipelineMaterials []*CiPipelineMaterialWebhookDataMapping
 	err := impl.dbConnection.Model(&pipelineMaterials).
 		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
-		Column("pr_webhook_data_id").
 		Select()
-	return pipelineMaterials, err
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return pipelineMaterials, nil
 }
 
-func (impl WebhookEventRepositoryImpl) GetOpenPrEventDataByIds(ids []int, limit int) ([]*WebhookPRDataEvent, error) {
-	var webhookPrEventData []*WebhookPRDataEvent
-	err := impl.dbConnection.Model(&webhookPrEventData).
+func (impl WebhookEventRepositoryImpl) GetWebhookEventParsedDataByIds(ids []int, limit int) ([]*WebhookEventParsedData, error) {
+	var webhookEventParsedData []*WebhookEventParsedData
+	err := impl.dbConnection.Model(&webhookEventParsedData).
 		Where("id in (?) ", pg.In(ids)).
-		Where("is_open =? ", true).
-		Order("pr_updated_on Desc").
+		Order("updated_on Desc").
 		Limit(limit).
 		Select()
-	return webhookPrEventData, err
+	return webhookEventParsedData, err
+}
+
+func (impl WebhookEventRepositoryImpl) GetWebhookEventParsedDataById(id int) (*WebhookEventParsedData, error) {
+	var webhookEventParsedData WebhookEventParsedData
+	err := impl.dbConnection.Model(&webhookEventParsedData).
+		Where("id = ? ", id).
+		Select()
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &webhookEventParsedData, nil
+}
+
+func (impl WebhookEventRepositoryImpl) GetWebhookEventConfigByEventId(eventId int) (*GitHostWebhookEvent, error) {
+	gitHostWebhookEvent := &GitHostWebhookEvent{}
+	err := impl.dbConnection.Model(gitHostWebhookEvent).
+		Column("git_host_webhook_event.*").
+		Relation("Selectors", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
+		Where("id =? ", eventId).
+		Where("is_active = TRUE ").
+		Select()
+
+	return gitHostWebhookEvent, err
 }

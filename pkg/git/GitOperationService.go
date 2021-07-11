@@ -26,7 +26,6 @@ import (
 )
 
 type GitOperationService interface {
-	FetchAndGetCommitInfo(pipelineMaterialId int, gitHash string) (*GitCommit, error)
 	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*GitCommit, error)
 }
 
@@ -49,19 +48,6 @@ func NewGitOperationServiceImpl (
 		locker: locker,
 		gitRepositoryManager: gitRepositoryManager,
 	}
-}
-
-
-func (impl GitOperationServiceImpl) FetchAndGetCommitInfo(pipelineMaterialId int, gitHash string) (*GitCommit, error) {
-	repo, err := impl.FetchRepository(pipelineMaterialId)
-
-	if err != nil {
-		impl.logger.Errorw("error in fetching the repository " ,"err", err)
-		return nil, err
-	}
-
-	commit, err := impl.gitRepositoryManager.GetCommitMetadataForRepository(repo, gitHash)
-	return commit, err
 }
 
 

@@ -37,15 +37,16 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	webhookEventBeanConverterImpl := git.NewWebhookEventBeanConverterImpl()
 	gitOperationServiceImpl := git.NewGitOperationServiceImpl(sugaredLogger, materialRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, repositoryManagerImpl)
-	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, materialRepositoryImpl, conn, gitOperationServiceImpl)
+	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, materialRepositoryImpl, conn, gitOperationServiceImpl, webhookEventBeanConverterImpl)
 	webhookEventParserImpl := git.NewWebhookEventParserImpl(sugaredLogger)
 	webhookHandlerImpl := git.NewWebhookHandlerImpl(sugaredLogger, webhookEventServiceImpl, webhookEventParserImpl)
 	gitWatcherImpl, err := git.NewGitWatcherImpl(repositoryManagerImpl, materialRepositoryImpl, sugaredLogger, ciPipelineMaterialRepositoryImpl, repositoryLocker, conn, webhookHandlerImpl)
 	if err != nil {
 		return nil, err
 	}
-	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl)
+	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl, webhookEventBeanConverterImpl)
 	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger, gitOperationServiceImpl)
 	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
 	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, conn)

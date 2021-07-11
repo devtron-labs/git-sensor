@@ -24,7 +24,7 @@ import (
 )
 
 type WebhookEventParser interface {
-	ParseEvent(webhookEvent *WebhookEvent) (*sql.WebhookPRDataEvent, error)
+	ParseEvent(eventId int, selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, error)
 }
 
 type WebhookEventParserImpl struct {
@@ -37,91 +37,42 @@ func NewWebhookEventParserImpl(logger *zap.SugaredLogger) *WebhookEventParserImp
 	}
 }
 
-func (impl WebhookEventParserImpl) ParseEvent(webhookEvent *WebhookEvent) (*sql.WebhookPRDataEvent, error){
 
-	eventPayloadJson := webhookEvent.RequestPayloadJson
+const (
+	WEBHOOK_SELECTOR_UNIQUE_ID_NAME string = "unique id"
+	WEBHOOK_SELECTOR_REPOSITORY_URL_NAME string = "repository url"
+	WEBHOOK_SELECTOR_HEADER_NAME string = "header"
+	WEBHOOK_SELECTOR_GIT_URL_NAME string = "git url"
+	WEBHOOK_SELECTOR_AUTHOR_NAME string = "author"
+	WEBHOOK_SELECTOR_DATE_NAME string = "date"
+	WEBHOOK_SELECTOR_TARGET_COMMIT_HASH_NAME string = "target commit hash"
+	WEBHOOK_SELECTOR_SOURCE_COMMIT_HASH_NAME string = "source commit hash"
+	WEBHOOK_SELECTOR_TARGET_BRANCH_NAME_NAME string = "target branch name"
+	WEBHOOK_SELECTOR_SOURCE_BRANCH_NAME_NAME string = "source branch name"
+)
 
-	if webhookEvent.GitHostType == GitHostType(GIT_HOST_NAME_GITHUB){
-		return impl.ParseGithubEvent(eventPayloadJson)
-	}else if webhookEvent.GitHostType == GitHostType(GIT_HOST_NAME_BITBUCKET_CLOUD) {
-		return impl.ParseBitbucketCloudEvent(eventPayloadJson)
+
+func (impl WebhookEventParserImpl) ParseEvent(eventId int, selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, error){
+
+	webhookEventParsedData := &sql.WebhookEventParsedData{
+		EventId: eventId,
 	}
 
-	return nil, nil
-}
+	additionalData := make(map[string]string)
 
-
-func (impl WebhookEventParserImpl) ParseGithubEvent(eventPayloadJson string) (*sql.WebhookPRDataEvent, error){
-
-	prId := gjson.Get(eventPayloadJson, "pull_request.id").String()
-	prUrl := gjson.Get(eventPayloadJson, "pull_request.html_url").String()
-	prTitle := gjson.Get(eventPayloadJson, "pull_request.title").String()
-	sourceBranchName := gjson.Get(eventPayloadJson, "pull_request.head.ref").String()
-	sourceBranchHash := gjson.Get(eventPayloadJson, "pull_request.head.sha").String()
-	targetBranchName := gjson.Get(eventPayloadJson, "pull_request.base.ref").String()
-	targetBranchHash := gjson.Get(eventPayloadJson, "pull_request.base.sha").String()
-	prCreatedOn := gjson.Get(eventPayloadJson, "pull_request.created_at").Time()
-	prUpdatedOn := gjson.Get(eventPayloadJson, "pull_request.updated_at").Time()
-	isOpen := gjson.Get(eventPayloadJson, "pull_request.state").String() == "open"
-	currentState := gjson.Get(eventPayloadJson, "action").String()
-	repositoryUrl := gjson.Get(eventPayloadJson, "repository.html_url").String()
-	authorName := gjson.Get(eventPayloadJson, "sender.login").String()
-
-	webhookEventData := &sql.WebhookPRDataEvent{
-		GitHostName: GIT_HOST_NAME_GITHUB,
-		PrId: prId,
-		PrUrl: prUrl,
-		PrTitle: prTitle,
-		SourceBranchName: sourceBranchName,
-		SourceBranchHash: sourceBranchHash,
-		TargetBranchName: targetBranchName,
-		TargetBranchHash: targetBranchHash,
-		PrCreatedOn: prCreatedOn,
-		PrUpdatedOn: prUpdatedOn,
-		IsOpen: isOpen,
-		ActualState: currentState,
-		RepositoryUrl: repositoryUrl,
-		AuthorName: authorName,
+	// loop in for all selectors
+	for _, selector := range selectors {
+		name := selector.Name
+		selectorValueStr := gjson.Get(requestPayloadJson, selector.Selector).String()
+		switch name {
+		case WEBHOOK_SELECTOR_UNIQUE_ID_NAME:
+			webhookEventParsedData.UniqueId = selectorValueStr
+		default:
+			additionalData[name] = selectorValueStr
+		}
 	}
 
-	return webhookEventData, nil
-}
+	webhookEventParsedData.Data = additionalData
 
-
-func (impl WebhookEventParserImpl) ParseBitbucketCloudEvent(eventPayloadJson string) (*sql.WebhookPRDataEvent, error){
-
-	// parse payload
-	prId := gjson.Get(eventPayloadJson, "pullrequest.id").String()
-	prUrl := gjson.Get(eventPayloadJson, "pullrequest.links.html.href").String()
-	prTitle := gjson.Get(eventPayloadJson, "pullrequest.title").String()
-	sourceBranchName := gjson.Get(eventPayloadJson, "pullrequest.source.branch.name").String()
-	sourceBranchHash := gjson.Get(eventPayloadJson, "pullrequest.source.commit.hash").String()
-	targetBranchName := gjson.Get(eventPayloadJson, "pullrequest.destination.branch.name").String()
-	targetBranchHash := gjson.Get(eventPayloadJson, "pullrequest.destination.commit.hash").String()
-	prCreatedOn := gjson.Get(eventPayloadJson, "pullrequest.created_on").Time()
-	prUpdatedOn := gjson.Get(eventPayloadJson, "pullrequest.updated_on").Time()
-	isOpen := gjson.Get(eventPayloadJson, "pullrequest.state").String() == "OPEN"
-	currentState := gjson.Get(eventPayloadJson, "pullrequest.state").String()
-	repositoryUrl := gjson.Get(eventPayloadJson, "repository.links.html.href").String()
-	authorName := gjson.Get(eventPayloadJson, "actor.display_name").String()
-
-	webhookEventData := &sql.WebhookPRDataEvent{
-		GitHostName: GIT_HOST_NAME_BITBUCKET_CLOUD,
-		PrId: prId,
-		PrUrl: prUrl,
-		PrTitle: prTitle,
-		SourceBranchName: sourceBranchName,
-		SourceBranchHash: sourceBranchHash,
-		TargetBranchName: targetBranchName,
-		TargetBranchHash: targetBranchHash,
-		PrCreatedOn: prCreatedOn,
-		PrUpdatedOn: prUpdatedOn,
-		IsOpen: isOpen,
-		ActualState: currentState,
-		RepositoryUrl: repositoryUrl,
-		AuthorName: authorName,
-	}
-
-	return webhookEventData, nil
-
+	return webhookEventParsedData, nil
 }

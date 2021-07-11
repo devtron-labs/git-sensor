@@ -37,6 +37,7 @@ func InitializeApp() (*App, error) {
 		api.NewRestHandlerImpl,
 		git.NewWebhookHandlerImpl,
 		git.NewWebhookEventParserImpl,
+		git.NewWebhookEventBeanConverterImpl,
 		wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
 		pkg.NewRepoManagerImpl,
 		wire.Bind(new(pkg.RepoManager), new(*pkg.RepoManagerImpl)),
