@@ -21,10 +21,11 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
+	"time"
 )
 
 type WebhookEventParser interface {
-	ParseEvent(eventId int, selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, error)
+	ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string, error)
 }
 
 type WebhookEventParserImpl struct {
@@ -45,20 +46,19 @@ const (
 	WEBHOOK_SELECTOR_GIT_URL_NAME string = "git url"
 	WEBHOOK_SELECTOR_AUTHOR_NAME string = "author"
 	WEBHOOK_SELECTOR_DATE_NAME string = "date"
-	WEBHOOK_SELECTOR_TARGET_COMMIT_HASH_NAME string = "target commit hash"
-	WEBHOOK_SELECTOR_SOURCE_COMMIT_HASH_NAME string = "source commit hash"
+	WEBHOOK_SELECTOR_TARGET_CHECKOUT_NAME string = "target checkout"
+	WEBHOOK_SELECTOR_SOURCE_CHECKOUT_NAME string = "source checkout"
 	WEBHOOK_SELECTOR_TARGET_BRANCH_NAME_NAME string = "target branch name"
 	WEBHOOK_SELECTOR_SOURCE_BRANCH_NAME_NAME string = "source branch name"
 )
 
 
-func (impl WebhookEventParserImpl) ParseEvent(eventId int, selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, error){
+func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string, error){
 
-	webhookEventParsedData := &sql.WebhookEventParsedData{
-		EventId: eventId,
-	}
+	webhookEventParsedData := &sql.WebhookEventParsedData{}
 
-	additionalData := make(map[string]string)
+	showData := make(map[string]string)
+	wholeData := make(map[string]string)
 
 	// loop in for all selectors
 	for _, selector := range selectors {
@@ -67,12 +67,23 @@ func (impl WebhookEventParserImpl) ParseEvent(eventId int, selectors []*sql.GitH
 		switch name {
 		case WEBHOOK_SELECTOR_UNIQUE_ID_NAME:
 			webhookEventParsedData.UniqueId = selectorValueStr
+		case WEBHOOK_SELECTOR_DATE_NAME:
+			if len(selectorValueStr) == 0 || selectorValueStr == "null"{
+				selectorValueStr = time.Now().String()
+			}
+			if selector.ToShow {
+				showData[name] = selectorValueStr
+			}
+			wholeData[name] = selectorValueStr
 		default:
-			additionalData[name] = selectorValueStr
+			if selector.ToShow {
+				showData[name] = selectorValueStr
+			}
+			wholeData[name] = selectorValueStr
 		}
 	}
 
-	webhookEventParsedData.Data = additionalData
+	webhookEventParsedData.Data = showData
 
-	return webhookEventParsedData, nil
+	return webhookEventParsedData, wholeData, nil
 }

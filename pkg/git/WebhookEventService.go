@@ -33,7 +33,7 @@ type WebhookEventService interface {
 	GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error)
 	SaveWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
 	UpdateWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
-	MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData) error
+	MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData, fullDataMap map[string]string) error
 }
 
 type WebhookEventServiceImpl struct {
@@ -110,9 +110,9 @@ func (impl WebhookEventServiceImpl) UpdateWebhookParsedEventData(webhookEventPar
 }
 
 
-func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData) error {
+func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData, fullDataMap map[string]string) error {
 
-	repositoryUrl := webhookEventParsedData.Data[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
+	repositoryUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
 
 	if len(repositoryUrl) == 0{
 		impl.logger.Warn("repository url is blank. so skipping matching condition")
@@ -152,7 +152,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 			}
 
 			//MatchFilter
-			match := impl.MatchFilter(event, webhookEventParsedData, ciPipelineMaterial.Value)
+			match := impl.MatchFilter(event, fullDataMap, ciPipelineMaterial.Value)
 
 
 			// insert/update mapping into DB
@@ -173,7 +173,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 }
 
 
-func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, webhookEventParsedData *sql.WebhookEventParsedData, ciPipelineMaterialJsonValue string) bool {
+func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, fullDataMap map[string]string, ciPipelineMaterialJsonValue string) bool {
 	webhookSourceTypeValue := WebhookSourceTypeValue{}
 	err := json.Unmarshal([]byte(ciPipelineMaterialJsonValue), &webhookSourceTypeValue)
 
@@ -183,7 +183,7 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 	}
 
 	// match event Id
-	if webhookEventParsedData.EventId != webhookSourceTypeValue.EventId {
+	if event.Id != webhookSourceTypeValue.EventId {
 		return false
 	}
 
@@ -211,7 +211,7 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 			continue
 		}
 
-		actualValue := webhookEventParsedData.Data[selector.Name]
+		actualValue := fullDataMap[selector.Name]
 
 		match, err = regexp.MatchString(conditionRegexValue, actualValue)
 		if err != nil{

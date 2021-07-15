@@ -131,20 +131,6 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			return err
 		}
 
-		if pipelineMaterial.Type == sql.SOURCE_TYPE_TAG_REGEX {
-			commits := make([]*git.GitCommit, 0)
-			b, err := json.Marshal(commits)
-			if err != nil {
-				pipelineMaterial.Errored = true
-				pipelineMaterial.ErrorMsg = err.Error()
-			} else {
-				pipelineMaterial.CommitHistory = string(b)
-				pipelineMaterial.Errored = false
-				pipelineMaterial.ErrorMsg = ""
-			}
-			materialCommits = append(materialCommits, pipelineMaterial)
-			continue
-		}
 		material, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
 		if err != nil {
 			impl.logger.Errorw("error in fetching material", "err", err)

@@ -37,6 +37,7 @@ func NewWebhookEventBeanConverterImpl() *WebhookEventBeanConverterImpl {
 func (impl WebhookEventBeanConverterImpl) ConvertFromWebhookParsedDataSqlBean(sqlBean *sql.WebhookEventParsedData) *WebhookData {
 	return &WebhookData{
 		Id : sqlBean.Id,
+		EventActionType: sqlBean.EventActionType,
 		Data : sqlBean.Data,
 	}
 }

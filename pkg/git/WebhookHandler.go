@@ -82,11 +82,17 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 		}
 
 		// parse event data using selectors
-		webhookEventParsedData, err := impl.webhookEventParser.ParseEvent(eventId, event.Selectors, payloadJson)
+		webhookEventParsedData, fullDataMap, err := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
 		if err != nil{
 			impl.logger.Errorw("error in parsing webhook event data","err", err)
 			return err
 		}
+
+
+		// set event details in webhook data (eventId and merged/non-merged etc..)
+		webhookEventParsedData.EventId = eventId
+		webhookEventParsedData.EventActionType = event.ActionType
+
 
 		// fetch webhook parsed data from DB if unique id is not blank
 		webhookParsedEventGetData, err := impl.webhookEventService.GetWebhookParsedEventDataByEventIdAndUniqueId(eventId, webhookEventParsedData.UniqueId)
@@ -94,6 +100,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 			impl.logger.Errorw("error in getting parsed webhook event data","err", err)
 			return err
 		}
+
 
 		// save or update in DB
 		if webhookParsedEventGetData != nil {
@@ -107,7 +114,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 		}
 
 		// match ci trigger condition and notify
-		err = impl.webhookEventService.MatchCiTriggerConditionAndNotify(event, webhookEventParsedData)
+		err = impl.webhookEventService.MatchCiTriggerConditionAndNotify(event, webhookEventParsedData, fullDataMap)
 		if err != nil{
 			impl.logger.Errorw("error in matching ci trigger condition for webhook after db save","err", err)
 			return err

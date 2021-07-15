@@ -65,6 +65,7 @@ type WebhookEventParsedData struct {
 	Id          			int      			`sql:"id,pk"`
 	EventId     			int 	 			`sql:"event_id,notnull"`
 	UniqueId				string 	 			`sql:"unique_id"`
+	EventActionType			string				`sql:"event_action_type,notnull"`
 	Data					map[string]string   `sql:"data,notnull"`
 	CreatedOn   			time.Time 			`sql:"created_on,notnull"`
 	UpdatedOn   			time.Time 			`sql:"updated_on"`
