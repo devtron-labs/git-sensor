@@ -370,7 +370,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	if  pipelineMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
 		return impl.FetchGitCommitsForOtherThanWebhookType(pipelineMaterial, gitMaterial)
 	}else{
-		return impl.FetchGitCommitsForWebhookType(pipelineMaterial)
+		return impl.FetchGitCommitsForWebhookType(pipelineMaterial, gitMaterial)
 	}
 
 	return nil, nil
@@ -402,11 +402,11 @@ func (impl RepoManagerImpl) FetchGitCommitsForOtherThanWebhookType(pipelineMater
 }
 
 
-func (impl RepoManagerImpl) FetchGitCommitsForWebhookType(pipelineMaterial *sql.CiPipelineMaterial) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchGitCommitsForWebhookType(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
+	response.LastFetchTime = gitMaterial.LastFetchTime
 
 	pipelineMaterialId := pipelineMaterial.Id
-
 	webhookMappings, err := impl.webhookEventRepository.GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook mapping for pipelineId ", "id", pipelineMaterialId, "errMsg", err)

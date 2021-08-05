@@ -25,6 +25,7 @@ import (
 	"go.uber.org/zap"
 	_ "gopkg.in/robfig/cron.v3"
 	"regexp"
+	"time"
 )
 
 type WebhookEventService interface {
@@ -160,6 +161,13 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 			if err != nil {
 				impl.logger.Errorw("err in saving mapping", "err", err)
 				return err
+			}
+
+			// update material with last fetch time
+			material.LastFetchTime = time.Now()
+			err = impl.materialRepository.Update(material)
+			if err != nil{
+				impl.logger.Errorw("error in updating material with last fetch time", "material", material, "err", err)
 			}
 
 			// if condition is match, then notify for CI
