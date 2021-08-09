@@ -436,6 +436,13 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 		}
 	}
 
+	impl.logger.Debugw("webhookDataIds :", webhookDataIds)
+
+	if len(webhookDataIds) == 0{
+		impl.logger.Debugw("webhook data Ids are null skipping")
+		return response, nil
+	}
+
 	webhookEventDataArr, err := impl.webhookEventParsedDataRepository.GetWebhookEventParsedDataByIds(webhookDataIds, 15)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook data for ids ", "ids", webhookDataIds, "errMsg", err)
