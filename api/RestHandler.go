@@ -45,14 +45,13 @@ type RestHandler interface {
 	GetWebhookEventConfig(w http.ResponseWriter, r *http.Request)
 }
 
-func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, gitOperationService git.GitOperationService) *RestHandlerImpl {
-	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger, gitOperationService: gitOperationService}
+func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *RestHandlerImpl {
+	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger}
 }
 
 type RestHandlerImpl struct {
-	repositoryManager pkg.RepoManager
-	logger            *zap.SugaredLogger
-	gitOperationService git.GitOperationService
+	repositoryManager   pkg.RepoManager
+	logger              *zap.SugaredLogger
 }
 
 type Response struct {
@@ -241,8 +240,8 @@ func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.
 	if len(material.GitTag) > 0 {
 		commits, err = handler.repositoryManager.GetCommitInfoForTag(material)
 	} else if len(material.BranchName) > 0 {
-		commits, err = handler.gitOperationService.GetLatestCommitForBranch(material.PipelineMaterialId, material.BranchName)
-	}else{
+		commits, err = handler.repositoryManager.GetLatestCommitForBranch(material.PipelineMaterialId, material.BranchName)
+	} else {
 		commits, err = handler.repositoryManager.GetCommitMetadata(material.PipelineMaterialId, material.GitHash)
 	}
 	if err != nil {
@@ -307,17 +306,17 @@ func (handler RestHandlerImpl) RefreshGitMaterial(w http.ResponseWriter, r *http
 	}
 }
 
-
 func (handler RestHandlerImpl) GetWebhookData(w http.ResponseWriter, r *http.Request) {
+	handler.logger.Debug("GetWebhookData API call")
 	decoder := json.NewDecoder(r.Body)
 	request := &git.WebhookDataRequest{}
 	err := decoder.Decode(request)
 	if err != nil {
-		handler.logger.Error(err)
+		handler.logger.Errorw("error in decoding request of GetWebhookData ", "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	handler.logger.Infow("webhook data request ", "req", request)
+	handler.logger.Debugw("webhook data request ", "req", request)
 	webhookData, err := handler.repositoryManager.GetWebhookDataById(request.Id)
 
 	if err != nil {
@@ -327,13 +326,13 @@ func (handler RestHandlerImpl) GetWebhookData(w http.ResponseWriter, r *http.Req
 	}
 }
 
-
 func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWriter, r *http.Request) {
+	handler.logger.Debug("GetAllWebhookEventConfigForHost API call")
 	decoder := json.NewDecoder(r.Body)
 	request := &git.WebhookEventConfigRequest{}
 	err := decoder.Decode(request)
 	if err != nil {
-		handler.logger.Error(err)
+		handler.logger.Errorw("error in decoding request of GetAllWebhookEventConfigForHost ", "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
@@ -347,13 +346,13 @@ func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWr
 	}
 }
 
-
 func (handler RestHandlerImpl) GetWebhookEventConfig(w http.ResponseWriter, r *http.Request) {
+	handler.logger.Debug("GetWebhookEventConfig API call")
 	decoder := json.NewDecoder(r.Body)
 	request := &git.WebhookEventConfigRequest{}
 	err := decoder.Decode(request)
 	if err != nil {
-		handler.logger.Error(err)
+		handler.logger.Errorw("error in decoding request of GetWebhookEventConfig ", "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
@@ -367,5 +366,3 @@ func (handler RestHandlerImpl) GetWebhookEventConfig(w http.ResponseWriter, r *h
 	}
 
 }
-
-

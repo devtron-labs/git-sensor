@@ -71,9 +71,7 @@ func (r MuxRouter) Init() {
 
 	r.Router.Path("/release/changes").HandlerFunc(r.restHandler.GetChangesInRelease).Methods("POST")
 
-	r.Router.Path("/webhook/data").HandlerFunc(r.restHandler.GetWebhookData).Methods("POST")
-
-	r.Router.Path("/webhook/host/events").HandlerFunc(r.restHandler.GetAllWebhookEventConfigForHost).Methods("POST")
-
-	r.Router.Path("/webhook/host/event").HandlerFunc(r.restHandler.GetWebhookEventConfig).Methods("POST")
+	r.Router.Path("/webhook/data").HandlerFunc(r.restHandler.GetWebhookData).Methods("GET")
+	r.Router.Path("/webhook/host/events").HandlerFunc(r.restHandler.GetAllWebhookEventConfigForHost).Methods("GET")
+	r.Router.Path("/webhook/host/event").HandlerFunc(r.restHandler.GetWebhookEventConfig).Methods("GET")
 }

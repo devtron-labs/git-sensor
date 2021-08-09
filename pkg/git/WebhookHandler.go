@@ -29,41 +29,45 @@ type WebhookHandler interface {
 }
 
 type WebhookHandlerImpl struct {
-	logger *zap.SugaredLogger
+	logger              *zap.SugaredLogger
 	webhookEventService WebhookEventService
-	webhookEventParser WebhookEventParser
+	webhookEventParser  WebhookEventParser
 }
 
 func NewWebhookHandlerImpl(logger *zap.SugaredLogger, webhookEventService WebhookEventService, webhookEventParser WebhookEventParser) *WebhookHandlerImpl {
 	return &WebhookHandlerImpl{
-		logger: logger,
+		logger:              logger,
 		webhookEventService: webhookEventService,
-		webhookEventParser: webhookEventParser,
+		webhookEventParser:  webhookEventParser,
 	}
 }
 
-func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) error{
+func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) error {
+	impl.logger.Debug("Webhook event came")
 
 	gitHostId := webhookEvent.GitHostId
 	eventType := webhookEvent.EventType
 	payloadJson := webhookEvent.RequestPayloadJson
 
+	impl.logger.Debugw("gitHostId", gitHostId, "eventType", eventType)
+
 	// get all configured events from database for given git host Id
 	events, err := impl.webhookEventService.GetAllGitHostWebhookEventByGitHostId(gitHostId)
 	if err != nil {
-		impl.logger.Errorw("error in getting webhook events from db","err", err, "gitHostId", gitHostId)
+		impl.logger.Errorw("error in getting webhook events from db", "err", err, "gitHostId", gitHostId)
 		return err
 	}
 
-	if len(events) == 0{
-		impl.logger.Warnw("webhook events not found for given gitHostId ","gitHostId", gitHostId)
+	if len(events) == 0 {
+		impl.logger.Warnw("webhook events not found for given gitHostId ", "gitHostId", gitHostId)
 		return nil
 	}
 
 	// operate for all matching event (match for eventType)
+	impl.logger.Debug("Checking for event matching")
 	for _, event := range events {
 		eventTypes := strings.Split(event.EventTypesCsv, ",")
-		if !contains(eventTypes, eventType){
+		if !contains(eventTypes, eventType) {
 			continue
 		}
 
@@ -71,36 +75,33 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 
 		// store in audit json table
 		webhookEventData := &sql.WebhookEventData{
-			EventId: eventId,
+			EventId:     eventId,
 			PayloadJson: payloadJson,
-			CreatedOn: time.Now(),
+			CreatedOn:   time.Now(),
 		}
 		err := impl.webhookEventService.SaveWebhookEventData(webhookEventData)
-		if err != nil{
-			impl.logger.Errorw("error in saving webhook event data in db","err", err)
+		if err != nil {
+			impl.logger.Errorw("error in saving webhook event data in db", "err", err)
 			return err
 		}
 
 		// parse event data using selectors
 		webhookEventParsedData, fullDataMap, err := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
-		if err != nil{
-			impl.logger.Errorw("error in parsing webhook event data","err", err)
+		if err != nil {
+			impl.logger.Errorw("error in parsing webhook event data", "err", err)
 			return err
 		}
-
 
 		// set event details in webhook data (eventId and merged/non-merged etc..)
 		webhookEventParsedData.EventId = eventId
 		webhookEventParsedData.EventActionType = event.ActionType
 
-
 		// fetch webhook parsed data from DB if unique id is not blank
 		webhookParsedEventGetData, err := impl.webhookEventService.GetWebhookParsedEventDataByEventIdAndUniqueId(eventId, webhookEventParsedData.UniqueId)
-		if err != nil{
-			impl.logger.Errorw("error in getting parsed webhook event data","err", err)
+		if err != nil {
+			impl.logger.Errorw("error in getting parsed webhook event data", "err", err)
 			return err
 		}
-
 
 		// save or update in DB
 		if webhookParsedEventGetData != nil {
@@ -108,15 +109,15 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 			webhookEventParsedData.CreatedOn = webhookParsedEventGetData.CreatedOn
 			webhookEventParsedData.UpdatedOn = time.Now()
 			impl.webhookEventService.UpdateWebhookParsedEventData(webhookEventParsedData)
-		}else{
+		} else {
 			webhookEventParsedData.CreatedOn = time.Now()
 			impl.webhookEventService.SaveWebhookParsedEventData(webhookEventParsedData)
 		}
 
 		// match ci trigger condition and notify
 		err = impl.webhookEventService.MatchCiTriggerConditionAndNotify(event, webhookEventParsedData, fullDataMap)
-		if err != nil{
-			impl.logger.Errorw("error in matching ci trigger condition for webhook after db save","err", err)
+		if err != nil {
+			impl.logger.Errorw("error in matching ci trigger condition for webhook after db save", "err", err)
 			return err
 		}
 
@@ -124,7 +125,6 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 
 	return nil
 }
-
 
 func contains(s []string, str string) bool {
 	for _, v := range s {
