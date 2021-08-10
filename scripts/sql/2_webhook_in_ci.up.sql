@@ -180,7 +180,7 @@ ALTER TABLE ci_pipeline_material_webhook_data_mapping
 ---- git_host_id : 1 - Github, 2 - Bitbucket
 INSERT INTO git_host_webhook_event (git_host_id, name, event_types_csv, action_type, is_active, created_on)
 VALUES (1, 'Pull Request', 'pull_request', 'merged', 't', NOW()),
-       (2, 'Pull Request', 'pullrequest:created,pullrequest:updated,pullrequest:changes_request_created,pullrequest:approved', 'merged', 't', NOW());
+       (2, 'Pull Request', 'pullrequest:created,pullrequest:updated,pullrequest:changes_request_created,pullrequest:approved,pullrequest:rejected', 'merged', 't', NOW());
 
 
 
