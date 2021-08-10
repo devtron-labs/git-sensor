@@ -559,7 +559,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 
 	commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, branchName, "", "", 1)
 
-	if commits != nil {
+	if commits == nil {
 		return nil, err
 	}else{
 		return commits[0], err
