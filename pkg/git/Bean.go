@@ -22,7 +22,6 @@ import (
 	"time"
 )
 
-
 type FetchScmChangesRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	From               string `json:"from"`
@@ -53,21 +52,20 @@ type MaterialChangeResp struct {
 }
 
 type GitCommit struct {
-	Commit    string
-	Author    string
-	Date      time.Time
-	Message   string
-	Changes   []string          	`json:",omitempty"`
-	FileStats *object.FileStats 	`json:",omitempty"`
-	WebhookData	  *WebhookData		`json:"webhookData"`
+	Commit      string
+	Author      string
+	Date        time.Time
+	Message     string
+	Changes     []string          `json:",omitempty"`
+	FileStats   *object.FileStats `json:",omitempty"`
+	WebhookData *WebhookData      `json:"webhookData"`
 }
 
 type WebhookData struct {
-	Id					int 				`json:"id"`
-	EventActionType     string				`json:"eventActionType"`
-	Data        		map[string]string	`json:"data"`
+	Id              int               `json:"id"`
+	EventActionType string            `json:"eventActionType"`
+	Data            map[string]string `json:"data"`
 }
-
 
 type CommitMetadataRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
@@ -95,45 +93,44 @@ type RefreshGitMaterialResponse struct {
 	LastFetchTime time.Time `json:"lastFetchTime"`
 }
 
-
 type WebhookEvent struct {
 	RequestPayloadJson string `json:"requestPayloadJson"`
-	GitHostId int `json:"gitHostId"`
-	EventType string `json:"eventType"`
+	GitHostId          int    `json:"gitHostId"`
+	EventType          string `json:"eventType"`
 }
 
 type WebhookEventResponse struct {
 	success bool
 }
 
-
 type WebhookEventConfig struct {
-	Id          int      `json:"id"`
-	GitHostId   int      `json:"gitHostId"`
-	Name        string   `json:"name"`
-	EventTypesCsv string `json:"eventTypesCsv"`
-	ActionType  string 	 `json:"actionType"`
-	IsActive	bool	 `json:"isActive"`
-	CreatedOn   time.Time `json:"createdOn"`
-	UpdatedOn   time.Time `json:"updatedOn"`
+	Id            int       `json:"id"`
+	GitHostId     int       `json:"gitHostId"`
+	Name          string    `json:"name"`
+	EventTypesCsv string    `json:"eventTypesCsv"`
+	ActionType    string    `json:"actionType"`
+	IsActive      bool      `json:"isActive"`
+	CreatedOn     time.Time `json:"createdOn"`
+	UpdatedOn     time.Time `json:"updatedOn"`
 
-	Selectors   []*WebhookEventSelectors  `json:"selectors"`
+	Selectors []*WebhookEventSelectors `json:"selectors"`
 }
 
 type WebhookEventSelectors struct {
-	Id          int      `json:"id"`
-	EventId     int 	 `json:"eventId"`
-	Name        string   `json:"name"`
-	Selector    string   `json:"selector"`
-	ToShow		bool	 `json:"toShow"`
-	PossibleValues string `json:"possibleValues"`
-	IsActive	bool	 `json:"isActive"`
-	CreatedOn   time.Time `json:"createdOn"`
-	UpdatedOn   time.Time `json:"updatedOn"`
+	Id               int       `json:"id"`
+	EventId          int       `json:"eventId"`
+	Name             string    `json:"name"`
+	Selector         string    `json:"selector"`
+	ToShow           bool      `json:"toShow"`
+	ToShowInCiFilter bool      `json:"toShowInCiFilter"`
+	PossibleValues   string    `json:"possibleValues"`
+	IsActive         bool      `json:"isActive"`
+	CreatedOn        time.Time `json:"createdOn"`
+	UpdatedOn        time.Time `json:"updatedOn"`
 }
 
 // key in condition is selectorId
 type WebhookSourceTypeValue struct {
-	EventId   int				`json:"eventId,omitempty"`
-	Condition map[int]string	`json:"condition,omitempty"`
+	EventId   int            `json:"eventId,omitempty"`
+	Condition map[int]string `json:"condition,omitempty"`
 }

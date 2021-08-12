@@ -64,6 +64,7 @@ func (impl WebhookEventBeanConverterImpl) ConvertFromWebhookEventSqlBean(webhook
 			Name: selectorFromDb.Name,
 			Selector: selectorFromDb.Selector,
 			ToShow: selectorFromDb.ToShow,
+			ToShowInCiFilter: selectorFromDb.ToShowInCiFilter,
 			PossibleValues: selectorFromDb.PossibleValues,
 			IsActive: selectorFromDb.IsActive,
 			CreatedOn: selectorFromDb.CreatedOn,

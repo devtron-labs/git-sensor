@@ -51,6 +51,7 @@ CREATE TABLE public.git_host_webhook_event_selectors (
      name character varying(250) NOT NULL,
      selector character varying(250) NOT NULL,
      to_show bool NOT NULL,
+     to_show_in_ci_filter bool NOT NULL,
      possible_values character varying(1000),
      is_active bool NOT NULL,
      created_on timestamptz NOT NULL,
@@ -186,35 +187,35 @@ VALUES (1, 'Pull Request', 'pull_request', 'merged', 't', NOW()),
 
 ---- insert PR data for github into git_host_webhook_event_selectors
 ---- event_id : 1 - PR for github, 2 - PR for bitbucket
-INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, is_active, possible_values, created_on)
-VALUES (1, 'unique id', 'pull_request.id', 'f', 't', NULL, NOW()),
-       (1, 'repository url', 'repository.html_url', 'f', 't', NULL, NOW()),
-       (1, 'header', 'pull_request.title', 't', 't', NULL, NOW()),
-       (1, 'git url', 'pull_request.html_url', 't', 't', NULL, NOW()),
-       (1, 'author', 'sender.login', 't', 't', NULL, NOW()),
-       (1, 'date', 'pull_request.updated_at', 't', 't', NULL, NOW()),
-       (1, 'target checkout', 'pull_request.base.sha', 't', 't', NULL, NOW()),
-       (1, 'source checkout', 'pull_request.head.sha', 't', 't', NULL, NOW()),
-       (1, 'target branch name', 'pull_request.base.ref', 't', 't', NULL, NOW()),
-       (1, 'source branch name', 'pull_request.head.ref', 't', 't', NULL, NOW()),
-       (1, 'state', 'pull_request.state', 'f', 't', 'open', NOW());
+INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
+VALUES (1, 'unique id', 'pull_request.id', 'f', 'f', 't', NULL, NOW()),
+       (1, 'repository url', 'repository.html_url', 'f', 'f', 't', NULL, NOW()),
+       (1, 'title', 'pull_request.title', 't', 't', 't', NULL, NOW()),
+       (1, 'git url', 'pull_request.html_url', 't', 'f', 't', NULL, NOW()),
+       (1, 'author', 'sender.login', 't', 't', 't', NULL, NOW()),
+       (1, 'date', 'pull_request.updated_at', 't', 'f', 't', NULL, NOW()),
+       (1, 'target checkout', 'pull_request.base.sha', 't', 'f', 't', NULL, NOW()),
+       (1, 'source checkout', 'pull_request.head.sha', 't', 'f', 't', NULL, NOW()),
+       (1, 'target branch name', 'pull_request.base.ref', 't', 't', 't', NULL, NOW()),
+       (1, 'source branch name', 'pull_request.head.ref', 't', 't', 't', NULL, NOW()),
+       (1, 'state', 'pull_request.state', 'f', 't', 't', 'open', NOW());
 
 
 
 ---- insert PR data for bitbucket into git_host_webhook_event_selectors
 ---- event_id : 1 - PR for github, 2 - PR for bitbucket
-INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, is_active, possible_values, created_on)
-VALUES (2, 'unique id', 'pullrequest.id', 'f', 't', NULL, NOW()),
-       (2, 'repository url', 'repository.links.html.href', 'f', 't', NULL, NOW()),
-       (2, 'header', 'pullrequest.title', 't', 't', NULL, NOW()),
-       (2, 'git url', 'pullrequest.links.html.href', 't', 't', NULL, NOW()),
-       (2, 'author', 'actor.display_name', 't', 't', NULL, NOW()),
-       (2, 'date', 'pullrequest.updated_on', 't', 't', NULL, NOW()),
-       (2, 'target checkout', 'pullrequest.destination.commit.hash', 't', 't', NULL, NOW()),
-       (2, 'source checkout', 'pullrequest.source.commit.hash', 't', 't', NULL, NOW()),
-       (2, 'target branch name', 'pullrequest.destination.branch.name', 't', 't', NULL, NOW()),
-       (2, 'source branch name', 'pullrequest.source.branch.name', 't', 't', NULL, NOW()),
-       (2, 'state', 'pullrequest.state', 'f', 't', 'OPEN', NOW());
+INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
+VALUES (2, 'unique id', 'pullrequest.id', 'f', 'f', 't', NULL, NOW()),
+       (2, 'repository url', 'repository.links.html.href', 'f', 'f', 't', NULL, NOW()),
+       (2, 'title', 'pullrequest.title', 't', 't', 't', NULL, NOW()),
+       (2, 'git url', 'pullrequest.links.html.href', 't', 'f', 't', NULL, NOW()),
+       (2, 'author', 'actor.display_name', 't', 't', 't', NULL, NOW()),
+       (2, 'date', 'pullrequest.updated_on', 't', 'f', 't', NULL, NOW()),
+       (2, 'target checkout', 'pullrequest.destination.commit.hash', 't', 'f', 't', NULL, NOW()),
+       (2, 'source checkout', 'pullrequest.source.commit.hash', 't', 'f', 't', NULL, NOW()),
+       (2, 'target branch name', 'pullrequest.destination.branch.name', 't', 't', 't', NULL, NOW()),
+       (2, 'source branch name', 'pullrequest.source.branch.name', 't', 't', 't', NULL, NOW()),
+       (2, 'state', 'pullrequest.state', 'f', 't', 't', 'OPEN', NOW());
 
 
 
@@ -227,25 +228,25 @@ VALUES (1, 'Tag Creation', 'create', 'non-merged', 't', NOW()),
 
 ---- insert tag creation data for github into git_host_webhook_event_selectors
 ---- event_id : 3 - Tag creation for github, 4 - Tag creation for bitbucket
-INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, is_active, possible_values, created_on)
-VALUES (3, 'repository url', 'repository.html_url', 'f', 't', NULL, NOW()),
-       (3, 'author', 'sender.login', 't', 't', NULL, NOW()),
-       (3, 'date', 'repository.pushed_at', 't', 't', NULL, NOW()),
-       (3, 'tag creation identifier', 'ref_type', 'f', 't', NULL, NOW()),
-       (3, 'tag name', 'ref', 'f', 't', NULL, NOW()),
-       (3, 'target checkout', 'ref', 't', 't', NULL, NOW());
+INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
+VALUES (3, 'repository url', 'repository.html_url', 'f', 'f', 't', NULL, NOW()),
+       (3, 'author', 'sender.login', 't', 't', 't', NULL, NOW()),
+       (3, 'date', 'repository.pushed_at', 't', 'f', 't', NULL, NOW()),
+       (3, 'tag creation identifier', 'ref_type', 'f', 't', 't', NULL, NOW()),
+       (3, 'tag name', 'ref', 'f', 't', 't', NULL, NOW()),
+       (3, 'target checkout', 'ref', 't', 'f', 't', NULL, NOW());
 
 
 
 ---- insert tag creation data for bitbucket into git_host_webhook_event_selectors
 ---- event_id : 3 - Tag creation for github, 4 - Tag creation for bitbucket
-INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, is_active, possible_values, created_on)
-VALUES (4, 'repository url', 'repository.links.html.href', 'f', 't', NULL, NOW()),
-       (4, 'author', 'actor.display_name', 't', 't', NULL, NOW()),
-       (4, 'date', 'push.changes.0.new.date', 't', 't', NULL, NOW()),
-       (4, 'tag creation identifier', 'push.changes.0.new.type', 'f', 't', NULL, NOW()),
-       (4, 'tag name', 'push.changes.0.new.name', 'f', 't', NULL, NOW()),
-       (4, 'target checkout', 'push.changes.0.new.name', 't', 't', NULL, NOW());
+INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
+VALUES (4, 'repository url', 'repository.links.html.href', 'f', 'f', 't', NULL, NOW()),
+       (4, 'author', 'actor.display_name', 't', 't', 't', NULL, NOW()),
+       (4, 'date', 'push.changes.0.new.date', 't', 'f', 't', NULL, NOW()),
+       (4, 'tag creation identifier', 'push.changes.0.new.type', 'f', 't', 't', NULL, NOW()),
+       (4, 'tag name', 'push.changes.0.new.name', 'f', 't', 't', NULL, NOW()),
+       (4, 'target checkout', 'push.changes.0.new.name', 't', 'f', 't', NULL, NOW());
 
 
 

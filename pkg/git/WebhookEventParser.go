@@ -41,7 +41,7 @@ func NewWebhookEventParserImpl(logger *zap.SugaredLogger) *WebhookEventParserImp
 const (
 	WEBHOOK_SELECTOR_UNIQUE_ID_NAME          string = "unique id"
 	WEBHOOK_SELECTOR_REPOSITORY_URL_NAME     string = "repository url"
-	WEBHOOK_SELECTOR_HEADER_NAME             string = "header"
+	WEBHOOK_SELECTOR_TITLE_NAME              string = "title"
 	WEBHOOK_SELECTOR_GIT_URL_NAME            string = "git url"
 	WEBHOOK_SELECTOR_AUTHOR_NAME             string = "author"
 	WEBHOOK_SELECTOR_DATE_NAME               string = "date"
