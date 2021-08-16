@@ -18,7 +18,6 @@
 package git
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/sql"
 	"go.uber.org/zap"
 	"strings"
 	"time"
@@ -72,19 +71,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 		}
 
 		eventId := event.Id
-
-		// store in audit json table
-		webhookEventData := &sql.WebhookEventData{
-			EventId:     eventId,
-			PayloadJson: payloadJson,
-			CreatedOn:   time.Now(),
-		}
-		err := impl.webhookEventService.SaveWebhookEventData(webhookEventData)
-		if err != nil {
-			impl.logger.Errorw("error in saving webhook event data in db", "err", err)
-			return err
-		}
-
+		
 		// parse event data using selectors
 		webhookEventParsedData, fullDataMap, err := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
 		if err != nil {

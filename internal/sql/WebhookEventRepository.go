@@ -44,6 +44,7 @@ type GitHostWebhookEventSelectors struct {
 	Selector         string    `sql:"selector,notnull"`
 	ToShow           bool      `sql:"to_show,notnull"`
 	ToShowInCiFilter bool      `sql:"to_show_in_ci_filter,notnull"`
+	FixValue         string    `sql:"fix_value"`
 	PossibleValues   string    `sql:"possible_values"`
 	IsActive         bool      `sql:"is_active,notnull"`
 	CreatedOn        time.Time `sql:"created_on,notnull"`

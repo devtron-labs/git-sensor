@@ -55,8 +55,6 @@ func InitializeApp() (*App, error) {
 		git.NewGitUtil,
 		sql.NewWebhookEventRepositoryImpl,
 		wire.Bind(new(sql.WebhookEventRepository), new(*sql.WebhookEventRepositoryImpl)),
-		sql.NewWebhookEventDataRepositoryImpl,
-		wire.Bind(new(sql.WebhookEventDataRepository), new(*sql.WebhookEventDataRepositoryImpl)),
 		sql.NewWebhookEventParsedDataRepositoryImpl,
 		wire.Bind(new(sql.WebhookEventParsedDataRepository), new(*sql.WebhookEventParsedDataRepositoryImpl)),
 		sql.NewWebhookEventDataMappingRepositoryImpl,

@@ -75,7 +75,7 @@ func (impl WebhookEventParsedDataRepositoryImpl) GetWebhookEventParsedDataByIds(
 	var webhookEventParsedData []*WebhookEventParsedData
 	err := impl.dbConnection.Model(&webhookEventParsedData).
 		Where("id in (?) ", pg.In(ids)).
-		Order("updated_on Desc").
+		Order("created_on Desc").
 		Limit(limit).
 		Select()
 	return webhookEventParsedData, err

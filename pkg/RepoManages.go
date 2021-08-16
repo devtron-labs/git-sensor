@@ -416,6 +416,11 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 	response.LastFetchTime = gitMaterial.LastFetchTime
+	if pipelineMaterial.Errored && !gitMaterial.CheckoutStatus {
+		response.IsRepoError = true
+		response.RepoErrorMsg = gitMaterial.FetchErrorMessage
+		return response, nil
+	}
 
 	pipelineMaterialId := pipelineMaterial.Id
 	webhookMappings, err := impl.webhookEventDataMappingRepository.GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)

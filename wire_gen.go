@@ -31,7 +31,6 @@ func InitializeApp() (*App, error) {
 	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	webhookEventRepositoryImpl := sql.NewWebhookEventRepositoryImpl(db)
-	webhookEventDataRepositoryImpl := sql.NewWebhookEventDataRepositoryImpl(db)
 	webhookEventParsedDataRepositoryImpl := sql.NewWebhookEventParsedDataRepositoryImpl(db)
 	webhookEventDataMappingRepositoryImpl := sql.NewWebhookEventDataMappingRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
@@ -41,7 +40,7 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	webhookEventBeanConverterImpl := git.NewWebhookEventBeanConverterImpl()
-	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, webhookEventDataRepositoryImpl, webhookEventParsedDataRepositoryImpl, webhookEventDataMappingRepositoryImpl, materialRepositoryImpl, conn, webhookEventBeanConverterImpl)
+	webhookEventServiceImpl := git.NewWebhookEventServiceImpl(sugaredLogger, webhookEventRepositoryImpl, webhookEventParsedDataRepositoryImpl, webhookEventDataMappingRepositoryImpl, materialRepositoryImpl, conn, webhookEventBeanConverterImpl)
 	webhookEventParserImpl := git.NewWebhookEventParserImpl(sugaredLogger)
 	webhookHandlerImpl := git.NewWebhookHandlerImpl(sugaredLogger, webhookEventServiceImpl, webhookEventParserImpl)
 	gitWatcherImpl, err := git.NewGitWatcherImpl(repositoryManagerImpl, materialRepositoryImpl, sugaredLogger, ciPipelineMaterialRepositoryImpl, repositoryLocker, conn, webhookHandlerImpl)

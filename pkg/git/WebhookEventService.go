@@ -30,7 +30,6 @@ import (
 
 type WebhookEventService interface {
 	GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*sql.GitHostWebhookEvent, error)
-	SaveWebhookEventData(webhookEventData *sql.WebhookEventData) error
 	GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error)
 	SaveWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
 	UpdateWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
@@ -40,7 +39,6 @@ type WebhookEventService interface {
 type WebhookEventServiceImpl struct {
 	logger                            *zap.SugaredLogger
 	webhookEventRepository            sql.WebhookEventRepository
-	webhookEventDataRepository        sql.WebhookEventDataRepository
 	webhookEventParsedDataRepository  sql.WebhookEventParsedDataRepository
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository
 	materialRepository                sql.MaterialRepository
@@ -49,13 +47,12 @@ type WebhookEventServiceImpl struct {
 }
 
 func NewWebhookEventServiceImpl(
-	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, webhookEventDataRepository sql.WebhookEventDataRepository, webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
+	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository, materialRepository sql.MaterialRepository, nats stan.Conn, webhookEventBeanConverter WebhookEventBeanConverter,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
 		logger:                            logger,
 		webhookEventRepository:            webhookEventRepository,
-		webhookEventDataRepository:        webhookEventDataRepository,
 		webhookEventParsedDataRepository:  webhookEventParsedDataRepository,
 		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
 		materialRepository:                materialRepository,
@@ -67,16 +64,6 @@ func NewWebhookEventServiceImpl(
 func (impl WebhookEventServiceImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*sql.GitHostWebhookEvent, error) {
 	impl.logger.Debugw("Getting All git host events", "gitHostId", gitHostId)
 	return impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
-}
-
-func (impl WebhookEventServiceImpl) SaveWebhookEventData(webhookEventData *sql.WebhookEventData) error {
-	impl.logger.Debug("Saving webhook event data")
-	err := impl.webhookEventDataRepository.SaveWebhookEventData(webhookEventData)
-	if err != nil {
-		impl.logger.Errorw("error in saving webhook event data in db", "err", err)
-		return err
-	}
-	return nil
 }
 
 func (impl WebhookEventServiceImpl) GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error) {
