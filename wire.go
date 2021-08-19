@@ -53,6 +53,20 @@ func InitializeApp() (*App, error) {
 		internal.NewRepositoryLocker,
 		internal.NewNatsConnection,
 		git.NewGitUtil,
+		sql.NewWebhookEventRepositoryImpl,
+		wire.Bind(new(sql.WebhookEventRepository), new(*sql.WebhookEventRepositoryImpl)),
+		sql.NewWebhookEventParsedDataRepositoryImpl,
+		wire.Bind(new(sql.WebhookEventParsedDataRepository), new(*sql.WebhookEventParsedDataRepositoryImpl)),
+		sql.NewWebhookEventDataMappingRepositoryImpl,
+		wire.Bind(new(sql.WebhookEventDataMappingRepository), new(*sql.WebhookEventDataMappingRepositoryImpl)),
+		git.NewWebhookEventBeanConverterImpl,
+		wire.Bind(new(git.WebhookEventBeanConverter), new(*git.WebhookEventBeanConverterImpl)),
+		git.NewWebhookEventServiceImpl,
+		wire.Bind(new(git.WebhookEventService), new(*git.WebhookEventServiceImpl)),
+		git.NewWebhookEventParserImpl,
+		wire.Bind(new(git.WebhookEventParser), new(*git.WebhookEventParserImpl)),
+		git.NewWebhookHandlerImpl,
+		wire.Bind(new(git.WebhookHandler), new(*git.WebhookHandlerImpl)),
 	)
 	return &App{}, nil
 }

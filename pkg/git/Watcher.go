@@ -40,6 +40,7 @@ type GitWatcherImpl struct {
 	nats                         stan.Conn
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
+	webhookHandler 	 			 WebhookHandler
 }
 
 type GitWatcher interface {
@@ -56,7 +57,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	nats stan.Conn, ) (*GitWatcherImpl, error) {
+	nats stan.Conn, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -79,6 +80,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		locker:                       locker,
 		nats:                         nats,
 		pollConfig:                   cfg,
+		webhookHandler:     		  webhookHandler,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -88,6 +90,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	}
 
 	//err = watcher.SubscribePull()
+	watcher.SubscribeWebhookEvent()
 	return watcher, err
 }
 
@@ -208,7 +211,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-	updated, repo, err := impl.repositoryManager.fetch(userName, password, material.Url, location)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		return err
@@ -297,6 +300,24 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 	}
 	return nil
 }
+
+
+func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
+	aw := (FETCH_TIMEOUT_SEC + 5) * time.Second
+	_, err := impl.nats.Subscribe(internal.WEBHOOK_EVENT_TOPIC, func(msg *stan.Msg) {
+		impl.logger.Debugw("received msg", "msg", msg)
+		msg.Ack() //ack immediate if lost next min it would get a new message
+		webhookEvent := &WebhookEvent{}
+		err := json.Unmarshal(msg.Data, webhookEvent)
+		if err != nil {
+			impl.logger.Infow("err in reading msg", "err", err)
+			return
+		}
+		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
+	}, stan.SetManualAckMode(), stan.AckWait(aw))
+	return err
+}
+
 
 /*func (impl GitWatcherImpl) sendRequest(reqByte []byte) {
 

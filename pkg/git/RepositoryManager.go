@@ -34,7 +34,7 @@ import (
 )
 
 type RepositoryManager interface {
-	fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
+	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
 	headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error)
 	Add(location, url string, userName, password string) error
 	Clean(cloneDir string) error
@@ -94,7 +94,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
@@ -205,6 +205,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	}
 	return gitCommit, nil
 }
+
 
 //from -> old commit
 //to -> new commit

@@ -38,6 +38,7 @@ type CiPipelineMaterial struct {
 	ErrorMsg      string     `sql:"error_msg,notnull"`
 }
 
+
 type CiPipelineMaterialRepository interface {
 	FindByGitMaterialId(gitMaterialId int) ([]*CiPipelineMaterial, error)
 	Update(material []*CiPipelineMaterial) error

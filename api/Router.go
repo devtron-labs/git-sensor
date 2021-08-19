@@ -17,12 +17,12 @@
 package api
 
 import (
-	"github.com/devtron-labs/git-sensor/util"
 	"encoding/json"
+	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"net/http"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type MuxRouter struct {
@@ -70,4 +70,8 @@ func (r MuxRouter) Init() {
 	r.Router.Path("/admin/reload/{materialId}").HandlerFunc(r.restHandler.ReloadMaterial).Methods("POST")
 
 	r.Router.Path("/release/changes").HandlerFunc(r.restHandler.GetChangesInRelease).Methods("POST")
+
+	r.Router.Path("/webhook/data").HandlerFunc(r.restHandler.GetWebhookData).Methods("GET")
+	r.Router.Path("/webhook/host/events").HandlerFunc(r.restHandler.GetAllWebhookEventConfigForHost).Methods("GET")
+	r.Router.Path("/webhook/host/event").HandlerFunc(r.restHandler.GetWebhookEventConfig).Methods("GET")
 }

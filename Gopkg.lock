@@ -586,6 +586,30 @@
   revision = "e58e780e1378aa4df5dc705364ff5ae9a4dd1e04"
   version = "v0.2.1"
 
+[[projects]]
+  digest = "1:8da3c6fa34386bd54a446a749efaa656069f20c232ab3f29b39b23f58c1ae43c"
+  name = "github.com/tidwall/gjson"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d7dbdd1d92aa9cdddd006b1655e415fa52f5cfba"
+  version = "v1.8.0"
+
+[[projects]]
+  digest = "1:5413669d0fb5cdfd63e693dbd1c41152b1450c31e8aecfecd842686513fbd20e"
+  name = "github.com/tidwall/match"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c2f534168b739a7ec1821a33839fb2f029f26bbc"
+  version = "v1.0.3"
+
+[[projects]]
+  digest = "1:241b505b43626e45d2b6d0a2f63ce20576e472221f72e51c0c1306f1c09da855"
+  name = "github.com/tidwall/pretty"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "aaa765e7476acb0028a854b85675801362cbdaa2"
+  version = "v1.2.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -612,6 +636,7 @@
     "gopkg.in/src-d/go-git.v4/plumbing/object",
     "gopkg.in/src-d/go-git.v4/plumbing/transport",
     "gopkg.in/src-d/go-git.v4/plumbing/transport/http",
+    "github.com/tidwall/gjson"	
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
