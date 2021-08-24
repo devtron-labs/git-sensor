@@ -27,13 +27,15 @@ type CiPipelineMaterialWebhookDataMapping struct {
 	CiPipelineMaterialId int      `sql:"ci_pipeline_material_id"`
 	WebhookDataId        int      `sql:"webhook_data_id"`
 	ConditionMatched     bool     `sql:"condition_matched,notnull"`
+	IsActive             bool     `sql:"is_active,notnull"`
 }
 
 type WebhookEventDataMappingRepository interface {
 	GetCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
 	SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
 	UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
-	GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error)
+	GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error)
+	InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error
 }
 
 type WebhookEventDataMappingRepositoryImpl struct {
@@ -49,6 +51,7 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetCiPipelineMaterialWebhookDa
 	err := impl.dbConnection.Model(&mapping).
 		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
 		Where("webhook_data_id =? ", webhookParsedDataId).
+		Where("is_active = TRUE ").
 		Select()
 
 	if err != nil {
@@ -71,10 +74,12 @@ func (impl WebhookEventDataMappingRepositoryImpl) UpdateCiPipelineMaterialWebhoo
 	return err
 }
 
-func (impl WebhookEventDataMappingRepositoryImpl) GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error) {
+func (impl WebhookEventDataMappingRepositoryImpl) GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error) {
 	var pipelineMaterials []*CiPipelineMaterialWebhookDataMapping
 	err := impl.dbConnection.Model(&pipelineMaterials).
 		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
+		Where("is_active = TRUE ").
+		Where("condition_matched = TRUE ").
 		Select()
 
 	if err != nil {
@@ -85,4 +90,12 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetCiPipelineMaterialWebhookDa
 	}
 
 	return pipelineMaterials, nil
+}
+
+func (impl WebhookEventDataMappingRepositoryImpl) InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error {
+	_, err := impl.dbConnection.Model(&CiPipelineMaterialWebhookDataMapping{}).
+		Set("is_active", "FALSE").
+		Where("ci_pipeline_material_id in (?) ", pg.In(ciPipelineMaterialIds)).
+		Update()
+	return err
 }

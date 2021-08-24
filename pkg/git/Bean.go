@@ -94,6 +94,7 @@ type RefreshGitMaterialResponse struct {
 }
 
 type WebhookEvent struct {
+	PayloadId          int    `json:"payloadId"`
 	RequestPayloadJson string `json:"requestPayloadJson"`
 	GitHostId          int    `json:"gitHostId"`
 	EventType          string `json:"eventType"`

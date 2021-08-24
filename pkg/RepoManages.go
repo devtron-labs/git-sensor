@@ -423,22 +423,20 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 	}
 
 	pipelineMaterialId := pipelineMaterial.Id
-	webhookMappings, err := impl.webhookEventDataMappingRepository.GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
+	matchedWebhookMappings, err := impl.webhookEventDataMappingRepository.GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook mapping for pipelineId ", "id", pipelineMaterialId, "errMsg", err)
 		return nil, err
 	}
 
-	if len(webhookMappings) == 0 {
+	if len(matchedWebhookMappings) == 0 {
 		impl.logger.Infow("no webhook mapping for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
 		return response, nil
 	}
 
 	var webhookDataIds []int
-	for _, webhookMapping := range webhookMappings {
-		if webhookMapping.ConditionMatched {
-			webhookDataIds = append(webhookDataIds, webhookMapping.WebhookDataId)
-		}
+	for _, webhookMapping := range matchedWebhookMappings {
+		webhookDataIds = append(webhookDataIds, webhookMapping.WebhookDataId)
 	}
 
 	impl.logger.Debugw("webhookDataIds :", webhookDataIds)
