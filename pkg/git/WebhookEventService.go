@@ -37,27 +37,30 @@ type WebhookEventService interface {
 }
 
 type WebhookEventServiceImpl struct {
-	logger                            *zap.SugaredLogger
-	webhookEventRepository            sql.WebhookEventRepository
-	webhookEventParsedDataRepository  sql.WebhookEventParsedDataRepository
-	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository
-	materialRepository                sql.MaterialRepository
-	nats                              stan.Conn
-	webhookEventBeanConverter         WebhookEventBeanConverter
+	logger                                        *zap.SugaredLogger
+	webhookEventRepository                        sql.WebhookEventRepository
+	webhookEventParsedDataRepository              sql.WebhookEventParsedDataRepository
+	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
+	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
+	materialRepository                            sql.MaterialRepository
+	nats                                          stan.Conn
+	webhookEventBeanConverter                     WebhookEventBeanConverter
 }
 
 func NewWebhookEventServiceImpl(
 	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
-	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository, materialRepository sql.MaterialRepository, nats stan.Conn, webhookEventBeanConverter WebhookEventBeanConverter,
+	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository, webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
+	materialRepository sql.MaterialRepository, nats stan.Conn, webhookEventBeanConverter WebhookEventBeanConverter,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
-		logger:                            logger,
-		webhookEventRepository:            webhookEventRepository,
-		webhookEventParsedDataRepository:  webhookEventParsedDataRepository,
-		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
-		materialRepository:                materialRepository,
-		nats:                              nats,
-		webhookEventBeanConverter:         webhookEventBeanConverter,
+		logger:                                        logger,
+		webhookEventRepository:                        webhookEventRepository,
+		webhookEventParsedDataRepository:              webhookEventParsedDataRepository,
+		webhookEventDataMappingRepository:             webhookEventDataMappingRepository,
+		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
+		materialRepository:                            materialRepository,
+		nats:                                          nats,
+		webhookEventBeanConverter:                     webhookEventBeanConverter,
 	}
 }
 
@@ -151,11 +154,15 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 
 			//MatchFilter
 			impl.logger.Debug("Matching filter")
-			match := impl.MatchFilter(event, fullDataMap, ciPipelineMaterial.Value)
-			impl.logger.Debug("Matched : ", match)
+			filterResults, overallMatch, err := impl.MatchFilter(event, fullDataMap, ciPipelineMaterial.Value)
+			if err != nil {
+				impl.logger.Errorw("err in matching filter", "err", err)
+				return err
+			}
+			impl.logger.Debug("Matched : ", overallMatch)
 
 			// insert/update mapping into DB
-			err = impl.HandleMaterialWebhookMappingIntoDb(ciPipelineMaterial.Id, webhookEventParsedData.Id, match)
+			err = impl.HandleMaterialWebhookMappingIntoDb(ciPipelineMaterial.Id, webhookEventParsedData.Id, overallMatch, filterResults)
 			if err != nil {
 				impl.logger.Errorw("err in handling mapping", "err", err)
 				return err
@@ -170,7 +177,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 			}
 
 			// if condition is match, then notify for CI
-			if match {
+			if overallMatch {
 				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData))
 			}
 		}
@@ -179,18 +186,18 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 	return nil
 }
 
-func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, fullDataMap map[string]string, ciPipelineMaterialJsonValue string) bool {
+func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, fullDataMap map[string]string, ciPipelineMaterialJsonValue string) ([]*sql.CiPipelineMaterialWebhookDataMappingFilterResult, bool, error) {
 	webhookSourceTypeValue := WebhookSourceTypeValue{}
 	err := json.Unmarshal([]byte(ciPipelineMaterialJsonValue), &webhookSourceTypeValue)
 
 	if err != nil {
 		impl.logger.Errorw("error in json parsing", "err", err, "ciPipelineMaterialJsonValue", ciPipelineMaterialJsonValue)
-		return false
+		return nil, false, err
 	}
 
 	// match event Id
 	if event.Id != webhookSourceTypeValue.EventId {
-		return false
+		return nil, false, nil
 	}
 
 	// match condition
@@ -198,10 +205,11 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 	// if no condition found then assume it matched
 	condition := webhookSourceTypeValue.Condition
 	if len(condition) == 0 {
-		return true
+		return nil, true, nil
 	}
 
-	match := true
+	overallMatch := true
+	var filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult
 
 	// loop in all selectors and match condition
 	for _, selector := range event.Selectors {
@@ -212,26 +220,31 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 		}
 
 		selectorId := selector.Id
-		conditionRegexValue := condition[selectorId]
-		if len(conditionRegexValue) == 0 {
-			continue
-		}
-
 		actualValue := fullDataMap[selector.Name]
 
-		match, err = regexp.MatchString(conditionRegexValue, actualValue)
-		if err != nil {
-			impl.logger.Errorw("err in matching regex condition", "err", err)
-			return false
+		filterResult := &sql.CiPipelineMaterialWebhookDataMappingFilterResult{
+			SelectorName : selector.Name,
+			SelectorValue: actualValue,
+			ConditionMatched: true,
+			IsActive: true,
 		}
 
-		if !match {
-			break
+		conditionRegexValue := condition[selectorId]
+		if len(conditionRegexValue) != 0 {
+			match, err := regexp.MatchString(conditionRegexValue, actualValue)
+			if err != nil || !match{
+				filterResult.ConditionMatched = false
+			}
+			if overallMatch && !filterResult.ConditionMatched {
+				overallMatch = false
+			}
 		}
+
+		filterResults = append(filterResults, filterResult)
 
 	}
 
-	return match
+	return filterResults, overallMatch, nil
 }
 
 func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData) *CiPipelineMaterialBean {
@@ -266,7 +279,7 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 	return nil
 }
 
-func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelineMaterialId int, webhookParsedDataId int, conditionMatched bool) error {
+func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelineMaterialId int, webhookParsedDataId int, conditionMatched bool, filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) error {
 	impl.logger.Debug("Handling Material webhook mapping into DB")
 
 	mapping, err := impl.webhookEventDataMappingRepository.GetCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialId, webhookParsedDataId)
@@ -279,9 +292,12 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 		CiPipelineMaterialId: ciPipelineMaterialId,
 		WebhookDataId:        webhookParsedDataId,
 		ConditionMatched:     conditionMatched,
+		IsActive: true,
 	}
 
-	if mapping == nil {
+	isNewMapping := mapping == nil
+
+	if isNewMapping {
 		// insert into DB
 		impl.logger.Debug("Saving mapping into DB")
 		err = impl.webhookEventDataMappingRepository.SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
@@ -294,6 +310,38 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 
 	if err != nil {
 		impl.logger.Errorw("err in saving ci-pipeline vs webhook data mapping", "err", err)
+		return err
+	}
+
+	return impl.HandleMaterialWebhookMappingFilterResultIntoDb(filterResults, ciPipelineMaterialWebhookDataMapping.Id, isNewMapping)
+}
+
+
+func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingFilterResultIntoDb(filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult, webhookDataMappingId int, isNewMapping bool) error {
+	impl.logger.Debug("Handling Material webhook mapping filter results into DB")
+
+	// if not new mapping, then inactivate old
+	if !isNewMapping {
+		err := impl.webhookEventDataMappingFilterResultRepository.InactivateForMappingId(webhookDataMappingId)
+		if err != nil {
+			impl.logger.Errorw("err in inactivating ci-pipeline vs webhook data mapping filter results", "err", err)
+			return err
+		}
+	}
+
+	if len(filterResults) == 0 {
+		return nil
+	}
+
+	for _, filterResult := range filterResults {
+		filterResult.WebhookDataMappingId = webhookDataMappingId
+		filterResult.CreatedOn = time.Now()
+	}
+
+	// insert into DB
+	err := impl.webhookEventDataMappingFilterResultRepository.SaveAll(filterResults)
+	if err != nil {
+		impl.logger.Errorw("err in saving ci-pipeline vs webhook data mapping filter results", "err", err)
 		return err
 	}
 
