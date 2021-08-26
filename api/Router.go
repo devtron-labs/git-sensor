@@ -74,4 +74,6 @@ func (r MuxRouter) Init() {
 	r.Router.Path("/webhook/data").HandlerFunc(r.restHandler.GetWebhookData).Methods("GET")
 	r.Router.Path("/webhook/host/events").HandlerFunc(r.restHandler.GetAllWebhookEventConfigForHost).Methods("GET")
 	r.Router.Path("/webhook/host/event").HandlerFunc(r.restHandler.GetWebhookEventConfig).Methods("GET")
+	r.Router.Path("/webhook/ci-pipeline-material/payload-data").HandlerFunc(r.restHandler.GetWebhookPayloadDataForPipelineMaterialId).Methods("GET")
+	r.Router.Path("/webhook/ci-pipeline-material/payload-filter-data").HandlerFunc(r.restHandler.GetWebhookPayloadFilterDataForPipelineMaterialId).Methods("GET")
 }

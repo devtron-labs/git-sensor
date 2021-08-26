@@ -17,17 +17,25 @@
 package sql
 
 import (
+	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/orm"
+	"time"
 )
 
 type CiPipelineMaterialWebhookDataMapping struct {
-	tableName            struct{} `sql:"ci_pipeline_material_webhook_data_mapping"`
-	Id                   int      `sql:"id,pk"`
-	CiPipelineMaterialId int      `sql:"ci_pipeline_material_id"`
-	WebhookDataId        int      `sql:"webhook_data_id"`
-	ConditionMatched     bool     `sql:"condition_matched,notnull"`
-	IsActive             bool     `sql:"is_active,notnull"`
+	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping"`
+	Id                   int       `sql:"id,pk"`
+	CiPipelineMaterialId int       `sql:"ci_pipeline_material_id"`
+	WebhookDataId        int       `sql:"webhook_data_id"`
+	ConditionMatched     bool      `sql:"condition_matched,notnull"`
+	IsActive             bool      `sql:"is_active,notnull"`
+	CreatedOn            time.Time `sql:"created_on"`
+	UpdatedOn            time.Time `sql:"updated_on"`
+
+	FilterResults          []*CiPipelineMaterialWebhookDataMappingFilterResult `pg:"fk:webhook_data_mapping_id"`
+	WebhookEventParsedData *WebhookEventParsedData                             `pg:"fk:id"`
 }
 
 type WebhookEventDataMappingRepository interface {
@@ -36,6 +44,8 @@ type WebhookEventDataMappingRepository interface {
 	UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
 	GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error)
 	InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error
+	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*CiPipelineMaterialWebhookDataMapping, error)
+	GetWebhookPayloadFilterDataForPipelineMaterialId(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
 }
 
 type WebhookEventDataMappingRepositoryImpl struct {
@@ -98,4 +108,59 @@ func (impl WebhookEventDataMappingRepositoryImpl) InactivateWebhookDataMappingFo
 		Where("ci_pipeline_material_id in (?) ", pg.In(ciPipelineMaterialIds)).
 		Update()
 	return err
+}
+
+func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*CiPipelineMaterialWebhookDataMapping, error) {
+
+	sortOrder := "DESC"
+	if request.EventTimeSortOrder == "ASC" {
+		sortOrder = "ASC"
+	}
+
+	var mappings []*CiPipelineMaterialWebhookDataMapping
+	err := impl.dbConnection.Model(&mappings).
+		Column("ci_pipeline_material_webhook_data_mapping.*").
+		Relation("FilterResults", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
+		Where("ci_pipeline_material_id =? ", request.CiPipelineMaterialId).
+		Where("is_active = TRUE ").
+		Limit(request.Limit).
+		Offset(request.Offset).
+		Order("updated_on " + sortOrder).
+		Select()
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return mappings, nil
+}
+
+func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error) {
+	var mapping CiPipelineMaterialWebhookDataMapping
+	err := impl.dbConnection.Model(&mapping).
+		Column("ci_pipeline_material_webhook_data_mapping.*").
+		Relation("FilterResults", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
+		Relation("WebhookEventParsedData", func(q *orm.Query) (query *orm.Query, err error) {
+			return q, nil
+		}).
+		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
+		Where("webhook_data_id =? ", webhookParsedDataId).
+		Where("is_active = TRUE ").
+		Select()
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &mapping, nil
 }

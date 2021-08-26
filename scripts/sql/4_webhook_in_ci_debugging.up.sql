@@ -7,6 +7,15 @@ alter table webhook_event_parsed_data
     add column payload_data_id INTEGER;
 
 
+--- add column created_on in ci_pipeline_material_webhook_data_mapping table
+alter table ci_pipeline_material_webhook_data_mapping
+    add column created_on timestamptz;
+
+
+--- add column updated_on in ci_pipeline_material_webhook_data_mapping table
+alter table ci_pipeline_material_webhook_data_mapping
+    add column updated_on timestamptz;
+
 
 --
 -- Name: ci_pipeline_material_webhook_data_mapping_filter_result_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -27,7 +36,8 @@ CREATE SEQUENCE public.ci_pipeline_material_webhook_data_mapping_filter_result_i
 
 CREATE TABLE public.ci_pipeline_material_webhook_data_mapping_filter_result
 (
-    id                      INTEGER                NOT NULL DEFAULT nextval('ci_pipeline_material_webhook_data_mapping_filter_result_id_seq'::regclass),
+    id                      INTEGER                NOT NULL DEFAULT nextval(
+            'ci_pipeline_material_webhook_data_mapping_filter_result_id_seq'::regclass),
     webhook_data_mapping_id INTEGER                NOT NULL,
     selector_name           character varying(250) NOT NULL,
     selector_value          character varying(1000),
@@ -44,4 +54,5 @@ ALTER TABLE ci_pipeline_material_webhook_data_mapping_filter_result
 
 
 --- Create index on ci_pipeline_material_webhook_data_mapping_filter_result.webhook_data_mapping_id
-CREATE INDEX ci_pipeline_material_webhook_data_mapping_filter_result_IX1 ON public.ci_pipeline_material_webhook_data_mapping_filter_result (webhook_data_mapping_id);
+CREATE
+INDEX ci_pipeline_material_webhook_data_mapping_filter_result_IX1 ON public.ci_pipeline_material_webhook_data_mapping_filter_result (webhook_data_mapping_id);

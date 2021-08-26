@@ -293,6 +293,7 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 		WebhookDataId:        webhookParsedDataId,
 		ConditionMatched:     conditionMatched,
 		IsActive: true,
+		UpdatedOn: time.Now(),
 	}
 
 	isNewMapping := mapping == nil
@@ -300,6 +301,7 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 	if isNewMapping {
 		// insert into DB
 		impl.logger.Debug("Saving mapping into DB")
+		ciPipelineMaterialWebhookDataMapping.CreatedOn = time.Now()
 		err = impl.webhookEventDataMappingRepository.SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
 	} else {
 		// update DB
