@@ -17,7 +17,6 @@
 package sql
 
 import (
-	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
@@ -34,8 +33,7 @@ type CiPipelineMaterialWebhookDataMapping struct {
 	CreatedOn            time.Time `sql:"created_on"`
 	UpdatedOn            time.Time `sql:"updated_on"`
 
-	FilterResults          []*CiPipelineMaterialWebhookDataMappingFilterResult `pg:"fk:webhook_data_mapping_id"`
-	WebhookEventParsedData *WebhookEventParsedData                             `pg:"fk:id"`
+	FilterResults []*CiPipelineMaterialWebhookDataMappingFilterResult `pg:"fk:webhook_data_mapping_id"`
 }
 
 type WebhookEventDataMappingRepository interface {
@@ -44,7 +42,7 @@ type WebhookEventDataMappingRepository interface {
 	UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping *CiPipelineMaterialWebhookDataMapping) error
 	GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(ciPipelineMaterialId int) ([]*CiPipelineMaterialWebhookDataMapping, error)
 	InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error
-	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*CiPipelineMaterialWebhookDataMapping, error)
+	GetWebhookPayloadDataForPipelineMaterialId(ciPipelineMaterialId int, limit int, offset int, eventTimeSortOrder string) ([]*CiPipelineMaterialWebhookDataMapping, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
 }
 
@@ -110,10 +108,10 @@ func (impl WebhookEventDataMappingRepositoryImpl) InactivateWebhookDataMappingFo
 	return err
 }
 
-func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*CiPipelineMaterialWebhookDataMapping, error) {
+func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadDataForPipelineMaterialId(ciPipelineMaterialId int, limit int, offset int, eventTimeSortOrder string) ([]*CiPipelineMaterialWebhookDataMapping, error) {
 
 	sortOrder := "DESC"
-	if request.EventTimeSortOrder == "ASC" {
+	if eventTimeSortOrder == "ASC" {
 		sortOrder = "ASC"
 	}
 
@@ -123,10 +121,10 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadDataForPipeli
 		Relation("FilterResults", func(q *orm.Query) (query *orm.Query, err error) {
 			return q.Where("is_active IS TRUE"), nil
 		}).
-		Where("ci_pipeline_material_id =? ", request.CiPipelineMaterialId).
+		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
 		Where("is_active = TRUE ").
-		Limit(request.Limit).
-		Offset(request.Offset).
+		Limit(limit).
+		Offset(offset).
 		Order("updated_on " + sortOrder).
 		Select()
 
@@ -146,9 +144,6 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadFilterDataFor
 		Column("ci_pipeline_material_webhook_data_mapping.*").
 		Relation("FilterResults", func(q *orm.Query) (query *orm.Query, err error) {
 			return q.Where("is_active IS TRUE"), nil
-		}).
-		Relation("WebhookEventParsedData", func(q *orm.Query) (query *orm.Query, err error) {
-			return q, nil
 		}).
 		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
 		Where("webhook_data_id =? ", webhookParsedDataId).

@@ -713,7 +713,7 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 		return nil, err
 	}
 
-	mappings, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadDataForPipelineMaterialId(request)
+	mappings, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadDataForPipelineMaterialId(request.CiPipelineMaterialId, request.Limit, request.Offset, request.EventTimeSortOrder)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook payload data ", "err", err)
 		return nil, err
@@ -723,23 +723,26 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 	filters :=  make(map[string]string)
 	for _, selector := range eventConfig.Selectors {
 		if condition, ok := webhookSourceTypeValue.Condition[selector.Id]; ok {
-			filters[selector.Selector] = condition
+			filters[selector.Name] = condition
 		}
 	}
 
 	// build payloads
 	var webhookPayloadDataPayloadResponses []*git.WebhookPayloadDataPayloadsResponse
 	for _, mapping := range mappings {
+
+		if len(mapping.FilterResults) == 0 {
+			continue
+		}
+
 		matchedFiltersCount := 0
 		failedFiltersCount := 0
 
-		if len(mapping.FilterResults) > 0 {
-			for _, filterResult := range mapping.FilterResults {
-				if filterResult.ConditionMatched {
-					matchedFiltersCount = matchedFiltersCount + 1
-				} else {
-					failedFiltersCount = failedFiltersCount + 1
-				}
+		for _, filterResult := range mapping.FilterResults {
+			if filterResult.ConditionMatched {
+				matchedFiltersCount = matchedFiltersCount + 1
+			} else {
+				failedFiltersCount = failedFiltersCount + 1
 			}
 		}
 
@@ -772,6 +775,12 @@ func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(req
 		return nil, err
 	}
 
+	parsedData, err := impl.webhookEventParsedDataRepository.GetWebhookEventParsedDataById(request.ParsedDataId)
+	if err != nil {
+		impl.logger.Errorw("error in getting parsed webhook data ", "err", err)
+		return nil, err
+	}
+
 	filterResults := mapping.FilterResults
 
 	// build payload
@@ -780,6 +789,7 @@ func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(req
 		for _, filterResult := range filterResults {
 			webhookPayloadFilterDataSelectorResponse := &git.WebhookPayloadFilterDataSelectorResponse{
 				SelectorName:  filterResult.SelectorName,
+				SelectorCondition: filterResult.SelectorCondition,
 				SelectorValue: filterResult.SelectorValue,
 				Match:         filterResult.ConditionMatched,
 			}
@@ -788,7 +798,7 @@ func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(req
 	}
 
 	webhookPayloadFilterDataResponse := &git.WebhookPayloadFilterDataResponse{
-		PayloadId: mapping.WebhookEventParsedData.PayloadDataId,
+		PayloadId: parsedData.PayloadDataId,
 		SelectorsData: webhookPayloadFilterDataSelectorResponses,
 	}
 

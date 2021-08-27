@@ -40,6 +40,7 @@ CREATE TABLE public.ci_pipeline_material_webhook_data_mapping_filter_result
             'ci_pipeline_material_webhook_data_mapping_filter_result_id_seq'::regclass),
     webhook_data_mapping_id INTEGER                NOT NULL,
     selector_name           character varying(250) NOT NULL,
+    selector_condition      character varying(1000),
     selector_value          character varying(1000),
     condition_matched       bool                   NOT NULL,
     is_active               bool                   NOT NULL,

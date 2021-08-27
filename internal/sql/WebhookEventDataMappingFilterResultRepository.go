@@ -17,7 +17,6 @@
 package sql
 
 import (
-	"github.com/devtron-labs/git-sensor/util"
 	"github.com/go-pg/pg"
 	"time"
 )
@@ -27,6 +26,7 @@ type CiPipelineMaterialWebhookDataMappingFilterResult struct {
 	Id                   int       `sql:"id,pk"`
 	WebhookDataMappingId int       `sql:"webhook_data_mapping_id,notnull"`
 	SelectorName         string    `sql:"selector_name,notnull"`
+	SelectorCondition    string    `sql:"selector_condition"`
 	SelectorValue        string    `sql:"selector_value"`
 	ConditionMatched     bool      `sql:"condition_matched,notnull"`
 	IsActive             bool      `sql:"is_active,notnull"`
@@ -34,8 +34,7 @@ type CiPipelineMaterialWebhookDataMappingFilterResult struct {
 }
 
 type WebhookEventDataMappingFilterResultRepository interface {
-	SaveAll(result []*CiPipelineMaterialWebhookDataMappingFilterResult) error
-	GetAllActiveForMappingId(webhookDataMappingId int) ([]*CiPipelineMaterialWebhookDataMappingFilterResult, error)
+	SaveAll(results []*CiPipelineMaterialWebhookDataMappingFilterResult) error
 	InactivateForMappingId(webhookDataMappingId int) error
 }
 
@@ -47,34 +46,15 @@ func NewWebhookEventDataMappingFilterResultRepositoryImpl(dbConnection *pg.DB) *
 	return &WebhookEventDataMappingFilterResultRepositoryImpl{dbConnection: dbConnection}
 }
 
-func (impl WebhookEventDataMappingFilterResultRepositoryImpl) SaveAll(result []*CiPipelineMaterialWebhookDataMappingFilterResult) error {
-	_, err := impl.dbConnection.Model(result).Insert()
+func (impl WebhookEventDataMappingFilterResultRepositoryImpl) SaveAll(results []*CiPipelineMaterialWebhookDataMappingFilterResult) error {
+	_, err := impl.dbConnection.Model(&results).Insert()
 	return err
 }
 
-func (impl WebhookEventDataMappingFilterResultRepositoryImpl) GetAllActiveForMappingId(webhookDataMappingId int) ([]*CiPipelineMaterialWebhookDataMappingFilterResult, error) {
-	var results []*CiPipelineMaterialWebhookDataMappingFilterResult
-	err := impl.dbConnection.Model(&results).
-		Where("webhook_data_mapping_id =? ", webhookDataMappingId).
-		Where("is_active = TRUE ").
-		Select()
-
-	if err != nil {
-		if util.IsErrNoRows(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return results, nil
-}
-
-
 func (impl WebhookEventDataMappingFilterResultRepositoryImpl) InactivateForMappingId(webhookDataMappingId int) error {
-	_, err := impl.dbConnection.Model(&CiPipelineMaterialWebhookDataMapping{}).
-		Set("is_active", "FALSE").
+	_, err := impl.dbConnection.Model(&CiPipelineMaterialWebhookDataMappingFilterResult{}).
+		Set("is_active = FALSE").
 		Where("webhook_data_mapping_id = ?  ", webhookDataMappingId).
 		Update()
 	return err
 }
-

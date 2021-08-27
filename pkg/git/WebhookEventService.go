@@ -222,14 +222,16 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 		selectorId := selector.Id
 		actualValue := fullDataMap[selector.Name]
 
+		conditionRegexValue := condition[selectorId]
+
 		filterResult := &sql.CiPipelineMaterialWebhookDataMappingFilterResult{
 			SelectorName : selector.Name,
+			SelectorCondition: conditionRegexValue,
 			SelectorValue: actualValue,
 			ConditionMatched: true,
 			IsActive: true,
 		}
 
-		conditionRegexValue := condition[selectorId]
 		if len(conditionRegexValue) != 0 {
 			match, err := regexp.MatchString(conditionRegexValue, actualValue)
 			if err != nil || !match{
@@ -240,7 +242,9 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 			}
 		}
 
-		filterResults = append(filterResults, filterResult)
+		if _, ok := condition[selectorId]; ok {
+			filterResults = append(filterResults, filterResult)
+		}
 
 	}
 
