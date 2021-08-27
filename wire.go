@@ -59,6 +59,8 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(sql.WebhookEventParsedDataRepository), new(*sql.WebhookEventParsedDataRepositoryImpl)),
 		sql.NewWebhookEventDataMappingRepositoryImpl,
 		wire.Bind(new(sql.WebhookEventDataMappingRepository), new(*sql.WebhookEventDataMappingRepositoryImpl)),
+		sql.NewWebhookEventDataMappingFilterResultRepositoryImpl,
+		wire.Bind(new(sql.WebhookEventDataMappingFilterResultRepository), new(*sql.WebhookEventDataMappingFilterResultRepositoryImpl)),
 		git.NewWebhookEventBeanConverterImpl,
 		wire.Bind(new(git.WebhookEventBeanConverter), new(*git.WebhookEventBeanConverterImpl)),
 		git.NewWebhookEventServiceImpl,
