@@ -46,7 +46,7 @@ type RepoManager interface {
 	GetWebhookDataById(id int) (*git.WebhookData, error)
 	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
-	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*git.WebhookPayloadDataResponse, error)
+	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
 }
 
@@ -678,8 +678,40 @@ func (impl RepoManagerImpl) GetWebhookEventConfig(eventId int) (*git.WebhookEven
 	return webhookEvent, nil
 }
 
-func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) ([]*git.WebhookPayloadDataResponse, error) {
+func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error) {
 	impl.logger.Debugw("Getting webhook payload data ", "request", request)
+
+	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.CiPipelineMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error in getting ci pipeline material", "err", err)
+		return nil, err
+	}
+
+	if pipelineMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
+		error := "pipeline material is not of webhook type"
+		impl.logger.Error(error)
+		return nil, errors.New(error)
+	}
+
+	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error in getting git material", "err", err)
+		return nil, err
+	}
+
+
+	webhookSourceTypeValue := &git.WebhookSourceTypeValue{}
+	err = json.Unmarshal([]byte(pipelineMaterial.Value), &webhookSourceTypeValue)
+	if err != nil {
+		impl.logger.Errorw("error in json parsing", "err", err, "ciPipelineMaterialJsonValue", pipelineMaterial.Value)
+		return nil, err
+	}
+
+	eventConfig, err := impl.GetWebhookEventConfig(webhookSourceTypeValue.EventId)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook event config ", "err", err)
+		return nil, err
+	}
 
 	mappings, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadDataForPipelineMaterialId(request)
 	if err != nil {
@@ -687,8 +719,16 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 		return nil, err
 	}
 
+	// build filters
+	filters :=  make(map[string]string)
+	for _, selector := range eventConfig.Selectors {
+		if condition, ok := webhookSourceTypeValue.Condition[selector.Id]; ok {
+			filters[selector.Selector] = condition
+		}
+	}
+
 	// build payloads
-	var webhookPayloadDataResponses []*git.WebhookPayloadDataResponse
+	var webhookPayloadDataPayloadResponses []*git.WebhookPayloadDataPayloadsResponse
 	for _, mapping := range mappings {
 		matchedFiltersCount := 0
 		failedFiltersCount := 0
@@ -703,7 +743,7 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 			}
 		}
 
-		webhookPayloadDataResponse := &git.WebhookPayloadDataResponse{
+		webhookPayloadDataPayloadResponse := &git.WebhookPayloadDataPayloadsResponse{
 			ParsedDataId:        mapping.WebhookDataId,
 			EventTime:           mapping.UpdatedOn,
 			MatchedFiltersCount: matchedFiltersCount,
@@ -711,10 +751,16 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 			MatchedFilters:      mapping.ConditionMatched,
 		}
 
-		webhookPayloadDataResponses = append(webhookPayloadDataResponses, webhookPayloadDataResponse)
+		webhookPayloadDataPayloadResponses = append(webhookPayloadDataPayloadResponses, webhookPayloadDataPayloadResponse)
 	}
 
-	return webhookPayloadDataResponses, nil
+	webhookPayloadDataResponse := &git.WebhookPayloadDataResponse{
+		RepositoryUrl: gitMaterial.Url,
+		Filters: filters,
+		Payloads: webhookPayloadDataPayloadResponses,
+	}
+
+	return webhookPayloadDataResponse, nil
 }
 
 func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error) {

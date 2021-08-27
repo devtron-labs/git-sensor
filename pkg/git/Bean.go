@@ -145,6 +145,12 @@ type WebhookPayloadDataRequest struct {
 }
 
 type WebhookPayloadDataResponse struct {
+	Filters       map[string]string                     `json:"filters"`
+	RepositoryUrl string                                `json:"repositoryUrl"`
+	Payloads      []*WebhookPayloadDataPayloadsResponse `json:"payloads"`
+}
+
+type WebhookPayloadDataPayloadsResponse struct {
 	ParsedDataId        int       `json:"parsedDataId"`
 	EventTime           time.Time `json:"eventTime"`
 	MatchedFiltersCount int       `json:"matchedFiltersCount"`
