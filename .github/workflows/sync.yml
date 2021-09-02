@@ -19,5 +19,5 @@ jobs:
     - uses: pawan-59/git-repo-sync@v0.1.14
       with:
         target-url: 'https://gitee.com/devtron-labs/git-sensor'
-        target-username: 'pawan_06d2'
+        target-username: 'prakarsh'
         target-token: ${{ secrets.GITEE_ACCESS_TOKEN }}
