@@ -109,7 +109,11 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 		}
 	}
 	if len(old) > 0 {
-		err := impl.ciPipelineMaterialRepository.Update(old)
+		err := impl.InactivateWebhookDataMappingForPipelineMaterials(old)
+		if err != nil {
+			return nil, err
+		}
+		err = impl.ciPipelineMaterialRepository.Update(old)
 		if err != nil {
 			return nil, err
 		}
@@ -133,6 +137,38 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 	}
 	return materials, nil
 }
+
+
+func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(oldMaterials []*sql.CiPipelineMaterial) error {
+	var ciPipelineMaterialIdsWebhookMappingDeactivate []int
+	for _, oldMaterial := range oldMaterials {
+		if oldMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
+			continue
+		}
+
+		materialFromDb, err := impl.ciPipelineMaterialRepository.FindById(oldMaterial.Id)
+		if err != nil {
+			impl.logger.Errorw("error in getting pipeline material from DB", "id", oldMaterial.Id, "err", err)
+			return err
+		}
+
+		if materialFromDb.Value != oldMaterial.Value {
+			ciPipelineMaterialIdsWebhookMappingDeactivate = append(ciPipelineMaterialIdsWebhookMappingDeactivate, oldMaterial.Id)
+		}
+	}
+
+	if len(ciPipelineMaterialIdsWebhookMappingDeactivate) > 0 {
+		impl.logger.Debugw("Inactivating webhook data mapping for ids ", "ids", ciPipelineMaterialIdsWebhookMappingDeactivate)
+		err := impl.webhookEventDataMappingRepository.InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIdsWebhookMappingDeactivate)
+		if err != nil {
+			impl.logger.Errorw("error in inactivating webhook data mapping for ", "ids", ciPipelineMaterialIdsWebhookMappingDeactivate, "err", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial

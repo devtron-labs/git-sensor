@@ -102,7 +102,7 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetMatchedCiPipelineMaterialWe
 
 func (impl WebhookEventDataMappingRepositoryImpl) InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error {
 	_, err := impl.dbConnection.Model(&CiPipelineMaterialWebhookDataMapping{}).
-		Set("is_active", "FALSE").
+		Set("is_active = FALSE ").
 		Where("ci_pipeline_material_id in (?) ", pg.In(ciPipelineMaterialIds)).
 		Update()
 	return err
