@@ -47,6 +47,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 	gitHostId := webhookEvent.GitHostId
 	eventType := webhookEvent.EventType
 	payloadJson := webhookEvent.RequestPayloadJson
+	payloadId := webhookEvent.PayloadId
 
 	impl.logger.Debugw("gitHostId", gitHostId, "eventType", eventType)
 
@@ -82,6 +83,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 		// set event details in webhook data (eventId and merged/non-merged etc..)
 		webhookEventParsedData.EventId = eventId
 		webhookEventParsedData.EventActionType = event.ActionType
+		webhookEventParsedData.PayloadDataId = payloadId
 
 		// fetch webhook parsed data from DB if unique id is not blank
 		webhookParsedEventGetData, err := impl.webhookEventService.GetWebhookParsedEventDataByEventIdAndUniqueId(eventId, webhookEventParsedData.UniqueId)

@@ -43,6 +43,8 @@ type RestHandler interface {
 	GetWebhookData(w http.ResponseWriter, r *http.Request)
 	GetAllWebhookEventConfigForHost(w http.ResponseWriter, r *http.Request)
 	GetWebhookEventConfig(w http.ResponseWriter, r *http.Request)
+	GetWebhookPayloadDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request)
+	GetWebhookPayloadFilterDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request)
 }
 
 func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *RestHandlerImpl {
@@ -363,6 +365,49 @@ func (handler RestHandlerImpl) GetWebhookEventConfig(w http.ResponseWriter, r *h
 		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {
 		handler.writeJsonResp(w, err, webhookEventConfig, http.StatusOK)
+	}
+
+}
+
+func (handler RestHandlerImpl) GetWebhookPayloadDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request) {
+	handler.logger.Debug("GetWebhookPayloadDataForPipelineMaterialId API call")
+	decoder := json.NewDecoder(r.Body)
+	request := &git.WebhookPayloadDataRequest{}
+	err := decoder.Decode(request)
+	if err != nil {
+		handler.logger.Errorw("error in decoding request of GetWebhookPayloadDataForPipelineMaterialId ", "err", err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("webhook payload data request ", "req", request)
+
+	data, err := handler.repositoryManager.GetWebhookPayloadDataForPipelineMaterialId(request)
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+	} else {
+		handler.writeJsonResp(w, err, data, http.StatusOK)
+	}
+
+}
+
+
+func (handler RestHandlerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request) {
+	handler.logger.Debug("GetWebhookPayloadFilterDataForPipelineMaterialId API call")
+	decoder := json.NewDecoder(r.Body)
+	request := &git.WebhookPayloadFilterDataRequest{}
+	err := decoder.Decode(request)
+	if err != nil {
+		handler.logger.Errorw("error in decoding request of GetWebhookPayloadFilterDataForPipelineMaterialId ", "err", err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("webhook payload filter data request ", "req", request)
+
+	data, err := handler.repositoryManager.GetWebhookPayloadFilterDataForPipelineMaterialId(request)
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+	} else {
+		handler.writeJsonResp(w, err, data, http.StatusOK)
 	}
 
 }

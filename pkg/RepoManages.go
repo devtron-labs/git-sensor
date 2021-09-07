@@ -46,20 +46,23 @@ type RepoManager interface {
 	GetWebhookDataById(id int) (*git.WebhookData, error)
 	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
+	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
+	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
 }
 
 type RepoManagerImpl struct {
-	logger                            *zap.SugaredLogger
-	materialRepository                sql.MaterialRepository
-	repositoryManager                 git.RepositoryManager
-	gitProviderRepository             sql.GitProviderRepository
-	ciPipelineMaterialRepository      sql.CiPipelineMaterialRepository
-	locker                            *internal.RepositoryLocker
-	gitWatcher                        git.GitWatcher
-	webhookEventRepository            sql.WebhookEventRepository
-	webhookEventParsedDataRepository  sql.WebhookEventParsedDataRepository
-	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository
-	webhookEventBeanConverter         git.WebhookEventBeanConverter
+	logger                                        *zap.SugaredLogger
+	materialRepository                            sql.MaterialRepository
+	repositoryManager                             git.RepositoryManager
+	gitProviderRepository                         sql.GitProviderRepository
+	ciPipelineMaterialRepository                  sql.CiPipelineMaterialRepository
+	locker                                        *internal.RepositoryLocker
+	gitWatcher                                    git.GitWatcher
+	webhookEventRepository                        sql.WebhookEventRepository
+	webhookEventParsedDataRepository              sql.WebhookEventParsedDataRepository
+	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
+	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
+	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 }
 
 func NewRepoManagerImpl(
@@ -72,6 +75,7 @@ func NewRepoManagerImpl(
 	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
 	webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository,
+	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
@@ -82,10 +86,11 @@ func NewRepoManagerImpl(
 		ciPipelineMaterialRepository:      ciPipelineMaterialRepository,
 		locker:                            locker,
 		gitWatcher:                        gitWatcher,
-		webhookEventRepository: 		   webhookEventRepository,
+		webhookEventRepository:            webhookEventRepository,
 		webhookEventParsedDataRepository:  webhookEventParsedDataRepository,
 		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
-		webhookEventBeanConverter:         webhookEventBeanConverter,
+		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
+		webhookEventBeanConverter:                     webhookEventBeanConverter,
 	}
 }
 
@@ -104,7 +109,11 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 		}
 	}
 	if len(old) > 0 {
-		err := impl.ciPipelineMaterialRepository.Update(old)
+		err := impl.InactivateWebhookDataMappingForPipelineMaterials(old)
+		if err != nil {
+			return nil, err
+		}
+		err = impl.ciPipelineMaterialRepository.Update(old)
 		if err != nil {
 			return nil, err
 		}
@@ -128,6 +137,38 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 	}
 	return materials, nil
 }
+
+
+func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(oldMaterials []*sql.CiPipelineMaterial) error {
+	var ciPipelineMaterialIdsWebhookMappingDeactivate []int
+	for _, oldMaterial := range oldMaterials {
+		if oldMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
+			continue
+		}
+
+		materialFromDb, err := impl.ciPipelineMaterialRepository.FindById(oldMaterial.Id)
+		if err != nil {
+			impl.logger.Errorw("error in getting pipeline material from DB", "id", oldMaterial.Id, "err", err)
+			return err
+		}
+
+		if materialFromDb.Value != oldMaterial.Value {
+			ciPipelineMaterialIdsWebhookMappingDeactivate = append(ciPipelineMaterialIdsWebhookMappingDeactivate, oldMaterial.Id)
+		}
+	}
+
+	if len(ciPipelineMaterialIdsWebhookMappingDeactivate) > 0 {
+		impl.logger.Debugw("Inactivating webhook data mapping for ids ", "ids", ciPipelineMaterialIdsWebhookMappingDeactivate)
+		err := impl.webhookEventDataMappingRepository.InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIdsWebhookMappingDeactivate)
+		if err != nil {
+			impl.logger.Errorw("error in inactivating webhook data mapping for ", "ids", ciPipelineMaterialIdsWebhookMappingDeactivate, "err", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
@@ -382,7 +423,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 		return impl.FetchGitCommitsForBranchFixPipeline(pipelineMaterial, gitMaterial)
 	} else if pipelineMaterialType == sql.SOURCE_TYPE_WEBHOOK {
 		return impl.FetchGitCommitsForWebhookTypePipeline(pipelineMaterial, gitMaterial)
-	}else{
+	} else {
 		err = errors.New("unknown pipelineMaterial Type")
 	}
 
@@ -423,27 +464,25 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 	}
 
 	pipelineMaterialId := pipelineMaterial.Id
-	webhookMappings, err := impl.webhookEventDataMappingRepository.GetCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
+	matchedWebhookMappings, err := impl.webhookEventDataMappingRepository.GetMatchedCiPipelineMaterialWebhookDataMappingForPipelineMaterial(pipelineMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook mapping for pipelineId ", "id", pipelineMaterialId, "errMsg", err)
 		return nil, err
 	}
 
-	if len(webhookMappings) == 0 {
+	if len(matchedWebhookMappings) == 0 {
 		impl.logger.Infow("no webhook mapping for ci pipeline, pipelineId", "pipelineId", pipelineMaterialId)
 		return response, nil
 	}
 
 	var webhookDataIds []int
-	for _, webhookMapping := range webhookMappings {
-		if webhookMapping.ConditionMatched {
-			webhookDataIds = append(webhookDataIds, webhookMapping.WebhookDataId)
-		}
+	for _, webhookMapping := range matchedWebhookMappings {
+		webhookDataIds = append(webhookDataIds, webhookMapping.WebhookDataId)
 	}
 
 	impl.logger.Debugw("webhookDataIds :", webhookDataIds)
 
-	if len(webhookDataIds) == 0{
+	if len(webhookDataIds) == 0 {
 		impl.logger.Debugw("webhook data Ids are null skipping")
 		return response, nil
 	}
@@ -566,7 +605,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 
 	if commits == nil {
 		return nil, err
-	}else{
+	} else {
 		return commits[0], err
 	}
 }
@@ -673,4 +712,131 @@ func (impl RepoManagerImpl) GetWebhookEventConfig(eventId int) (*git.WebhookEven
 	webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)
 
 	return webhookEvent, nil
+}
+
+func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error) {
+	impl.logger.Debugw("Getting webhook payload data ", "request", request)
+
+	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.CiPipelineMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error in getting ci pipeline material", "err", err)
+		return nil, err
+	}
+
+	if pipelineMaterial.Type != sql.SOURCE_TYPE_WEBHOOK {
+		error := "pipeline material is not of webhook type"
+		impl.logger.Error(error)
+		return nil, errors.New(error)
+	}
+
+	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error in getting git material", "err", err)
+		return nil, err
+	}
+
+
+	webhookSourceTypeValue := &git.WebhookSourceTypeValue{}
+	err = json.Unmarshal([]byte(pipelineMaterial.Value), &webhookSourceTypeValue)
+	if err != nil {
+		impl.logger.Errorw("error in json parsing", "err", err, "ciPipelineMaterialJsonValue", pipelineMaterial.Value)
+		return nil, err
+	}
+
+	eventConfig, err := impl.GetWebhookEventConfig(webhookSourceTypeValue.EventId)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook event config ", "err", err)
+		return nil, err
+	}
+
+	mappings, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadDataForPipelineMaterialId(request.CiPipelineMaterialId, request.Limit, request.Offset, request.EventTimeSortOrder)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook payload data ", "err", err)
+		return nil, err
+	}
+
+	// build filters
+	filters :=  make(map[string]string)
+	for _, selector := range eventConfig.Selectors {
+		if condition, ok := webhookSourceTypeValue.Condition[selector.Id]; ok {
+			filters[selector.Name] = condition
+		}
+	}
+
+	// build payloads
+	var webhookPayloadDataPayloadResponses []*git.WebhookPayloadDataPayloadsResponse
+	for _, mapping := range mappings {
+
+		if len(mapping.FilterResults) == 0 {
+			continue
+		}
+
+		matchedFiltersCount := 0
+		failedFiltersCount := 0
+
+		for _, filterResult := range mapping.FilterResults {
+			if filterResult.ConditionMatched {
+				matchedFiltersCount = matchedFiltersCount + 1
+			} else {
+				failedFiltersCount = failedFiltersCount + 1
+			}
+		}
+
+		webhookPayloadDataPayloadResponse := &git.WebhookPayloadDataPayloadsResponse{
+			ParsedDataId:        mapping.WebhookDataId,
+			EventTime:           mapping.UpdatedOn,
+			MatchedFiltersCount: matchedFiltersCount,
+			FailedFiltersCount:  failedFiltersCount,
+			MatchedFilters:      mapping.ConditionMatched,
+		}
+
+		webhookPayloadDataPayloadResponses = append(webhookPayloadDataPayloadResponses, webhookPayloadDataPayloadResponse)
+	}
+
+	webhookPayloadDataResponse := &git.WebhookPayloadDataResponse{
+		RepositoryUrl: gitMaterial.Url,
+		Filters: filters,
+		Payloads: webhookPayloadDataPayloadResponses,
+	}
+
+	return webhookPayloadDataResponse, nil
+}
+
+func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error) {
+	impl.logger.Debugw("Getting webhook payload filter data ", "request", request)
+
+	mapping, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadFilterDataForPipelineMaterialId(request.CiPipelineMaterialId, request.ParsedDataId)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook filter payload data ", "err", err)
+		return nil, err
+	}
+
+	parsedData, err := impl.webhookEventParsedDataRepository.GetWebhookEventParsedDataById(request.ParsedDataId)
+	if err != nil {
+		impl.logger.Errorw("error in getting parsed webhook data ", "err", err)
+		return nil, err
+	}
+
+	filterResults := mapping.FilterResults
+
+	// build payload
+	var webhookPayloadFilterDataSelectorResponses []*git.WebhookPayloadFilterDataSelectorResponse
+	if len(filterResults) > 0 {
+		for _, filterResult := range filterResults {
+			webhookPayloadFilterDataSelectorResponse := &git.WebhookPayloadFilterDataSelectorResponse{
+				SelectorName:  filterResult.SelectorName,
+				SelectorCondition: filterResult.SelectorCondition,
+				SelectorValue: filterResult.SelectorValue,
+				Match:         filterResult.ConditionMatched,
+			}
+			webhookPayloadFilterDataSelectorResponses = append(webhookPayloadFilterDataSelectorResponses, webhookPayloadFilterDataSelectorResponse)
+		}
+	}
+
+	webhookPayloadFilterDataResponse := &git.WebhookPayloadFilterDataResponse{
+		PayloadId: parsedData.PayloadDataId,
+		SelectorsData: webhookPayloadFilterDataSelectorResponses,
+	}
+
+	return webhookPayloadFilterDataResponse, nil
 }

@@ -94,6 +94,7 @@ type RefreshGitMaterialResponse struct {
 }
 
 type WebhookEvent struct {
+	PayloadId          int    `json:"payloadId"`
 	RequestPayloadJson string `json:"requestPayloadJson"`
 	GitHostId          int    `json:"gitHostId"`
 	EventType          string `json:"eventType"`
@@ -134,4 +135,42 @@ type WebhookEventSelectors struct {
 type WebhookSourceTypeValue struct {
 	EventId   int            `json:"eventId,omitempty"`
 	Condition map[int]string `json:"condition,omitempty"`
+}
+
+type WebhookPayloadDataRequest struct {
+	CiPipelineMaterialId int    `json:"ciPipelineMaterialId"`
+	Limit                int    `json:"limit"`
+	Offset               int    `json:"offset"`
+	EventTimeSortOrder   string `json:"eventTimeSortOrder"`
+}
+
+type WebhookPayloadDataResponse struct {
+	Filters       map[string]string                     `json:"filters"`
+	RepositoryUrl string                                `json:"repositoryUrl"`
+	Payloads      []*WebhookPayloadDataPayloadsResponse `json:"payloads"`
+}
+
+type WebhookPayloadDataPayloadsResponse struct {
+	ParsedDataId        int       `json:"parsedDataId"`
+	EventTime           time.Time `json:"eventTime"`
+	MatchedFiltersCount int       `json:"matchedFiltersCount"`
+	FailedFiltersCount  int       `json:"failedFiltersCount"`
+	MatchedFilters      bool      `json:"matchedFilters"`
+}
+
+type WebhookPayloadFilterDataRequest struct {
+	CiPipelineMaterialId int `json:"ciPipelineMaterialId"`
+	ParsedDataId         int `json:"parsedDataId"`
+}
+
+type WebhookPayloadFilterDataResponse struct {
+	PayloadId     int                                         `json:"payloadId"`
+	SelectorsData []*WebhookPayloadFilterDataSelectorResponse `json:"selectorsData"`
+}
+
+type WebhookPayloadFilterDataSelectorResponse struct {
+	SelectorName      string `json:"selectorName"`
+	SelectorCondition string `json:"selectorCondition"`
+	SelectorValue     string `json:"selectorValue"`
+	Match             bool   `json:"match"`
 }
