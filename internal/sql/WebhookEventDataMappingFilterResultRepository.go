@@ -22,7 +22,7 @@ import (
 )
 
 type CiPipelineMaterialWebhookDataMappingFilterResult struct {
-	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping_filter_result"`
+	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping_filter_result" pg:",discard_unknown_columns"`
 	Id                   int       `sql:"id,pk"`
 	WebhookDataMappingId int       `sql:"webhook_data_mapping_id,notnull"`
 	SelectorName         string    `sql:"selector_name,notnull"`

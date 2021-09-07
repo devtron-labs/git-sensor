@@ -24,7 +24,7 @@ import (
 )
 
 type CiPipelineMaterialWebhookDataMapping struct {
-	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping"`
+	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping" pg:",discard_unknown_columns"`
 	Id                   int       `sql:"id,pk"`
 	CiPipelineMaterialId int       `sql:"ci_pipeline_material_id"`
 	WebhookDataId        int       `sql:"webhook_data_id"`

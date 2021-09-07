@@ -23,7 +23,7 @@ import (
 )
 
 type WebhookEventParsedData struct {
-	tableName       struct{}          `sql:"webhook_event_parsed_data"`
+	tableName       struct{}          `sql:"webhook_event_parsed_data" pg:",discard_unknown_columns"`
 	Id              int               `sql:"id,pk"`
 	EventId         int               `sql:"event_id,notnull"`
 	PayloadDataId   int               `sql:"payload_data_id"`
