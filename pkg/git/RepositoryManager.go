@@ -29,8 +29,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -70,8 +68,6 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
-
 		// add private key
 		sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 		if err != nil {
