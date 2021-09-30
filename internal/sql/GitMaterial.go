@@ -111,7 +111,7 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	return &material, err
 }
 
-func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
