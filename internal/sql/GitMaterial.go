@@ -81,7 +81,7 @@ func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 func (repo MaterialRepositoryImpl) FindActive() ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
-		Column("git_material.*", "GitProvider").
+		Column("git_material.*", "GitProvider", ).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
 			return q.Where("active IS TRUE"), nil
 		}).
