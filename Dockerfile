@@ -12,5 +12,6 @@ COPY ./git-ask-pass.sh /git-ask-pass.sh
 RUN chmod +x /git-ask-pass.sh
 RUN apk add --no-cache ca-certificates
 RUN apk add git --no-cache
+RUN apk add openssh --no-cache
 COPY --from=build-env  /go/src/github.com/devtron-labs/git-sensor/git-sensor .
 CMD ["./git-sensor"]

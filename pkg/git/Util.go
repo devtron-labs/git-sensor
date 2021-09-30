@@ -19,8 +19,8 @@ package git
 import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
+	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -28,9 +28,11 @@ import (
 )
 
 const (
-	GIT_BASE_DIR      = "/git-base/"
-	CLONE_TIMEOUT_SEC = 600
-	FETCH_TIMEOUT_SEC = 30
+	GIT_BASE_DIR        = "/git-base/"
+	SSH_PRIVATE_KEY_DIR = "/ssh-keys/"
+	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
+	CLONE_TIMEOUT_SEC   = 600
+	FETCH_TIMEOUT_SEC   = 30
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -51,26 +53,6 @@ func GetLocationForMaterial(material *sql.GitMaterial) (location string, err err
 	return "", fmt.Errorf("unsupported format url %s", material.Url)
 }
 
-func GetAuthMethod(gitProvider *sql.GitProvider) (transport.AuthMethod, error) {
-
-	var auth transport.AuthMethod
-	switch gitProvider.AuthMode {
-	case sql.AUTH_MODE_USERNAME_PASSWORD:
-		auth = &http.BasicAuth{Password: gitProvider.Password, Username: gitProvider.UserName}
-	case sql.AUTH_MODE_ACCESS_TOKEN:
-		auth = &http.BasicAuth{Password: gitProvider.AccessToken, Username: gitProvider.UserName}
-	case sql.AUTH_MODE_ANONYMOUS:
-		auth = nil
-	case sql.AUTH_MODE_SSH:
-		//signer, err := ssh.ParsePrivateKey([]byte(""))
-		//auth = &ssh.PublicKeys{User: "git", Signer: signer}
-		return nil, fmt.Errorf("ssh not supported")
-	default:
-		return nil, fmt.Errorf("unsupported %s", gitProvider.AuthMode)
-	}
-	return auth, nil
-}
-
 func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password string, err error) {
 	switch gitProvider.AuthMode {
 	case sql.AUTH_MODE_USERNAME_PASSWORD:
@@ -81,8 +63,57 @@ func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password strin
 	case sql.AUTH_MODE_ANONYMOUS:
 		return "", "", nil
 	case sql.AUTH_MODE_SSH:
-		return "", "", fmt.Errorf("ssh not supported")
+		return "", "", nil
 	default:
 		return "", "", fmt.Errorf("unsupported %s", gitProvider.AuthMode)
 	}
+}
+
+func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) (privateKeyPath string, err error) {
+	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
+	sshPrivateKeyFilePath := path.Join(SSH_PRIVATE_KEY_DIR, SSH_PRIVATE_KEY_FILE_NAME)
+
+	// if file exists then return
+	if _, err := os.Stat(sshPrivateKeyFilePath); os.IsExist(err) {
+		return sshPrivateKeyFilePath, nil
+	}
+
+	// create dirs
+	err = os.MkdirAll(sshPrivateKeyFolderPath, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	// create file with content
+	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0600)
+	if err != nil {
+		return "", err
+	}
+
+	return sshPrivateKeyFilePath, nil
+}
+
+
+func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) error {
+	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
+	sshPrivateKeyFilePath := path.Join(SSH_PRIVATE_KEY_DIR, SSH_PRIVATE_KEY_FILE_NAME)
+
+	// if file exists then delete file
+	if _, err := os.Stat(sshPrivateKeyFilePath); os.IsExist(err) {
+		os.Remove(sshPrivateKeyFilePath)
+	}
+
+	// create dirs
+	err := os.MkdirAll(sshPrivateKeyFolderPath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	// create file with content
+	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0600)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

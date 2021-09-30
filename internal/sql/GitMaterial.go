@@ -28,7 +28,7 @@ const (
 	SOURCE_TYPE_BRANCH_FIXED SourceType = "SOURCE_TYPE_BRANCH_FIXED"
 	SOURCE_TYPE_BRANCH_REGEX SourceType = "SOURCE_TYPE_BRANCH_REGEX"
 	SOURCE_TYPE_TAG_ANY      SourceType = "SOURCE_TYPE_TAG_ANY"
-	SOURCE_TYPE_WEBHOOK 	 SourceType = "WEBHOOK"
+	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
 //TODO: add support for submodule
@@ -37,6 +37,7 @@ type GitMaterial struct {
 	Id               int      `sql:"id,pk"`
 	GitProviderId    int      `sql:"git_provider_id,notnull"`
 	Url              string   `sql:"url,omitempty"`
+	FetchSubmodules  bool     `sql:"fetch_submodules,notnull"`
 	Name             string   `sql:"name, omitempty"`
 	CheckoutLocation string   `sql:"checkout_location"`
 	CheckoutStatus   bool     `sql:"checkout_status,notnull"`
@@ -80,7 +81,7 @@ func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 func (repo MaterialRepositoryImpl) FindActive() ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
-		Column("git_material.*", "GitProvider", ).
+		Column("git_material.*", "GitProvider").
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
 			return q.Where("active IS TRUE"), nil
 		}).
@@ -110,7 +111,7 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	return &material, err
 }
 
-func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {

@@ -81,3 +81,12 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 	})
 	return err
 }
+
+func (impl *GitUtil) ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
+	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
+	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
+	cmd := exec.Command("git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	output, errMsg, err := impl.runCommand(cmd)
+	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, errMsg, err
+}
