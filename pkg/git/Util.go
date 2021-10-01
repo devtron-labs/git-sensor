@@ -71,7 +71,7 @@ func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password strin
 
 func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) (privateKeyPath string, err error) {
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
-	sshPrivateKeyFilePath := path.Join(SSH_PRIVATE_KEY_DIR, SSH_PRIVATE_KEY_FILE_NAME)
+	sshPrivateKeyFilePath := path.Join(sshPrivateKeyFolderPath, SSH_PRIVATE_KEY_FILE_NAME)
 
 	// if file exists then return
 	if _, err := os.Stat(sshPrivateKeyFilePath); os.IsExist(err) {
@@ -96,7 +96,7 @@ func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent stri
 
 func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) error {
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
-	sshPrivateKeyFilePath := path.Join(SSH_PRIVATE_KEY_DIR, SSH_PRIVATE_KEY_FILE_NAME)
+	sshPrivateKeyFilePath := path.Join(sshPrivateKeyFolderPath, SSH_PRIVATE_KEY_FILE_NAME)
 
 	// if file exists then delete file
 	if _, err := os.Stat(sshPrivateKeyFilePath); os.IsExist(err) {
