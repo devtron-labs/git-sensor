@@ -43,13 +43,21 @@ const (
 
 func GetLocationForMaterial(material *sql.GitMaterial) (location string, err error) {
 	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
-	gitRegex := `^https.*`
-	matched, err := regexp.MatchString(gitRegex, material.Url)
-	if matched {
-		location := strings.ReplaceAll(material.Url, "https://", "")
-		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), location)
+	httpsRegex := `^https.*`
+	httpsMatched, err := regexp.MatchString(httpsRegex, material.Url)
+	if httpsMatched {
+		locationWithoutProtocol := strings.ReplaceAll(material.Url, "https://", "")
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), locationWithoutProtocol)
 		return checkoutPath, nil
 	}
+
+	sshRegex := `^git@.*`
+	sshMatched, err := regexp.MatchString(sshRegex, material.Url)
+	if sshMatched {
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), material.Url)
+		return checkoutPath, nil
+	}
+	
 	return "", fmt.Errorf("unsupported format url %s", material.Url)
 }
 
