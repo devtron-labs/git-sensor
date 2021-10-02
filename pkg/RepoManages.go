@@ -228,7 +228,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 		err = impl.gitProviderRepository.Save(provider)
 	}
 
-	if (err != nil) && (provider.AuthMode == sql.AUTH_MODE_SSH) {
+	if (err == nil) && (provider.AuthMode == sql.AUTH_MODE_SSH) {
 		err = git.CreateOrUpdateSshPrivateKeyOnDisk(provider.Id, provider.SshPrivateKey)
 		if err != nil {
 			impl.logger.Errorw("error in creating/updating ssh private key ","err", err)
