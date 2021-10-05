@@ -28,7 +28,7 @@ const (
 	SOURCE_TYPE_BRANCH_FIXED SourceType = "SOURCE_TYPE_BRANCH_FIXED"
 	SOURCE_TYPE_BRANCH_REGEX SourceType = "SOURCE_TYPE_BRANCH_REGEX"
 	SOURCE_TYPE_TAG_ANY      SourceType = "SOURCE_TYPE_TAG_ANY"
-	SOURCE_TYPE_WEBHOOK 	 SourceType = "WEBHOOK"
+	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
 //TODO: add support for submodule
@@ -37,6 +37,7 @@ type GitMaterial struct {
 	Id               int      `sql:"id,pk"`
 	GitProviderId    int      `sql:"git_provider_id,notnull"`
 	Url              string   `sql:"url,omitempty"`
+	FetchSubmodules  bool     `sql:"fetch_submodules,notnull"`
 	Name             string   `sql:"name, omitempty"`
 	CheckoutLocation string   `sql:"checkout_location"`
 	CheckoutStatus   bool     `sql:"checkout_status,notnull"`

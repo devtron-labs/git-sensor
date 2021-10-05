@@ -227,6 +227,14 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	} else {
 		err = impl.gitProviderRepository.Save(provider)
 	}
+
+	if (err == nil) && (provider.AuthMode == sql.AUTH_MODE_SSH) {
+		err = git.CreateOrUpdateSshPrivateKeyOnDisk(provider.Id, provider.SshPrivateKey)
+		if err != nil {
+			impl.logger.Errorw("error in creating/updating ssh private key ","err", err)
+		}
+	}
+
 	return provider, err
 }
 
@@ -253,6 +261,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	existingMaterial.GitProviderId = material.GitProviderId
 	existingMaterial.Deleted = material.Deleted
 	existingMaterial.CheckoutStatus = false
+	existingMaterial.FetchSubmodules = material.FetchSubmodules
 
 	err = impl.materialRepository.Update(existingMaterial)
 	if err != nil {
@@ -330,7 +339,7 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
-	err = impl.repositoryManager.Add(checkoutPath, material.Url, userName, password)
+	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, userName, password, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true

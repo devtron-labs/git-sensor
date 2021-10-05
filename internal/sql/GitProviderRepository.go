@@ -28,16 +28,16 @@ const (
 )
 
 type GitProvider struct {
-	tableName   struct{} `sql:"git_provider"`
-	Id          int      `sql:"id,pk"`
-	Name        string   `sql:"name,notnull"`
-	Url         string   `sql:"url,notnull"`
-	UserName    string   `sql:"user_name"`
-	Password    string   `sql:"password"`
-	SshKey      string   `sql:"ssh_key"`
-	AccessToken string   `sql:"access_token"`
-	AuthMode    AuthMode `sql:"auth_mode,notnull"`
-	Active      bool     `sql:"active,notnull"`
+	tableName     struct{} `sql:"git_provider"`
+	Id            int      `sql:"id,pk"`
+	Name          string   `sql:"name,notnull"`
+	Url           string   `sql:"url,notnull"`
+	UserName      string   `sql:"user_name"`
+	Password      string   `sql:"password"`
+	SshPrivateKey string   `sql:"ssh_private_key"`
+	AccessToken   string   `sql:"access_token"`
+	AuthMode      AuthMode `sql:"auth_mode,notnull"`
+	Active        bool     `sql:"active,notnull"`
 	//models.AuditLog
 }
 

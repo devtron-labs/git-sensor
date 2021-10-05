@@ -36,7 +36,7 @@ import (
 type RepositoryManager interface {
 	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
 	headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error)
-	Add(location, url string, userName, password string) error
+	Add(gitProviderId int, location, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
 	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -54,10 +54,10 @@ func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil) *Repo
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil}
 }
 
-func (impl RepositoryManagerImpl) Add(location string, url string, userName, password string) error {
+func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	err := os.RemoveAll(location)
 	if err != nil {
-		impl.logger.Errorw("error in cleaning checkoutpath", "err", err)
+		impl.logger.Errorw("error in cleaning checkout path", "err", err)
 		return err
 	}
 	err = impl.gitUtil.Init(location, url, true)
@@ -65,9 +65,27 @@ func (impl RepositoryManagerImpl) Add(location string, url string, userName, pas
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
 	}
-	opt, errormag, err := impl.gitUtil.Fetch(location, userName, password)
+
+	// check ssh
+	if authMode == sql.AUTH_MODE_SSH {
+		// add private key
+		sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
+		if err != nil {
+			impl.logger.Errorw("error in creating ssh private key", "err", err)
+			return err
+		}
+
+		//git config core.sshCommand
+		_, errorMsg, err :=  impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
+		if err != nil {
+			impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
+			return err
+		}
+	}
+
+	opt, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
 	if err != nil {
-		impl.logger.Errorw("error in cloning repo", "errormsg", errormag, "err", err)
+		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err
 	}
 	impl.logger.Debugw("opt msg", "opt", opt)
