@@ -76,7 +76,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		}
 
 		//git config core.sshCommand
-		_, errorMsg, err :=  impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
+		_, errorMsg, err := impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
 		if err != nil {
 			impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
 			return err
@@ -224,7 +224,6 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	return gitCommit, nil
 }
 
-
 //from -> old commit
 //to -> new commit
 //
@@ -274,7 +273,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
-		fs, err := commit.Stats()
+		fs, err := impl.getStats(commit)
 		if err != nil {
 			impl.logger.Errorw("error in getting fs", "branch", branch, "err", err)
 			break
@@ -286,6 +285,18 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		itrCounter = itrCounter + 1
 	}
 	return gitCommits, err
+}
+
+func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileStats, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			// sometimes the Patch generation will fail due to a known bug in
+			// sergi's go-diff: https://github.com/sergi/go-diff/issues/89.
+			return
+		}
+	}()
+	fs, err := commit.Stats()
+	return fs, err
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
