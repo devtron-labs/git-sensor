@@ -67,12 +67,14 @@ func (impl GitProviderRepositoryImpl) Update(provider *GitProvider) error {
 }
 func (impl GitProviderRepositoryImpl) GetById(id int) (*GitProvider, error) {
 	var provider GitProvider
-	err := impl.dbConnection.Model(&provider).Where("id =? ", id).Select()
+	err := impl.dbConnection.Model(&provider).Where("id =? ", id).
+		Where("active = ?", true).Select()
 	return &provider, err
 }
 
 func (impl GitProviderRepositoryImpl) Exists(id int) (bool, error) {
 	var provider GitProvider
-	exists, err := impl.dbConnection.Model(&provider).Where("id =? ", id).Exists()
+	exists, err := impl.dbConnection.Model(&provider).Where("id =? ", id).
+		Where("active = ?", true).Exists()
 	return exists, err
 }
