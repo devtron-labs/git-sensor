@@ -19,6 +19,12 @@ package git
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"go.uber.org/zap"
@@ -26,11 +32,6 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport"
-	"io"
-	"log"
-	"os"
-	"strings"
-	"time"
 )
 
 type RepositoryManager interface {
@@ -480,7 +481,6 @@ func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff,
 		}
 		new = parents[0]
 	}
-	return
 }
 
 func in(obj *object.Commit, list []*object.Commit) bool {

@@ -19,34 +19,35 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/devtron-labs/git-sensor/api"
+	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
-	"github.com/nats-io/stan"
 	"go.uber.org/zap"
-	"net/http"
-	"os"
-	"time"
 )
 
 type App struct {
-	MuxRouter *api.MuxRouter
-	Logger    *zap.SugaredLogger
-	watcher   *git.GitWatcherImpl
-	server    *http.Server
-	db        *pg.DB
-	nats      stan.Conn
+	MuxRouter    *api.MuxRouter
+	Logger       *zap.SugaredLogger
+	watcher      *git.GitWatcherImpl
+	server       *http.Server
+	db           *pg.DB
+	pubSubClient *internal.PubSubClient
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, nats stan.Conn) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *internal.PubSubClient) *App {
 	return &App{
-		MuxRouter: MuxRouter,
-		Logger:    Logger,
-		watcher:   impl,
-		db:        db,
-		nats:      nats,
+		MuxRouter:    MuxRouter,
+		Logger:       Logger,
+		watcher:      impl,
+		db:           db,
+		pubSubClient: pubSubClient,
 	}
 }
 
@@ -84,16 +85,11 @@ func (app *App) Stop() {
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
 	app.Logger.Infow("stopping nats")
-	nc := app.nats.NatsConn()
-	err := app.nats.Close()
-	if err != nil {
-		app.Logger.Errorw("error in closing stan", "err", err)
-	}
-	err = nc.Drain()
+
+	err := app.pubSubClient.Conn.Drain()
 	if err != nil {
 		app.Logger.Errorw("error in draining nats", "err", err)
 	}
-	nc.Close()
 
 	app.Logger.Infow("closing router")
 	err = app.server.Shutdown(timeoutContext)

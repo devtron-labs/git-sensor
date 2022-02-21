@@ -17,25 +17,34 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/caarlos0/env"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/stan"
-	"time"
+	"go.uber.org/zap"
 )
 
 const (
-	NEW_CI_MATERIAL_TOPIC = "GIT-SENSOR.NEW-CI-MATERIAL" //{publisher-app-name}-{topic-name}
-	POLL_CI_TOPIC ="GIT-SENSOR.PULL"
-	WEBHOOK_EVENT_TOPIC = "ORCHESTRATOR.WEBHOOK_EVENT"
+	NEW_CI_MATERIAL_TOPIC       = "GIT-SENSOR.NEW-CI-MATERIAL" //{publisher-app-name}-{topic-name}
+	POLL_CI_TOPIC               = "GIT-SENSOR.PULL"
+	POLL_CI_TOPIC_GRP           = "GIT-SENSOR.PULL.GRP"
+	POLL_CI_TOPIC_DURABLE       = "GIT-SENSOR.PULL.DURABLE"
+	WEBHOOK_EVENT_TOPIC         = "ORCHESTRATOR.WEBHOOK_EVENT"
+	WEBHOOK_EVENT_TOPIC_GRP     = "ORCHESTRATOR.WEBHOOK_EVENT_GRP"
+	WEBHOOK_EVENT_TOPIC_DURABLE = "ORCHESTRATOR.WEBHOOK_EVENT_DURABLE"
 )
+
+type PubSubClient struct {
+	Logger     *zap.SugaredLogger
+	JetStrCtxt nats.JetStreamContext
+	Conn       nats.Conn
+}
 
 type PubSubConfig struct {
 	NatsServerHost string `env:"NATS_SERVER_HOST" envDefault:"nats://devtron-nats.devtroncd:4222"`
-	ClusterId      string `env:"CLUSTER_ID" envDefault:"devtron-stan"`
-	ClientId       string `env:"CLIENT_ID" envDefault:"git-sensor"`
 }
 
-func NewNatsConnection() (stan.Conn, error) {
+func NewNatsConnection(logger *zap.SugaredLogger) (*PubSubClient, error) {
 	cfg := &PubSubConfig{}
 	err := env.Parse(cfg)
 	if err != nil {
@@ -46,9 +55,13 @@ func NewNatsConnection() (stan.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	sc, err := stan.Connect(cfg.ClusterId, cfg.ClientId, stan.NatsConn(nc))
-	if err != nil {
-		return nil, err
+
+	//Create a jetstream context
+	js, _ := nc.JetStream()
+
+	natsClient := &PubSubClient{
+		Logger:     logger,
+		JetStrCtxt: js,
 	}
-	return sc, nil
+	return natsClient, nil
 }

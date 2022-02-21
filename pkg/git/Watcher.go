@@ -21,14 +21,16 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
-	//"github.com/devtron-labs/git-sensor/pkg"
+	"github.com/nats-io/nats.go"
+
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/stan"
-	"go.uber.org/zap"
-	"gopkg.in/robfig/cron.v3"
 	"time"
+
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
 )
 
 type GitWatcherImpl struct {
@@ -37,10 +39,10 @@ type GitWatcherImpl struct {
 	cron                         *cron.Cron
 	logger                       *zap.SugaredLogger
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
-	nats                         stan.Conn
+	pubSubClient                 *internal.PubSubClient
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
-	webhookHandler 	 			 WebhookHandler
+	webhookHandler               WebhookHandler
 }
 
 type GitWatcher interface {
@@ -57,7 +59,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	nats stan.Conn, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
+	pubSubClient *internal.PubSubClient, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -78,9 +80,9 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		ciPipelineMaterialRepository: ciPipelineMaterialRepository,
 		materialRepo:                 materialRepo,
 		locker:                       locker,
-		nats:                         nats,
+		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
-		webhookHandler:     		  webhookHandler,
+		webhookHandler:               webhookHandler,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -142,7 +144,25 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 		}
 		impl.logger.Infow("publishing pull msg", "id", material.Id)
 
-		err = impl.nats.Publish(internal.POLL_CI_TOPIC, b)
+		streamInfo, strInfoErr := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.POLL_CI_TOPIC)
+		if strInfoErr != nil {
+			impl.logger.Errorw("Error while getting stream info", "topic", internal.POLL_CI_TOPIC, "error", strInfoErr)
+		}
+		if streamInfo == nil {
+			//Stream doesn't already exist. Create a new stream from jetStreamContext
+			_, addStrError := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
+				Name:     internal.POLL_CI_TOPIC,
+				Subjects: []string{internal.POLL_CI_TOPIC + ".*"},
+			})
+			if addStrError != nil {
+				impl.logger.Errorw("Error while creating stream", "topic", internal.POLL_CI_TOPIC, "error", addStrError)
+			}
+		}
+
+		//Generate random string for passing as Header Id in message
+		randString := "MsgHeaderId-" + util.Generate(10)
+
+		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.POLL_CI_TOPIC, b, nats.MsgId(randString))
 		impl.logger.Debugw("published msg", "msg", material)
 		if err != nil {
 			impl.logger.Infow("error in publishing message", "err", err)
@@ -150,9 +170,9 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 	}
 }
 
+//TODO : adhiran : see if we can set durable here
 func (impl GitWatcherImpl) SubscribePull() error {
-	aw := (FETCH_TIMEOUT_SEC + 5) * time.Second
-	_, err := impl.nats.Subscribe(internal.POLL_CI_TOPIC, func(msg *stan.Msg) {
+	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.POLL_CI_TOPIC, internal.POLL_CI_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
 		msg.Ack() //ack immediate if lost next min it would get a new message
 		material := &sql.GitMaterial{}
@@ -161,12 +181,16 @@ func (impl GitWatcherImpl) SubscribePull() error {
 			impl.logger.Infow("err in reading msg", "err", err)
 			return
 		}
-		impl.logger.Debugw("polling for material", "id", material.Id, "url", material.Url, "msg timestamp", msg.Timestamp)
+		msgMetaData, metaErr := msg.Metadata()
+		if nil != metaErr {
+			impl.logger.Debugw("Error while getting metadata of message", "err", metaErr)
+		}
+		impl.logger.Debugw("polling for material", "id", material.Id, "url", material.Url, "msg timestamp", msgMetaData.Timestamp)
 		_, err = impl.pollAndUpdateGitMaterial(material)
 		if err != nil {
 			impl.logger.Errorw("err in poling", "material", material, "err", err)
 		}
-	}, stan.SetManualAckMode(), stan.AckWait(aw))
+	}, nats.Durable(internal.POLL_CI_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(""))
 	return err
 }
 
@@ -292,7 +316,25 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 			impl.logger.Error("err in json marshaling", "err", err)
 			continue
 		}
-		err = impl.nats.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb)
+		streamInfo, strInfoErr := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.NEW_CI_MATERIAL_TOPIC)
+		if strInfoErr != nil {
+			impl.logger.Errorw("Error while getting stream info", "topic", internal.NEW_CI_MATERIAL_TOPIC, "error", strInfoErr)
+		}
+		if streamInfo == nil {
+			//Stream doesn't already exist. Create a new stream from jetStreamContext
+			_, addStrError := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
+				Name:     internal.NEW_CI_MATERIAL_TOPIC,
+				Subjects: []string{internal.NEW_CI_MATERIAL_TOPIC + ".*"},
+			})
+			if addStrError != nil {
+				impl.logger.Errorw("Error while creating stream", "topic", internal.NEW_CI_MATERIAL_TOPIC, "error", addStrError)
+			}
+		}
+
+		//Generate random string for passing as Header Id in message
+		randString := "MsgHeaderId-" + util.Generate(10)
+
+		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))
 		if err != nil {
 			impl.logger.Errorw("error in publishing material modification msg ", "material", material)
 		}
@@ -301,10 +343,9 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 	return nil
 }
 
-
+//TODO : adhiran : See if we need to set durable
 func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
-	aw := (FETCH_TIMEOUT_SEC + 5) * time.Second
-	_, err := impl.nats.Subscribe(internal.WEBHOOK_EVENT_TOPIC, func(msg *stan.Msg) {
+	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.WEBHOOK_EVENT_TOPIC, internal.WEBHOOK_EVENT_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
 		msg.Ack() //ack immediate if lost next min it would get a new message
 		webhookEvent := &WebhookEvent{}
@@ -314,10 +355,9 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 			return
 		}
 		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
-	}, stan.SetManualAckMode(), stan.AckWait(aw))
+	}, nats.Durable(internal.WEBHOOK_EVENT_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(""))
 	return err
 }
-
 
 /*func (impl GitWatcherImpl) sendRequest(reqByte []byte) {
 
