@@ -144,18 +144,18 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 		}
 		impl.logger.Infow("publishing pull msg", "id", material.Id)
 
-		streamInfo, strInfoErr := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.POLL_CI_TOPIC)
-		if strInfoErr != nil {
-			impl.logger.Errorw("Error while getting stream info", "topic", internal.POLL_CI_TOPIC, "error", strInfoErr)
+		streamInfo, err := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.POLL_CI_TOPIC)
+		if err != nil {
+			impl.logger.Errorw("Error while getting stream info", "topic", internal.POLL_CI_TOPIC, "error", err)
 		}
 		if streamInfo == nil {
 			//Stream doesn't already exist. Create a new stream from jetStreamContext
-			_, addStrError := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
+			_, err := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
 				Name:     internal.POLL_CI_TOPIC,
 				Subjects: []string{internal.POLL_CI_TOPIC + ".*"},
 			})
-			if addStrError != nil {
-				impl.logger.Errorw("Error while creating stream", "topic", internal.POLL_CI_TOPIC, "error", addStrError)
+			if err != nil {
+				impl.logger.Errorw("Error while creating stream", "topic", internal.POLL_CI_TOPIC, "error", err)
 			}
 		}
 
@@ -170,7 +170,7 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 	}
 }
 
-//TODO : adhiran : see if we can set durable here
+//TODO : adhiran : work with Nishant to see if we can bind to specific stream
 func (impl GitWatcherImpl) SubscribePull() error {
 	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.POLL_CI_TOPIC, internal.POLL_CI_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
@@ -343,7 +343,7 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 	return nil
 }
 
-//TODO : adhiran : See if we need to set durable
+//TODO : adhiran : Work with Nishant to see if we can bind to specific stream
 func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.WEBHOOK_EVENT_TOPIC, internal.WEBHOOK_EVENT_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
@@ -358,26 +358,6 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 	}, nats.Durable(internal.WEBHOOK_EVENT_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(""))
 	return err
 }
-
-/*func (impl GitWatcherImpl) sendRequest(reqByte []byte) {
-
-	url := "http://devtroncd-orchestrator-service-prod:80/webhook/git"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqByte))
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("webhook failed" + err.Error())
-	}
-	defer resp.Body.Close()
-
-//test 3
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
-}*/
 
 type CronLoggerImpl struct {
 	logger *zap.SugaredLogger
