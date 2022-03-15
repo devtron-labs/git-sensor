@@ -316,18 +316,18 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 			impl.logger.Error("err in json marshaling", "err", err)
 			continue
 		}
-		streamInfo, strInfoErr := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.NEW_CI_MATERIAL_TOPIC)
+		streamInfo, strInfoErr := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.GIT_SENSOR_STREAM)
 		if strInfoErr != nil {
-			impl.logger.Errorw("Error while getting stream info", "topic", internal.NEW_CI_MATERIAL_TOPIC, "error", strInfoErr)
+			impl.logger.Errorw("Error while getting stream info", "topic", internal.GIT_SENSOR_STREAM, "error", strInfoErr)
 		}
 		if streamInfo == nil {
 			//Stream doesn't already exist. Create a new stream from jetStreamContext
 			_, addStrError := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
-				Name:     internal.NEW_CI_MATERIAL_TOPIC,
-				Subjects: []string{internal.NEW_CI_MATERIAL_TOPIC + ".*"},
+				Name:     internal.GIT_SENSOR_STREAM,
+				Subjects: []string{internal.GIT_SENSOR_STREAM + ".*"},
 			})
 			if addStrError != nil {
-				impl.logger.Errorw("Error while creating stream", "topic", internal.NEW_CI_MATERIAL_TOPIC, "error", addStrError)
+				impl.logger.Errorw("Error while creating stream", "topic", internal.GIT_SENSOR_STREAM, "error", addStrError)
 			}
 		}
 
