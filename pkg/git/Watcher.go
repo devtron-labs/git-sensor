@@ -217,7 +217,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
-			err = impl.repositoryManager.CreateSshFileAndConfigureSshCommand(location, gitProvider.Id, gitProvider.SshPrivateKey)
+			err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProvider.Id, gitProvider.SshPrivateKey)
 			if err != nil {
 				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
 				return err

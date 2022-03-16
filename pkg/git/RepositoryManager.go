@@ -43,7 +43,7 @@ type RepositoryManager interface {
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
 	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
-	CreateSshFileAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
+	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
 }
 
 type RepositoryManagerImpl struct {
@@ -69,7 +69,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		err = impl.CreateSshFileAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
+		err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
 			return err
 		}
@@ -371,7 +371,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	return GitChanges, nil
 }
 
-func (impl RepositoryManagerImpl) CreateSshFileAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
 	// add private key
 	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
