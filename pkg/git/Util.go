@@ -29,7 +29,7 @@ import (
 
 const (
 	GIT_BASE_DIR        = "/git-base/"
-	SSH_PRIVATE_KEY_DIR = "/ssh-keys/"
+	SSH_PRIVATE_KEY_DIR = "/git-base/ssh-keys/"
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
 	CLONE_TIMEOUT_SEC   = 600
 	FETCH_TIMEOUT_SEC   = 30
