@@ -118,7 +118,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 			continue
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
-		wp.SubmitWait(func() {
+		wp.Submit(func() {
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
@@ -205,7 +205,8 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 }
 
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
-	userName, password, err := GetUserNamePassword(material.GitProvider)
+	gitProvider := material.GitProvider
+	userName, password, err := GetUserNamePassword(gitProvider)
 	location, err := GetLocationForMaterial(material)
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
@@ -214,7 +215,23 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
-		return err
+		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
+		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
+			err = CreateOrUpdateSshPrivateKeyOnDisk(gitProvider.Id, gitProvider.SshPrivateKey)
+			if err != nil {
+				impl.logger.Errorw("error in creating ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
+				return err
+			}else{
+				impl.logger.Info("Retrying fetching for" , "repo",  material.Url)
+				updated, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location)
+				if err != nil {
+					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
+					return err
+				}
+			}
+		}else{
+			return err
+		}
 	}
 	if !updated {
 		return nil
