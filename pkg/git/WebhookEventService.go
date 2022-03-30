@@ -276,21 +276,11 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 		impl.logger.Error("err in json marshaling", "err", err)
 		return err
 	}
-	streamInfo, err := impl.pubSubClient.JetStrCtxt.StreamInfo(internal.GIT_SENSOR_STREAM)
-	if err != nil {
-		impl.logger.Errorw("Error while getting stream info", "topic", internal.GIT_SENSOR_STREAM, "error", err)
-	}
-	if streamInfo == nil {
-		//Stream doesn't already exist. Create a new stream from jetStreamContext
-		_, err := impl.pubSubClient.JetStrCtxt.AddStream(&nats.StreamConfig{
-			Name:     internal.GIT_SENSOR_STREAM,
-			Subjects: []string{internal.GIT_SENSOR_STREAM + ".*"},
-		})
-		if err != nil {
-			impl.logger.Errorw("Error while creating stream", "topic", internal.GIT_SENSOR_STREAM, "error", err)
-		}
-	}
+	err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
 
+	if err != nil {
+		impl.logger.Errorw("Error while adding stream", "error", err)
+	}
 	//Generate random string for passing as Header Id in message
 	randString := "MsgHeaderId-" + util.Generate(10)
 	_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))

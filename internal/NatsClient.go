@@ -24,17 +24,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	NEW_CI_MATERIAL_TOPIC       = "GIT-SENSOR.NEW-CI-MATERIAL" //{publisher-app-name}-{topic-name}
-	POLL_CI_TOPIC               = "GIT-SENSOR.PULL"
-	POLL_CI_TOPIC_GRP           = "GIT-SENSOR.PULL.GRP"
-	POLL_CI_TOPIC_DURABLE       = "GIT-SENSOR.PULL.DURABLE"
-	WEBHOOK_EVENT_TOPIC         = "ORCHESTRATOR.WEBHOOK_EVENT"
-	WEBHOOK_EVENT_TOPIC_GRP     = "ORCHESTRATOR.WEBHOOK_EVENT_GRP"
-	WEBHOOK_EVENT_TOPIC_DURABLE = "ORCHESTRATOR.WEBHOOK_EVENT_DURABLE"
-	GIT_SENSOR_STREAM           = "GIT-SENSOR"
-)
-
 type PubSubClient struct {
 	Logger     *zap.SugaredLogger
 	JetStrCtxt nats.JetStreamContext
