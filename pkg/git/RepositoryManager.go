@@ -44,6 +44,7 @@ type RepositoryManager interface {
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
 	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
+	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
 }
 
 type RepositoryManagerImpl struct {
@@ -69,17 +70,8 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		// add private key
-		sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
+		err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
-			impl.logger.Errorw("error in creating ssh private key", "err", err)
-			return err
-		}
-
-		//git config core.sshCommand
-		_, errorMsg, err := impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
-		if err != nil {
-			impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
 			return err
 		}
 	}
@@ -378,6 +370,24 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	impl.logger.Debugw("computed files stats", "filestats", fileStats)
 	GitChanges.FileStats = fileStats
 	return GitChanges, nil
+}
+
+func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
+	// add private key
+	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
+	if err != nil {
+		impl.logger.Errorw("error in creating ssh private key", "err", err)
+		return err
+	}
+
+	//git config core.sshCommand
+	_, errorMsg, err := impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
+	if err != nil {
+		impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
+		return err
+	}
+
+	return nil
 }
 
 func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {

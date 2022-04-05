@@ -17,22 +17,29 @@
 package logger
 
 import (
+	"github.com/caarlos0/env"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
+type LogConfig struct {
+	Level int `env:"LOG_LEVEL" envDefault:"0"`  // default info
+}
 
 
-func NewSugardLogger() *zap.SugaredLogger {
-	l, err := zap.NewProduction()
+func NewSugaredLogger() *zap.SugaredLogger {
+	logConfig := &LogConfig{}
+	err := env.Parse(logConfig)
 	if err != nil {
-		panic("failed to create the default logger: " + err.Error())
+		panic("failed to parse env config for logger: " + err.Error())
 	}
-	//l, err := zap.NewDevelopment()
-	/*l, err := zap.NewProduction()
-	if err != nil {
-		panic("failed to create the default logger: " + err.Error())
-	}
-	Logger := l.Sugar()*/
-	return l.Sugar()
 
+	config := zap.NewProductionConfig()
+	config.Level = zap.NewAtomicLevelAt(zapcore.Level(logConfig.Level))
+
+	log, err := config.Build()
+	if err != nil {
+		panic("failed to create the logger: " + err.Error())
+	}
+	return log.Sugar()
 }
