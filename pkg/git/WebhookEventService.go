@@ -19,13 +19,15 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/nats-io/stan"
-	"go.uber.org/zap"
-	_ "gopkg.in/robfig/cron.v3"
 	"regexp"
 	"time"
+
+	"github.com/devtron-labs/git-sensor/internal"
+	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/util"
+	"github.com/nats-io/nats.go"
+	_ "github.com/robfig/cron/v3"
+	"go.uber.org/zap"
 )
 
 type WebhookEventService interface {
@@ -43,14 +45,14 @@ type WebhookEventServiceImpl struct {
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	materialRepository                            sql.MaterialRepository
-	nats                                          stan.Conn
+	pubSubClient                                  *internal.PubSubClient
 	webhookEventBeanConverter                     WebhookEventBeanConverter
 }
 
 func NewWebhookEventServiceImpl(
 	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository, webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
-	materialRepository sql.MaterialRepository, nats stan.Conn, webhookEventBeanConverter WebhookEventBeanConverter,
+	materialRepository sql.MaterialRepository, pubSubClient *internal.PubSubClient, webhookEventBeanConverter WebhookEventBeanConverter,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
 		logger:                                        logger,
@@ -59,7 +61,7 @@ func NewWebhookEventServiceImpl(
 		webhookEventDataMappingRepository:             webhookEventDataMappingRepository,
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		materialRepository:                            materialRepository,
-		nats:                                          nats,
+		pubSubClient:                                  pubSubClient,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 	}
 }
@@ -225,16 +227,16 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 		conditionRegexValue := condition[selectorId]
 
 		filterResult := &sql.CiPipelineMaterialWebhookDataMappingFilterResult{
-			SelectorName : selector.Name,
+			SelectorName:      selector.Name,
 			SelectorCondition: conditionRegexValue,
-			SelectorValue: actualValue,
-			ConditionMatched: true,
-			IsActive: true,
+			SelectorValue:     actualValue,
+			ConditionMatched:  true,
+			IsActive:          true,
 		}
 
 		if len(conditionRegexValue) != 0 {
 			match, err := regexp.MatchString(conditionRegexValue, actualValue)
-			if err != nil || !match{
+			if err != nil || !match {
 				filterResult.ConditionMatched = false
 			}
 			if overallMatch && !filterResult.ConditionMatched {
@@ -274,8 +276,14 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 		impl.logger.Error("err in json marshaling", "err", err)
 		return err
 	}
+	err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
 
-	err = impl.nats.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb)
+	if err != nil {
+		impl.logger.Errorw("Error while adding stream", "error", err)
+	}
+	//Generate random string for passing as Header Id in message
+	randString := "MsgHeaderId-" + util.Generate(10)
+	_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))
 	if err != nil {
 		impl.logger.Errorw("error in publishing material modification msg ", "material", material)
 	}
@@ -296,8 +304,8 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 		CiPipelineMaterialId: ciPipelineMaterialId,
 		WebhookDataId:        webhookParsedDataId,
 		ConditionMatched:     conditionMatched,
-		IsActive: true,
-		UpdatedOn: time.Now(),
+		IsActive:             true,
+		UpdatedOn:            time.Now(),
 	}
 
 	isNewMapping := mapping == nil
@@ -321,7 +329,6 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 
 	return impl.HandleMaterialWebhookMappingFilterResultIntoDb(filterResults, ciPipelineMaterialWebhookDataMapping.Id, isNewMapping)
 }
-
 
 func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingFilterResultIntoDb(filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult, webhookDataMappingId int, isNewMapping bool) error {
 	impl.logger.Debug("Handling Material webhook mapping filter results into DB")

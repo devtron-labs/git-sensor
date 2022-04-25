@@ -21,14 +21,16 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
-	//"github.com/devtron-labs/git-sensor/pkg"
+	"github.com/nats-io/nats.go"
+
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/stan"
-	"go.uber.org/zap"
-	"gopkg.in/robfig/cron.v3"
 	"time"
+
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
 )
 
 type GitWatcherImpl struct {
@@ -37,10 +39,10 @@ type GitWatcherImpl struct {
 	cron                         *cron.Cron
 	logger                       *zap.SugaredLogger
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
-	nats                         stan.Conn
+	pubSubClient                 *internal.PubSubClient
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
-	webhookHandler 	 			 WebhookHandler
+	webhookHandler               WebhookHandler
 }
 
 type GitWatcher interface {
@@ -57,7 +59,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	nats stan.Conn, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
+	pubSubClient *internal.PubSubClient, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -78,9 +80,9 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		ciPipelineMaterialRepository: ciPipelineMaterialRepository,
 		materialRepo:                 materialRepo,
 		locker:                       locker,
-		nats:                         nats,
+		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
-		webhookHandler:     		  webhookHandler,
+		webhookHandler:               webhookHandler,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -142,7 +144,15 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 		}
 		impl.logger.Infow("publishing pull msg", "id", material.Id)
 
-		err = impl.nats.Publish(internal.POLL_CI_TOPIC, b)
+		err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
+
+		if err != nil {
+			impl.logger.Errorw("Error while adding stream", "error", err)
+		}
+		//Generate random string for passing as Header Id in message
+		randString := "MsgHeaderId-" + util.Generate(10)
+
+		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.POLL_CI_TOPIC, b, nats.MsgId(randString))
 		impl.logger.Debugw("published msg", "msg", material)
 		if err != nil {
 			impl.logger.Infow("error in publishing message", "err", err)
@@ -151,8 +161,7 @@ func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
 }
 
 func (impl GitWatcherImpl) SubscribePull() error {
-	aw := (FETCH_TIMEOUT_SEC + 5) * time.Second
-	_, err := impl.nats.Subscribe(internal.POLL_CI_TOPIC, func(msg *stan.Msg) {
+	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.POLL_CI_TOPIC, internal.POLL_CI_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
 		msg.Ack() //ack immediate if lost next min it would get a new message
 		material := &sql.GitMaterial{}
@@ -161,12 +170,16 @@ func (impl GitWatcherImpl) SubscribePull() error {
 			impl.logger.Infow("err in reading msg", "err", err)
 			return
 		}
-		impl.logger.Debugw("polling for material", "id", material.Id, "url", material.Url, "msg timestamp", msg.Timestamp)
+		msgMetaData, metaErr := msg.Metadata()
+		if nil != metaErr {
+			impl.logger.Debugw("Error while getting metadata of message", "err", metaErr)
+		}
+		impl.logger.Debugw("polling for material", "id", material.Id, "url", material.Url, "msg timestamp", msgMetaData.Timestamp)
 		_, err = impl.pollAndUpdateGitMaterial(material)
 		if err != nil {
 			impl.logger.Errorw("err in poling", "material", material, "err", err)
 		}
-	}, stan.SetManualAckMode(), stan.AckWait(aw))
+	}, nats.Durable(internal.POLL_CI_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(internal.GIT_SENSOR_STREAM))
 	return err
 }
 
@@ -309,7 +322,15 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 			impl.logger.Error("err in json marshaling", "err", err)
 			continue
 		}
-		err = impl.nats.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb)
+		err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
+
+		if err != nil {
+			impl.logger.Errorw("Error while adding stream", "error", err)
+		}
+		//Generate random string for passing as Header Id in message
+		randString := "MsgHeaderId-" + util.Generate(10)
+
+		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))
 		if err != nil {
 			impl.logger.Errorw("error in publishing material modification msg ", "material", material)
 		}
@@ -318,10 +339,8 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 	return nil
 }
 
-
 func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
-	aw := (FETCH_TIMEOUT_SEC + 5) * time.Second
-	_, err := impl.nats.Subscribe(internal.WEBHOOK_EVENT_TOPIC, func(msg *stan.Msg) {
+	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.WEBHOOK_EVENT_TOPIC, internal.WEBHOOK_EVENT_TOPIC_GRP, func(msg *nats.Msg) {
 		impl.logger.Debugw("received msg", "msg", msg)
 		msg.Ack() //ack immediate if lost next min it would get a new message
 		webhookEvent := &WebhookEvent{}
@@ -331,30 +350,9 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 			return
 		}
 		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
-	}, stan.SetManualAckMode(), stan.AckWait(aw))
+	}, nats.Durable(internal.WEBHOOK_EVENT_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(internal.ORCHESTRATOR_STREAM))
 	return err
 }
-
-
-/*func (impl GitWatcherImpl) sendRequest(reqByte []byte) {
-
-	url := "http://devtroncd-orchestrator-service-prod:80/webhook/git"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqByte))
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("webhook failed" + err.Error())
-	}
-	defer resp.Body.Close()
-
-//test 3
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
-}*/
 
 type CronLoggerImpl struct {
 	logger *zap.SugaredLogger

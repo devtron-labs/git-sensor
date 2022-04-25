@@ -23,8 +23,8 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg/git"
+	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
-	_ "gopkg.in/robfig/cron.v3"
 )
 
 type RepoManager interface {
@@ -138,7 +138,6 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 	return materials, nil
 }
 
-
 func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(oldMaterials []*sql.CiPipelineMaterial) error {
 	var ciPipelineMaterialIdsWebhookMappingDeactivate []int
 	for _, oldMaterial := range oldMaterials {
@@ -168,7 +167,6 @@ func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(old
 
 	return nil
 }
-
 
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
@@ -231,7 +229,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	if (err == nil) && (provider.AuthMode == sql.AUTH_MODE_SSH) {
 		err = git.CreateOrUpdateSshPrivateKeyOnDisk(provider.Id, provider.SshPrivateKey)
 		if err != nil {
-			impl.logger.Errorw("error in creating/updating ssh private key ","err", err)
+			impl.logger.Errorw("error in creating/updating ssh private key ", "err", err)
 		}
 	}
 
@@ -744,7 +742,6 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 		return nil, err
 	}
 
-
 	webhookSourceTypeValue := &git.WebhookSourceTypeValue{}
 	err = json.Unmarshal([]byte(pipelineMaterial.Value), &webhookSourceTypeValue)
 	if err != nil {
@@ -765,7 +762,7 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 	}
 
 	// build filters
-	filters :=  make(map[string]string)
+	filters := make(map[string]string)
 	for _, selector := range eventConfig.Selectors {
 		if condition, ok := webhookSourceTypeValue.Condition[selector.Id]; ok {
 			filters[selector.Name] = condition
@@ -804,8 +801,8 @@ func (impl RepoManagerImpl) GetWebhookPayloadDataForPipelineMaterialId(request *
 
 	webhookPayloadDataResponse := &git.WebhookPayloadDataResponse{
 		RepositoryUrl: gitMaterial.Url,
-		Filters: filters,
-		Payloads: webhookPayloadDataPayloadResponses,
+		Filters:       filters,
+		Payloads:      webhookPayloadDataPayloadResponses,
 	}
 
 	return webhookPayloadDataResponse, nil
@@ -833,17 +830,17 @@ func (impl RepoManagerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(req
 	if len(filterResults) > 0 {
 		for _, filterResult := range filterResults {
 			webhookPayloadFilterDataSelectorResponse := &git.WebhookPayloadFilterDataSelectorResponse{
-				SelectorName:  filterResult.SelectorName,
+				SelectorName:      filterResult.SelectorName,
 				SelectorCondition: filterResult.SelectorCondition,
-				SelectorValue: filterResult.SelectorValue,
-				Match:         filterResult.ConditionMatched,
+				SelectorValue:     filterResult.SelectorValue,
+				Match:             filterResult.ConditionMatched,
 			}
 			webhookPayloadFilterDataSelectorResponses = append(webhookPayloadFilterDataSelectorResponses, webhookPayloadFilterDataSelectorResponse)
 		}
 	}
 
 	webhookPayloadFilterDataResponse := &git.WebhookPayloadFilterDataResponse{
-		PayloadId: parsedData.PayloadDataId,
+		PayloadId:     parsedData.PayloadDataId,
 		SelectorsData: webhookPayloadFilterDataSelectorResponses,
 	}
 
