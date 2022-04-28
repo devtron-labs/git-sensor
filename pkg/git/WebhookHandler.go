@@ -49,7 +49,7 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 	payloadJson := webhookEvent.RequestPayloadJson
 	payloadId := webhookEvent.PayloadId
 
-	impl.logger.Debugw("gitHostId", gitHostId, "eventType", eventType)
+	impl.logger.Debugw("webhook event request data", "gitHostId", gitHostId, "eventType", eventType)
 
 	// get all configured events from database for given git host Id
 	events, err := impl.webhookEventService.GetAllGitHostWebhookEventByGitHostId(gitHostId)
@@ -66,13 +66,15 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 	// operate for all matching event (match for eventType)
 	impl.logger.Debug("Checking for event matching")
 	for _, event := range events {
-		eventTypes := strings.Split(event.EventTypesCsv, ",")
-		if !contains(eventTypes, eventType) {
-			continue
+		if len(event.EventTypesCsv) > 0 {
+			eventTypes := strings.Split(event.EventTypesCsv, ",")
+			if !contains(eventTypes, eventType) {
+				continue
+			}
 		}
 
 		eventId := event.Id
-		
+
 		// parse event data using selectors
 		webhookEventParsedData, fullDataMap, err := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
 		if err != nil {
