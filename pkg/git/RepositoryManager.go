@@ -193,13 +193,14 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 //to -> new commit
 //
 func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
-	var branchRef string
-	// if branch is like 'refs/heads/master' then branchRef is same as branch, otherwise create ref
-	if strings.HasPrefix(branch, "refs/") {
-		branchRef = branch
-	}else{
-		branchRef = fmt.Sprintf("refs/remotes/origin/%s", branch)
+	// fix for azure devops : branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
+	// fix for manual trigger webhook bases pipeline
+	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
+	if strings.HasPrefix(branch, "refs/heads/"){
+		branch = strings.ReplaceAll(branch, "refs/heads/", "")
 	}
+
+	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
 		impl.logger.Errorw("ref not found", "branch", branch, "err", err)
