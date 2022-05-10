@@ -193,8 +193,8 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 //to -> new commit
 //
 func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
-	// fix for azure devops : branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
-	// fix for manual trigger webhook bases pipeline
+	// fix for azure devops (manual trigger webhook bases pipeline) :
+	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
 	if strings.HasPrefix(branch, "refs/heads/"){
 		branch = strings.ReplaceAll(branch, "refs/heads/", "")
