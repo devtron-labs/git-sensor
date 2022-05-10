@@ -36,7 +36,6 @@ import (
 
 type RepositoryManager interface {
 	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
-	headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error)
 	Add(gitProviderId int, location, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -130,33 +129,6 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 
 }
 
-func (impl RepositoryManagerImpl) headForBranch(repository *git.Repository, materials []*sql.CiPipelineMaterial) (ref map[*sql.CiPipelineMaterial]*object.Commit, err error) {
-	//refs/remotes/origin/test-1"
-	heads := map[*sql.CiPipelineMaterial]*object.Commit{}
-	it, err := repository.References()
-	if err != nil {
-		return nil, err
-	}
-	for {
-		ref, err := it.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		if match, material := matches(materials, ref.Name().String()); match {
-
-			commit, err := repository.CommitObject(ref.Hash())
-			if err != nil {
-				return nil, err
-			}
-			heads[material] = commit
-		}
-	}
-	return heads, nil
-}
-
 func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*GitCommit, error) {
 	tag = strings.TrimSpace(tag)
 	r, err := git.PlainOpen(checkoutPath)
@@ -221,10 +193,17 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 //to -> new commit
 //
 func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
+	// fix for azure devops (manual trigger webhook bases pipeline) :
+	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
+	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
+	if strings.HasPrefix(branch, "refs/heads/"){
+		branch = strings.ReplaceAll(branch, "refs/heads/", "")
+	}
+
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
-		impl.logger.Infow("ref not found", "branch", branch, "err", err)
+		impl.logger.Errorw("ref not found", "branch", branch, "err", err)
 		return nil, fmt.Errorf("branch %s not found in the repository ", branch)
 	} else if err != nil {
 		impl.logger.Errorw("error in getting reference", "branch", branch, "err", err)
@@ -303,17 +282,6 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	///---------------------
 	return impl.ChangesSinceByRepository(r, branch, from, to, count)
 	///----------------------
-
-}
-
-func matches(materials []*sql.CiPipelineMaterial, ref string) (bool, *sql.CiPipelineMaterial) {
-	for _, material := range materials {
-		remoteRef := "refs/remotes/origin/" + material.Value
-		if remoteRef == ref {
-			return true, material
-		}
-	}
-	return false, nil
 
 }
 
