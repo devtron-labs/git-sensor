@@ -74,7 +74,6 @@ func (impl GitProviderRepositoryImpl) GetById(id int) (*GitProvider, error) {
 
 func (impl GitProviderRepositoryImpl) Exists(id int) (bool, error) {
 	var provider GitProvider
-	exists, err := impl.dbConnection.Model(&provider).Where("id =? ", id).
-		Where("active = ?", true).Exists()
+	exists, err := impl.dbConnection.Model(&provider).Where("id =? ", id).Exists()
 	return exists, err
 }
