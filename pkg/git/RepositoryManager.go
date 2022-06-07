@@ -207,7 +207,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	}
 
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	impl.logger.Infow("INVESTIGATE before repository.Reference", "branch", branch)
 	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
+	impl.logger.Infow("INVESTIGATE after repository.Reference", "branch", branch)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
 		impl.logger.Errorw("ref not found", "branch", branch, "err", err)
 		return nil, fmt.Errorf("branch %s not found in the repository ", branch)
@@ -215,7 +217,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		impl.logger.Errorw("error in getting reference", "branch", branch, "err", err)
 		return nil, err
 	}
+	impl.logger.Infow("INVESTIGATE before repository.log", "branch", branch)
 	itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
+	impl.logger.Infow("INVESTIGATE after repository.log", "branch", branch)
 	if err != nil {
 		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
 		return nil, err
@@ -251,7 +255,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
+		impl.logger.Infow("INVESTIGATE before getStats", "branch", branch)
 		fs, err := impl.getStats(commit)
+		impl.logger.Infow("INVESTIGATE after getStats", "branch", branch)
 		if err != nil {
 			impl.logger.Errorw("error in getting fs", "branch", branch, "err", err)
 			break
