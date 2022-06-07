@@ -61,7 +61,9 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
 		return err
 	}
+	impl.logger.Infow("INVESTIGATE before gitUtil.Init", "id", gitProviderId)
 	err = impl.gitUtil.Init(location, url, true)
+	impl.logger.Infow("INVESTIGATE after gitUtil.Init", "id", gitProviderId)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
@@ -69,13 +71,17 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
+		impl.logger.Infow("INVESTIGATE before CreateSshFileIfNotExistsAndConfigureSshCommand", "id", gitProviderId)
 		err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
+		impl.logger.Infow("INVESTIGATE after CreateSshFileIfNotExistsAndConfigureSshCommand", "id", gitProviderId)
 		if err != nil {
 			return err
 		}
 	}
 
+	impl.logger.Infow("INVESTIGATE before gitUtil.Fetch", "id", gitProviderId)
 	opt, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	impl.logger.Infow("INVESTIGATE after gitUtil.Fetch", "id", gitProviderId)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err

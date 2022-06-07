@@ -299,12 +299,16 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 }
 
 func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
+	impl.logger.Infow("INVESTIGATE before FindById", "id", materialId)
 	material, err := impl.materialRepository.FindById(materialId)
+	impl.logger.Infow("INVESTIGATE after FindById", "id", materialId)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", "id", materialId, "err", err)
 		return err
 	}
+	impl.logger.Infow("INVESTIGATE before checkoutMaterial", "id", materialId)
 	_, err = impl.checkoutMaterial(material)
+	impl.logger.Infow("INVESTIGATE after checkoutMaterial", "id", materialId)
 	if err != nil {
 		impl.logger.Errorw("error in repo refresh", "id", material, "err", err)
 		return err
@@ -333,7 +337,9 @@ func (impl RepoManagerImpl) checkoutRepo(material *sql.GitMaterial) (*sql.GitMat
 
 func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	impl.logger.Infow("checking out material", "id", material.Id)
+	impl.logger.Infow("INVESTIGATE before gitProviderRepository.GetById", "id", material.Id)
 	gitProvider, err := impl.gitProviderRepository.GetById(material.GitProviderId)
+	impl.logger.Infow("INVESTIGATE after gitProviderRepository.GetById", "id", material.Id)
 	if err != nil {
 		return material, err
 	}
@@ -345,7 +351,9 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
+	impl.logger.Infow("INVESTIGATE before repositoryManager.Add", "id", material.Id)
 	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, userName, password, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	impl.logger.Infow("INVESTIGATE after repositoryManager.Add", "id", material.Id)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true
@@ -354,7 +362,9 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 		material.CheckoutMsgAny = err.Error()
 		material.FetchErrorMessage = err.Error()
 	}
+	impl.logger.Infow("INVESTIGATE before materialRepository.Update", "id", material.Id)
 	err = impl.materialRepository.Update(material)
+	impl.logger.Infow("INVESTIGATE after materialRepository.Update", "id", material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in updating material repo", "err", err, "material", material)
 		return nil, err
@@ -364,7 +374,9 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 		impl.logger.Errorw("unable to load material", "err", err)
 		return nil, err
 	}
+	impl.logger.Infow("INVESTIGATE before updatePipelineMaterialCommit", "id", material.Id)
 	err = impl.updatePipelineMaterialCommit(ciPipelineMaterial)
+	impl.logger.Infow("INVESTIGATE after updatePipelineMaterialCommit", "id", material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in updating pipeline material", "err", err)
 	}
