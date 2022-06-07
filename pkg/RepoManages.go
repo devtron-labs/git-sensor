@@ -267,26 +267,34 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 		return nil, err
 	}
 
+	impl.logger.Infow("INVESTIGATE Before lease locker", "id", material.Id)
 	repoLock := impl.locker.LeaseLocker(material.Id)
+	impl.logger.Infow("INVESTIGATE After lease locker", "id", material.Id)
 	repoLock.Mutex.Lock()
+	impl.logger.Infow("INVESTIGATE After mutex locker", "id", material.Id)
 	defer func() {
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(material.Id)
 	}()
 
+	impl.logger.Infow("INVESTIGATE before clean", "id", material.Id)
 	err = impl.repositoryManager.Clean(existingMaterial.CheckoutLocation)
+	impl.logger.Infow("INVESTIGATE after clean", "id", material.Id)
 	if err != nil {
 		impl.logger.Errorw("err", err)
 		return nil, err
 	}
 
 	if !existingMaterial.Deleted {
+		impl.logger.Infow("INVESTIGATE before checkout", "id", material.Id)
 		err = impl.checkoutUpdatedRepo(material.Id)
+		impl.logger.Infow("INVESTIGATE after checkout", "id", material.Id)
 		if err != nil {
 			impl.logger.Errorw("err", err)
 			return nil, err
 		}
 	}
+	impl.logger.Infow("INVESTIGATE before return", "id", material.Id)
 	return existingMaterial, nil
 }
 
