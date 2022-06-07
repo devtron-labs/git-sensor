@@ -179,14 +179,19 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			return err
 		}
 
+		if pipelineMaterial.Type == sql.SOURCE_TYPE_WEBHOOK {
+			continue
+		}
+
 		material, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
 		if err != nil {
 			impl.logger.Errorw("error in fetching material", "err", err)
 			continue
 		}
-		impl.logger.Infow("INVESTIGATE before ChangesSince", "id", material.Id)
+
+		impl.logger.Infow("INVESTIGATE before ChangesSince", "id", pipelineMaterial.Id)
 		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", 0)
-		impl.logger.Infow("INVESTIGATE after ChangesSince", "id", material.Id)
+		impl.logger.Infow("INVESTIGATE after ChangesSince", "id", pipelineMaterial.Id)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
