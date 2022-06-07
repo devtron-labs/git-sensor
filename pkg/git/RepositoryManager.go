@@ -255,9 +255,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
-		impl.logger.Infow("INVESTIGATE before getStats", "branch", branch)
+		impl.logger.Infow("INVESTIGATE before getStats", "branch", branch, "gitCommit", gitCommit.Commit)
 		fs, err := impl.getStats(commit)
-		impl.logger.Infow("INVESTIGATE after getStats", "branch", branch)
+		impl.logger.Infow("INVESTIGATE after getStats", "branch", branch, "gitCommit", gitCommit.Commit)
 		if err != nil {
 			impl.logger.Errorw("error in getting fs", "branch", branch, "err", err)
 			break
