@@ -184,7 +184,9 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 		Date:    commit.Author.When,
 		Message: commit.Message,
 	}
+	impl.logger.Infow("INVESTIGATE GetCommitMetadata before stat", "commitHash", commitHash)
 	fs, err := commit.Stats()
+	impl.logger.Infow("INVESTIGATE GetCommitMetadata after stat", "commitHash", commitHash)
 	if err != nil {
 		impl.logger.Errorw("error in getting fs", "path", checkoutPath, "err", err)
 		return nil, err
