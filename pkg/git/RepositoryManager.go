@@ -151,7 +151,7 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		Date:    commit.Author.When,
 		Message: commit.Message,
 	}
-	fs, err := commit.Stats()
+	fs, err := impl.getStats(commit)
 	if err != nil {
 		impl.logger.Errorw("error in getting fs", "path", checkoutPath, "err", err)
 		return nil, err
@@ -178,7 +178,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 		Date:    commit.Author.When,
 		Message: commit.Message,
 	}
-	fs, err := commit.Stats()
+	fs, err := impl.getStats(commit)
 	if err != nil {
 		impl.logger.Errorw("error in getting fs", "path", checkoutPath, "err", err)
 		return nil, err
@@ -196,7 +196,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
-	if strings.HasPrefix(branch, "refs/heads/"){
+	if strings.HasPrefix(branch, "refs/heads/") {
 		branch = strings.ReplaceAll(branch, "refs/heads/", "")
 	}
 
@@ -264,6 +264,7 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 		if err := recover(); err != nil {
 			// sometimes the Patch generation will fail due to a known bug in
 			// sergi's go-diff: https://github.com/sergi/go-diff/issues/89.
+			impl.logger.Errorw("panic error in commit getStats", "commitHash", commit.Hash.String(), "err", err)
 			return
 		}
 	}()
