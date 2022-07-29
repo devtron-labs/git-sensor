@@ -32,6 +32,7 @@ type RepoManager interface {
 	FetchChanges(pipelineMaterialId int, from string, to string, count int) (*git.MaterialChangeResp, error) //limit
 	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
 	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error)
+	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
 
 	SaveGitProvider(provider *sql.GitProvider) (*sql.GitProvider, error)
 	AddRepo(material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
@@ -615,6 +616,59 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	} else {
 		return commits[0], err
 	}
+}
+
+func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error) {
+	// fetch ciPipelineMaterial
+	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error while fetching ciPipelineMaterial", "pipelineMaterialId", pipelineMaterialId, "err", err)
+		return nil, err
+	}
+
+	// validations
+	if pipelineMaterial.Type == sql.SOURCE_TYPE_WEBHOOK {
+		return nil, errors.New("fetching commit info is not supported for webhook based ci pipeline material")
+	}
+	branchName := pipelineMaterial.Value
+	if len(branchName) == 0 {
+		return nil, errors.New("branch name is empty in ci pipeline material")
+	}
+
+	// fetch gitMaterial
+	gitMaterialId := pipelineMaterial.GitMaterialId
+	gitMaterial, err := impl.materialRepository.FindById(gitMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error while fetching gitMaterial", "gitMaterialId", gitMaterialId, "err", err)
+		return nil, err
+	}
+
+	// validate checkout status of gitMaterial
+	if !gitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	}
+
+	// lock-unlock
+	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock.Mutex.Lock()
+	defer func() {
+		repoLock.Mutex.Unlock()
+		impl.locker.ReturnLocker(gitMaterial.Id)
+	}()
+
+	commits, err := impl.repositoryManager.ChangesSince(gitMaterial.CheckoutLocation, branchName, gitHash, "", 1)
+	if err != nil {
+		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
+		return nil, err
+	}
+	if len(commits) == 0 {
+		return nil, fmt.Errorf("commit not found in branch %s", branchName)
+	}
+	if len(commits) > 1 {
+		return nil, fmt.Errorf("more than one commit found in branch %s", branchName)
+	}
+
+	return commits[0], err
 }
 
 func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error) {
