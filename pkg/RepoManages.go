@@ -632,6 +632,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 	}
 	branchName := pipelineMaterial.Value
 	if len(branchName) == 0 {
+		impl.logger.Errorw("branch name is empty", "pipelineMaterialId", pipelineMaterialId)
 		return nil, errors.New("branch name is empty in ci pipeline material")
 	}
 
@@ -645,6 +646,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 
 	// validate checkout status of gitMaterial
 	if !gitMaterial.CheckoutStatus {
+		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
 		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
 	}
 
@@ -661,11 +663,15 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
 	}
-	if len(commits) == 0 {
-		return nil, fmt.Errorf("commit not found in branch %s", branchName)
-	}
+
 	if len(commits) > 1 {
-		return nil, fmt.Errorf("more than one commit found in branch %s", branchName)
+		impl.logger.Errorw("more than one commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
+		return nil, fmt.Errorf("more than one commit found for commit hash %s in branch %s", gitHash, branchName)
+	}
+
+	if len(commits) == 0 {
+		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
+		return nil, nil
 	}
 
 	return commits[0], err
