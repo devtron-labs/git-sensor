@@ -35,6 +35,7 @@ type RestHandler interface {
 	FetchChanges(w http.ResponseWriter, r *http.Request)
 	GetHeadForPipelineMaterials(w http.ResponseWriter, r *http.Request)
 	GetCommitMetadata(w http.ResponseWriter, r *http.Request)
+	GetCommitMetadataForPipelineMaterial(w http.ResponseWriter, r *http.Request)
 	ReloadAllMaterial(w http.ResponseWriter, r *http.Request)
 	ReloadMaterial(w http.ResponseWriter, r *http.Request)
 	GetChangesInRelease(w http.ResponseWriter, r *http.Request)
@@ -52,8 +53,8 @@ func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLo
 }
 
 type RestHandlerImpl struct {
-	repositoryManager   pkg.RepoManager
-	logger              *zap.SugaredLogger
+	repositoryManager pkg.RepoManager
+	logger            *zap.SugaredLogger
 }
 
 type Response struct {
@@ -253,6 +254,24 @@ func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.
 	}
 }
 
+func (handler RestHandlerImpl) GetCommitMetadataForPipelineMaterial(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	material := &git.CommitMetadataRequest{}
+	err := decoder.Decode(material)
+	if err != nil {
+		handler.logger.Error(err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	handler.logger.Infow("commit detail request for pipeline material", "req", material)
+	commit, err := handler.repositoryManager.GetCommitMetadataForPipelineMaterial(material.PipelineMaterialId, material.GitHash)
+	if err != nil {
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+	} else {
+		handler.writeJsonResp(w, err, commit, http.StatusOK)
+	}
+}
+
 func (handler RestHandlerImpl) GetCommitInfoForTag(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	material := &git.CommitMetadataRequest{}
@@ -389,7 +408,6 @@ func (handler RestHandlerImpl) GetWebhookPayloadDataForPipelineMaterialId(w http
 	}
 
 }
-
 
 func (handler RestHandlerImpl) GetWebhookPayloadFilterDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request) {
 	handler.logger.Debug("GetWebhookPayloadFilterDataForPipelineMaterialId API call")
