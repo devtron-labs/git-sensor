@@ -177,7 +177,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 		pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterial.Id)
 		if err != nil {
 			impl.logger.Errorw("material not found", "material", pipelineMaterial)
-			return err
+			continue
 		}
 
 		material, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
