@@ -109,6 +109,8 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 			newMaterial = append(newMaterial, material)
 		}
 	}
+	impl.logger.Infow("Testing ", "old length ", len(old), "new length", len(newMaterial))
+	impl.logger.Infow("Testing ", "old materials ", old)
 	if len(old) > 0 {
 		err := impl.InactivateWebhookDataMappingForPipelineMaterials(old)
 		if err != nil {
@@ -119,6 +121,7 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 			return nil, err
 		}
 	}
+	impl.logger.Infow("Testing ", "new materials ", newMaterial)
 	if len(newMaterial) > 0 {
 		_, err := impl.ciPipelineMaterialRepository.Save(newMaterial)
 		if err != nil {
@@ -132,6 +135,7 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 			oldNotDeleted = append(oldNotDeleted, material)
 		}
 	}
+	impl.logger.Infow("Testing ", "oldNotDeleted materials ", oldNotDeleted)
 	err := impl.updatePipelineMaterialCommit(append(newMaterial, oldNotDeleted...))
 	if err != nil {
 		return nil, err
