@@ -76,6 +76,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 	}
 
 	opt, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	impl.logger.Infow("repo fetch results", "opt", opt, "errorMsg", errorMsg, "err", err)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err

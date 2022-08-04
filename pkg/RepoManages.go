@@ -339,6 +339,7 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 		return material, err
 	}
 	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, userName, password, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	impl.logger.Infow("got results, repositoryManager.Add", "err", err, "checkoutPath", checkoutPath, "material", material, "gitProvider", gitProvider)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true
