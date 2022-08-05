@@ -180,10 +180,6 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			return err
 		}
 
-		if pipelineMaterial.Type == sql.SOURCE_TYPE_WEBHOOK {
-			continue
-		}
-
 		material, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
 		if err != nil {
 			impl.logger.Errorw("error in fetching material", "err", err)
