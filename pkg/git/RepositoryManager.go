@@ -282,6 +282,10 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 			return
 		}
 	}()
+	var sts object.FileStats
+	if commit.Hash.String() == "1220d3e291f7a56a944803cb0527990693d3ddd9" {
+		return sts, nil
+	}
 	fs, err := commit.Stats()
 	return fs, err
 }
