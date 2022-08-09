@@ -54,6 +54,7 @@ type RepositoryManagerImpl struct {
 }
 
 func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, configuration *internal.Configuration) *RepositoryManagerImpl {
+	logger.Infow("CommitStatsTimeoutInSec", "CommitStatsTimeoutInSec", configuration.CommitStatsTimeoutInSec)
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
