@@ -276,6 +276,7 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 
 	result := make(chan FileStatsResult, 1)
 	go func() {
+		time.Sleep(time.Duration(5) * time.Second)
 		result <- impl.getUntimedFileStats(commit)
 	}()
 
