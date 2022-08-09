@@ -1,4 +1,5 @@
-//+build wireinject
+//go:build wireinject
+// +build wireinject
 
 /*
  * Copyright (c) 2020 Devtron Labs
@@ -33,6 +34,7 @@ func InitializeApp() (*App, error) {
 	wire.Build(
 		NewApp,
 		api.NewMuxRouter,
+		internal.ParseConfiguration,
 		logger.NewSugaredLogger,
 		api.NewRestHandlerImpl,
 		wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
