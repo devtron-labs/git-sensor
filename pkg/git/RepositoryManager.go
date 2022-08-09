@@ -54,7 +54,6 @@ type RepositoryManagerImpl struct {
 }
 
 func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, configuration *internal.Configuration) *RepositoryManagerImpl {
-	logger.Infow("CommitStatsTimeoutInSec", "CommitStatsTimeoutInSec", configuration.CommitStatsTimeoutInSec)
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
@@ -276,7 +275,6 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 
 	result := make(chan FileStatsResult, 1)
 	go func() {
-		time.Sleep(time.Duration(5) * time.Second)
 		result <- impl.getUntimedFileStats(commit)
 	}()
 
