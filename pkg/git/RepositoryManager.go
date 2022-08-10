@@ -274,12 +274,15 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 	}()
 
 	// create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.CommitStatsTimeoutInSec)*time.Second)
+	duration := time.Now().Add(-5 * time.Second)
+	ctx, cancel := context.WithDeadline(context.Background(), duration)
+
+	//ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.CommitStatsTimeoutInSec)*time.Second)
 	defer cancel()
 	fs, err := commit.StatsContext(ctx)
 
 	// for timeout error, return empty result without error
-	if err == context.DeadlineExceeded {
+	if err == context.DeadlineExceeded || err == object.ErrCanceled {
 		impl.logger.Errorw("Timeout occurred for getting file stats", "commit", commit.Hash.String())
 		return nil, nil
 	}
