@@ -273,17 +273,28 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 		}
 	}()
 
-	// create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.CommitStatsTimeoutInSec)*time.Second)
-	defer cancel()
-	fs, err := commit.StatsContext(ctx)
+	result := make(chan FileStatsResult, 1)
+	go func() {
+		result <- impl.getUntimedFileStats(commit)
+	}()
 
-	// for timeout error, return empty result without error
-	if err == context.DeadlineExceeded || err == object.ErrCanceled {
+	select {
+	case <-time.After(time.Duration(impl.configuration.CommitStatsTimeoutInSec) * time.Second):
 		impl.logger.Errorw("Timeout occurred for getting file stats", "commit", commit.Hash.String())
 		return nil, nil
+	case result := <-result:
+		return result.FileStats, result.Error
 	}
-	return fs, err
+}
+
+// this function gives file stats in untimed manner. There is no timeout for this
+// avoid calling this method directly until and unless timeout is not needed
+func (impl RepositoryManagerImpl) getUntimedFileStats(commit *object.Commit) FileStatsResult {
+	fs, err := commit.Stats()
+	return FileStatsResult{
+		FileStats: fs,
+		Error:     err,
+	}
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
@@ -303,6 +314,11 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 type GitChanges struct {
 	Commits   []*Commit
 	FileStats object.FileStats
+}
+
+type FileStatsResult struct {
+	FileStats object.FileStats
+	Error     error
 }
 
 //from -> old commit
