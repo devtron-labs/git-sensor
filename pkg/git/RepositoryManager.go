@@ -19,6 +19,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internal"
 	"io"
 	"log"
 	"os"
@@ -47,12 +48,13 @@ type RepositoryManager interface {
 }
 
 type RepositoryManagerImpl struct {
-	logger  *zap.SugaredLogger
-	gitUtil *GitUtil
+	logger        *zap.SugaredLogger
+	gitUtil       *GitUtil
+	configuration *internal.Configuration
 }
 
-func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil) *RepositoryManagerImpl {
-	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil}
+func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, configuration *internal.Configuration) *RepositoryManagerImpl {
+	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
 func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
@@ -259,6 +261,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	return gitCommits, err
 }
 
+// this function gives file stats in timed manner.
+// if timed-out, return empty result without error
 func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileStats, error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -268,7 +272,17 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 			return
 		}
 	}()
-	fs, err := commit.Stats()
+
+	// create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.CommitStatsTimeoutInSec)*time.Second)
+	defer cancel()
+	fs, err := commit.StatsContext(ctx)
+
+	// for timeout error, return empty result without error
+	if err == context.DeadlineExceeded || err == object.ErrCanceled {
+		impl.logger.Errorw("Timeout occurred for getting file stats", "commit", commit.Hash.String())
+		return nil, nil
+	}
 	return fs, err
 }
 
