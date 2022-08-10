@@ -276,7 +276,6 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 	// create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.CommitStatsTimeoutInSec)*time.Second)
 	defer cancel()
-	time.Sleep(time.Duration(3) * time.Second)
 	fs, err := commit.StatsContext(ctx)
 
 	// for timeout error, return empty result without error
