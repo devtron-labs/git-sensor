@@ -264,15 +264,6 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 // this function gives file stats in timed manner.
 // if timed-out, return empty result without error
 func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileStats, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			// sometimes the Patch generation will fail due to a known bug in
-			// sergi's go-diff: https://github.com/sergi/go-diff/issues/89.
-			impl.logger.Errorw("panic error in commit getStats", "commitHash", commit.Hash.String(), "err", err)
-			return
-		}
-	}()
-
 	result := make(chan FileStatsResult, 1)
 	go func() {
 		result <- impl.getUntimedFileStats(commit)
@@ -290,6 +281,15 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 // this function gives file stats in untimed manner. There is no timeout for this
 // avoid calling this method directly until and unless timeout is not needed
 func (impl RepositoryManagerImpl) getUntimedFileStats(commit *object.Commit) FileStatsResult {
+	defer func() {
+		if err := recover(); err != nil {
+			// sometimes the Patch generation will fail due to a known bug in
+			// sergi's go-diff: https://github.com/sergi/go-diff/issues/89.
+			impl.logger.Errorw("panic error in commit getStats", "commitHash", commit.Hash.String(), "err", err)
+			return
+		}
+	}()
+
 	fs, err := commit.Stats()
 	return FileStatsResult{
 		FileStats: fs,
