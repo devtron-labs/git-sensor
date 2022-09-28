@@ -349,7 +349,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	}
 	patch, err := oldTree.Patch(newTree)
 	if err != nil {
-		impl.logger.Errorw("can'tget patch: ", "err", err)
+		impl.logger.Errorw("can't get patch: ", "err", err)
 		return nil, err
 	}
 	commits, err := computeDiff(repository, &newHash, &oldHash)
