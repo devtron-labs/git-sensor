@@ -264,10 +264,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 // this function gives file stats in timed manner.
 // if timed-out, return empty result without error
 func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileStats, error) {
-	fmt.Println("returning")
-	return nil, nil
-
-	/*result := make(chan FileStatsResult, 1)
+	result := make(chan FileStatsResult, 1)
 	go func() {
 		result <- impl.getUntimedFileStats(commit)
 	}()
@@ -277,8 +274,11 @@ func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileSt
 		impl.logger.Errorw("Timeout occurred for getting file stats", "commit", commit.Hash.String())
 		return nil, nil
 	case result := <-result:
+		fmt.Println("stats for " + commit.Hash.String())
+		fmt.Println(result.FileStats)
+		fmt.Println(result.Error)
 		return result.FileStats, result.Error
-	}*/
+	}
 }
 
 // this function gives file stats in untimed manner. There is no timeout for this
