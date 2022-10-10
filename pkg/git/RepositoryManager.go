@@ -153,14 +153,6 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		Date:    commit.Author.When,
 		Message: commit.Message,
 	}
-	fs, err := impl.getStats(commit)
-	if err != nil {
-		impl.logger.Errorw("error in getting fs", "path", checkoutPath, "err", err)
-		return nil, err
-	}
-	for _, f := range fs {
-		gitCommit.Changes = append(gitCommit.Changes, f.Name)
-	}
 	return gitCommit, nil
 }
 
@@ -179,14 +171,6 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 		Commit:  commit.Hash.String(),
 		Date:    commit.Author.When,
 		Message: commit.Message,
-	}
-	fs, err := impl.getStats(commit)
-	if err != nil {
-		impl.logger.Errorw("error in getting fs", "path", checkoutPath, "err", err)
-		return nil, err
-	}
-	for _, f := range fs {
-		gitCommit.Changes = append(gitCommit.Changes, f.Name)
 	}
 	return gitCommit, nil
 }
@@ -247,54 +231,10 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
-		fs, err := impl.getStats(commit)
-		if err != nil {
-			impl.logger.Errorw("error in getting fs", "branch", branch, "err", err)
-			break
-		}
-		for _, f := range fs {
-			gitCommit.Changes = append(gitCommit.Changes, f.Name)
-		}
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
 	}
 	return gitCommits, err
-}
-
-// this function gives file stats in timed manner.
-// if timed-out, return empty result without error
-func (impl RepositoryManagerImpl) getStats(commit *object.Commit) (object.FileStats, error) {
-	result := make(chan FileStatsResult, 1)
-	go func() {
-		result <- impl.getUntimedFileStats(commit)
-	}()
-
-	select {
-	case <-time.After(time.Duration(impl.configuration.CommitStatsTimeoutInSec) * time.Second):
-		impl.logger.Errorw("Timeout occurred for getting file stats", "commit", commit.Hash.String())
-		return nil, nil
-	case result := <-result:
-		return result.FileStats, result.Error
-	}
-}
-
-// this function gives file stats in untimed manner. There is no timeout for this
-// avoid calling this method directly until and unless timeout is not needed
-func (impl RepositoryManagerImpl) getUntimedFileStats(commit *object.Commit) FileStatsResult {
-	defer func() {
-		if err := recover(); err != nil {
-			// sometimes the Patch generation will fail due to a known bug in
-			// sergi's go-diff: https://github.com/sergi/go-diff/issues/89.
-			impl.logger.Errorw("panic error in commit getStats", "commitHash", commit.Hash.String(), "err", err)
-			return
-		}
-	}()
-
-	fs, err := commit.Stats()
-	return FileStatsResult{
-		FileStats: fs,
-		Error:     err,
-	}
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
