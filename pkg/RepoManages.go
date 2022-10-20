@@ -252,7 +252,7 @@ func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMat
 func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	existingMaterial, err := impl.materialRepository.FindById(material.Id)
 	if err != nil {
-		impl.logger.Errorw("err", err)
+		impl.logger.Errorw("error in fetching material", err)
 		return nil, err
 	}
 	existingMaterial.Name = material.Name
@@ -277,14 +277,14 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 
 	err = impl.repositoryManager.Clean(existingMaterial.CheckoutLocation)
 	if err != nil {
-		impl.logger.Errorw("err", err)
+		impl.logger.Errorw("error in refreshing material ", "err", err)
 		return nil, err
 	}
 
 	if !existingMaterial.Deleted {
 		err = impl.checkoutUpdatedRepo(material.Id)
 		if err != nil {
-			impl.logger.Errorw("err", err)
+			impl.logger.Errorw("error in checking out updated repo", "err", err)
 			return nil, err
 		}
 	}
