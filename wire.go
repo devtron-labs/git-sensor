@@ -20,6 +20,7 @@
 package main
 
 import (
+	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/logger"
@@ -53,7 +54,8 @@ func InitializeApp() (*App, error) {
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
 		internal.NewRepositoryLocker,
-		internal.NewNatsConnection,
+		//internal.NewNatsConnection,
+		pubsub.NewPubSubClientServiceImpl,
 		git.NewGitUtil,
 		sql.NewWebhookEventRepositoryImpl,
 		wire.Bind(new(sql.WebhookEventRepository), new(*sql.WebhookEventRepositoryImpl)),
