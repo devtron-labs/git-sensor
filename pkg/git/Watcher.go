@@ -25,7 +25,6 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/gammazero/workerpool"
-	"github.com/nats-io/nats.go"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"time"
@@ -267,16 +266,6 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 			impl.logger.Error("err in json marshaling", "err", err)
 			continue
 		}
-		streamConfig := &nats.StreamConfig{
-			Name:     pubsub.GIT_SENSOR_STREAM,
-			Subjects: pubsub.GetStreamSubjects(pubsub.GIT_SENSOR_STREAM),
-		}
-		err = pubsub.AddStream(impl.pubSubClient.NatsClient.JetStrCtxt, streamConfig, pubsub.GIT_SENSOR_STREAM)
-
-		if err != nil {
-			impl.logger.Errorw("Error while adding stream", "error", err)
-		}
-		//Generate random string for passing as Header Id in message
 		err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(mb))
 		if err != nil {
 			impl.logger.Errorw("error in publishing material modification msg ", "material", material)

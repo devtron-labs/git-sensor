@@ -21,7 +21,6 @@ import (
 	"fmt"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/nats-io/nats.go"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"regexp"
@@ -273,15 +272,6 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 	if err != nil {
 		impl.logger.Error("err in json marshaling", "err", err)
 		return err
-	}
-	streamConfig := &nats.StreamConfig{
-		Name:     pubsub.GIT_SENSOR_STREAM,
-		Subjects: pubsub.GetStreamSubjects(pubsub.GIT_SENSOR_STREAM),
-	}
-	err = pubsub.AddStream(impl.pubSubClient.NatsClient.JetStrCtxt, streamConfig, pubsub.GIT_SENSOR_STREAM)
-
-	if err != nil {
-		impl.logger.Errorw("Error while adding stream", "error", err)
 	}
 
 	err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(mb))
