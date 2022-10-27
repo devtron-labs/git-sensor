@@ -23,8 +23,8 @@ import (
 	"os"
 	"time"
 
+	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
-	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/go-pg/pg"
@@ -38,10 +38,10 @@ type App struct {
 	watcher      *git.GitWatcherImpl
 	server       *http.Server
 	db           *pg.DB
-	pubSubClient *internal.PubSubClient
+	pubSubClient *pubsub.PubSubClientServiceImpl
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *internal.PubSubClient) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl) *App {
 	return &App{
 		MuxRouter:    MuxRouter,
 		Logger:       Logger,
@@ -86,7 +86,7 @@ func (app *App) Stop() {
 	app.watcher.StopCron()
 	app.Logger.Infow("stopping nats")
 
-	err := app.pubSubClient.Conn.Drain()
+	err := app.pubSubClient.NatsClient.Conn.Drain()
 	if err != nil {
 		app.Logger.Errorw("error in draining nats", "err", err)
 	}
