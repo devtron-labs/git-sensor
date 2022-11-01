@@ -84,15 +84,8 @@ func (app *App) Stop() {
 	timeoutContext, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
-	app.Logger.Infow("stopping nats")
-
-	err := app.pubSubClient.NatsClient.Conn.Drain()
-	if err != nil {
-		app.Logger.Errorw("error in draining nats", "err", err)
-	}
-
 	app.Logger.Infow("closing router")
-	err = app.server.Shutdown(timeoutContext)
+	err := app.server.Shutdown(timeoutContext)
 	if err != nil {
 		app.Logger.Errorw("error in mux router shutdown", "err", err)
 	}
