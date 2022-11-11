@@ -4,13 +4,13 @@ go 1.17
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.0-20221028123910-ac349a64526a
+	github.com/devtron-labs/common-lib v0.0.0-20221111092855-6dae5a34a041
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
 	github.com/google/wire v0.4.0
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
-	github.com/nats-io/nats.go v1.15.0
+	github.com/nats-io/nats.go v1.19.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/tidwall/gjson v1.8.0
