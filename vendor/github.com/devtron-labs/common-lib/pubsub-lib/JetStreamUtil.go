@@ -65,7 +65,7 @@ const (
 	CD_TRIGGER_GROUP                    string = "CD_TRIGGER_GROUP-1"
 	CD_TRIGGER_DURABLE                  string = "CD_TRIGGER_DURABLE-1"
 	WEBHOOK_EVENT_TOPIC                 string = "WEBHOOK_EVENT"
-	WEBHOOK_EVENT_GROUP                 string = "WEBHOOK_EVENT_GROUP"
+	WEBHOOK_EVENT_GROUP                 string = "WEBHOOK_EVENT_GRP"
 	WEBHOOK_EVENT_DURABLE               string = "WEBHOOK_EVENT_DURABLE"
 	DEVTRON_TEST_TOPIC                  string = "Test_Topic"
 	DEVTRON_TEST_STREAM                 string = "Devtron_Test_Stream"
