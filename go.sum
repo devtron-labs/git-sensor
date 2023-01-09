@@ -153,6 +153,8 @@ github.com/devtron-labs/common-lib v0.0.0-20221130102802-3c5611054fcc h1:Mq2pd2+
 github.com/devtron-labs/common-lib v0.0.0-20221130102802-3c5611054fcc/go.mod h1:R24nOqgk4buk9zv+BXzORfObZsOe3NE9P55KrZXGX9k=
 github.com/devtron-labs/common-lib v0.0.0-20221208044859-269008fed09b h1:yGXerrqwyjPIr62q1RadJh6MYH3vG6T9nChH+yOJnnA=
 github.com/devtron-labs/common-lib v0.0.0-20221208044859-269008fed09b/go.mod h1:R24nOqgk4buk9zv+BXzORfObZsOe3NE9P55KrZXGX9k=
+github.com/devtron-labs/common-lib v0.0.0-20230109070754-ff4dca200a2c h1:jz7yPUlIJXFg9AvJh2fb0QW7JT6+RKj8LOl1mWM/HQA=
+github.com/devtron-labs/common-lib v0.0.0-20230109070754-ff4dca200a2c/go.mod h1:R24nOqgk4buk9zv+BXzORfObZsOe3NE9P55KrZXGX9k=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/eapache/go-resiliency v1.1.0/go.mod h1:kFI+JgMyC7bLPUVY133qvEBtVayf5mFgVsvEsIPBvNs=
