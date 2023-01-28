@@ -23,8 +23,8 @@ import (
 	"os"
 	"time"
 
+	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
-	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/go-pg/pg"
@@ -38,10 +38,10 @@ type App struct {
 	watcher      *git.GitWatcherImpl
 	server       *http.Server
 	db           *pg.DB
-	pubSubClient *internal.PubSubClient
+	pubSubClient *pubsub.PubSubClientServiceImpl
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *internal.PubSubClient) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl) *App {
 	return &App{
 		MuxRouter:    MuxRouter,
 		Logger:       Logger,
@@ -84,15 +84,8 @@ func (app *App) Stop() {
 	timeoutContext, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
-	app.Logger.Infow("stopping nats")
-
-	err := app.pubSubClient.Conn.Drain()
-	if err != nil {
-		app.Logger.Errorw("error in draining nats", "err", err)
-	}
-
 	app.Logger.Infow("closing router")
-	err = app.server.Shutdown(timeoutContext)
+	err := app.server.Shutdown(timeoutContext)
 	if err != nil {
 		app.Logger.Errorw("error in mux router shutdown", "err", err)
 	}

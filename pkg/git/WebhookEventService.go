@@ -19,15 +19,12 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"time"
-
-	"github.com/devtron-labs/git-sensor/internal"
+	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/util"
-	"github.com/nats-io/nats.go"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"regexp"
+	"time"
 )
 
 type WebhookEventService interface {
@@ -45,14 +42,14 @@ type WebhookEventServiceImpl struct {
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	materialRepository                            sql.MaterialRepository
-	pubSubClient                                  *internal.PubSubClient
+	pubSubClient                                  *pubsub.PubSubClientServiceImpl
 	webhookEventBeanConverter                     WebhookEventBeanConverter
 }
 
 func NewWebhookEventServiceImpl(
 	logger *zap.SugaredLogger, webhookEventRepository sql.WebhookEventRepository, webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository, webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
-	materialRepository sql.MaterialRepository, pubSubClient *internal.PubSubClient, webhookEventBeanConverter WebhookEventBeanConverter,
+	materialRepository sql.MaterialRepository, pubSubClient *pubsub.PubSubClientServiceImpl, webhookEventBeanConverter WebhookEventBeanConverter,
 ) *WebhookEventServiceImpl {
 	return &WebhookEventServiceImpl{
 		logger:                                        logger,
@@ -276,19 +273,13 @@ func (impl WebhookEventServiceImpl) NotifyForAutoCi(material *CiPipelineMaterial
 		impl.logger.Error("err in json marshaling", "err", err)
 		return err
 	}
-	err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
 
-	if err != nil {
-		impl.logger.Errorw("Error while adding stream", "error", err)
-	}
-	//Generate random string for passing as Header Id in message
-	randString := "MsgHeaderId-" + util.Generate(10)
-	_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))
+	err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(mb))
 	if err != nil {
 		impl.logger.Errorw("error in publishing material modification msg ", "material", material)
 	}
 
-	return nil
+	return err
 }
 
 func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelineMaterialId int, webhookParsedDataId int, conditionMatched bool, filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) error {

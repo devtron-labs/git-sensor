@@ -17,20 +17,17 @@
 package git
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/caarlos0/env"
+	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
-	"github.com/nats-io/nats.go"
-
-	"encoding/json"
-	"fmt"
-	"time"
-
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"time"
 )
 
 type GitWatcherImpl struct {
@@ -39,7 +36,7 @@ type GitWatcherImpl struct {
 	cron                         *cron.Cron
 	logger                       *zap.SugaredLogger
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
-	pubSubClient                 *internal.PubSubClient
+	pubSubClient                 *pubsub.PubSubClientServiceImpl
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
@@ -59,7 +56,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	pubSubClient *internal.PubSubClient, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -130,59 +127,6 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp.StopWait()
 }
 
-func (impl GitWatcherImpl) Publish(materials []*sql.GitMaterial) {
-	for _, material := range materials {
-		if len(material.CiPipelineMaterials) == 0 {
-			impl.logger.Infow("no ci pipeline, skipping", "id", material.Id, "url", material.Url)
-			continue
-		}
-		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
-		b, err := json.Marshal(materialMsg)
-		if err != nil {
-			impl.logger.Infow("error in serializing", "err", err)
-			continue
-		}
-		impl.logger.Infow("publishing pull msg", "id", material.Id)
-
-		err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
-
-		if err != nil {
-			impl.logger.Errorw("Error while adding stream", "error", err)
-		}
-		//Generate random string for passing as Header Id in message
-		randString := "MsgHeaderId-" + util.Generate(10)
-
-		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.POLL_CI_TOPIC, b, nats.MsgId(randString))
-		impl.logger.Debugw("published msg", "msg", material)
-		if err != nil {
-			impl.logger.Infow("error in publishing message", "err", err)
-		}
-	}
-}
-
-func (impl GitWatcherImpl) SubscribePull() error {
-	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.POLL_CI_TOPIC, internal.POLL_CI_TOPIC_GRP, func(msg *nats.Msg) {
-		impl.logger.Debugw("received msg", "msg", msg)
-		msg.Ack() //ack immediate if lost next min it would get a new message
-		material := &sql.GitMaterial{}
-		err := json.Unmarshal(msg.Data, material)
-		if err != nil {
-			impl.logger.Infow("err in reading msg", "err", err)
-			return
-		}
-		msgMetaData, metaErr := msg.Metadata()
-		if nil != metaErr {
-			impl.logger.Debugw("Error while getting metadata of message", "err", metaErr)
-		}
-		impl.logger.Debugw("polling for material", "id", material.Id, "url", material.Url, "msg timestamp", msgMetaData.Timestamp)
-		_, err = impl.pollAndUpdateGitMaterial(material)
-		if err != nil {
-			impl.logger.Errorw("err in poling", "material", material, "err", err)
-		}
-	}, nats.Durable(internal.POLL_CI_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(internal.GIT_SENSOR_STREAM))
-	return err
-}
-
 func (impl GitWatcherImpl) PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	//tmp expose remove in future
 	return impl.pollAndUpdateGitMaterial(material)
@@ -234,15 +178,15 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			if err != nil {
 				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
 				return err
-			}else{
-				impl.logger.Info("Retrying fetching for" , "repo",  material.Url)
+			} else {
+				impl.logger.Info("Retrying fetching for", "repo", material.Url)
 				updated, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
 				}
 			}
-		}else{
+		} else {
 			return err
 		}
 	}
@@ -322,15 +266,7 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 			impl.logger.Error("err in json marshaling", "err", err)
 			continue
 		}
-		err = internal.AddStream(impl.pubSubClient.JetStrCtxt, internal.GIT_SENSOR_STREAM)
-
-		if err != nil {
-			impl.logger.Errorw("Error while adding stream", "error", err)
-		}
-		//Generate random string for passing as Header Id in message
-		randString := "MsgHeaderId-" + util.Generate(10)
-
-		_, err = impl.pubSubClient.JetStrCtxt.Publish(internal.NEW_CI_MATERIAL_TOPIC, mb, nats.MsgId(randString))
+		err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(mb))
 		if err != nil {
 			impl.logger.Errorw("error in publishing material modification msg ", "material", material)
 		}
@@ -340,17 +276,18 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 }
 
 func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
-	_, err := impl.pubSubClient.JetStrCtxt.QueueSubscribe(internal.WEBHOOK_EVENT_TOPIC, internal.WEBHOOK_EVENT_TOPIC_GRP, func(msg *nats.Msg) {
+	callback := func(msg *pubsub.PubSubMsg) {
 		impl.logger.Debugw("received msg", "msg", msg)
-		msg.Ack() //ack immediate if lost next min it would get a new message
+		//msg.Ack() //ack immediate if lost next min it would get a new message
 		webhookEvent := &WebhookEvent{}
-		err := json.Unmarshal(msg.Data, webhookEvent)
+		err := json.Unmarshal([]byte(msg.Data), webhookEvent)
 		if err != nil {
 			impl.logger.Infow("err in reading msg", "err", err)
 			return
 		}
 		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
-	}, nats.Durable(internal.WEBHOOK_EVENT_TOPIC_DURABLE), nats.DeliverLast(), nats.ManualAck(), nats.BindStream(internal.ORCHESTRATOR_STREAM))
+	}
+	err := impl.pubSubClient.Subscribe(pubsub.WEBHOOK_EVENT_TOPIC, callback)
 	return err
 }
 
