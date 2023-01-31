@@ -14,4 +14,9 @@ RUN apk add --no-cache ca-certificates
 RUN apk add git --no-cache
 RUN apk add openssh --no-cache
 COPY --from=build-env  /go/src/github.com/devtron-labs/git-sensor/git-sensor .
+
+RUN adduser -D devtron
+RUN chown -R devtron:devtron ./git-sensor
+USER devtron
+
 CMD ["./git-sensor"]
