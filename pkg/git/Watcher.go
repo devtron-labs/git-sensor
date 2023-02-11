@@ -202,9 +202,6 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	var updatedMaterialsModel []*sql.CiPipelineMaterial
 	var erroredMaterialsModels []*sql.CiPipelineMaterial
 	for _, material := range materials {
-		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
-			continue
-		}
 		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 15)
 		if err != nil {
 			material.Errored = true
