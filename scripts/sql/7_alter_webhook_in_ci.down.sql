@@ -1,0 +1,1 @@
+DELETE FROM git_host_webhook_event_selectors WHERE name='repository ssh url';
