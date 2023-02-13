@@ -109,6 +109,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 	impl.logger.Debug("matching CI trigger condition")
 
 	repositoryUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
+	repositorySSHUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_SSH_URL_NAME]
 
 	if len(repositoryUrl) == 0 {
 		impl.logger.Warn("repository url is blank. so skipping matching condition")
@@ -119,6 +120,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 	var repoUrls []string
 	repoUrls = append(repoUrls, repositoryUrl)
 	repoUrls = append(repoUrls, fmt.Sprintf("%s%s", repositoryUrl, ".git"))
+	repoUrls = append(repoUrls, repositorySSHUrl)
 
 	impl.logger.Debug("getting CI materials for URLs : ", repoUrls)
 	materials, err := impl.materialRepository.FindAllActiveByUrls(repoUrls)
