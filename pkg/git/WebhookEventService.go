@@ -24,6 +24,7 @@ import (
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -109,20 +110,28 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 	impl.logger.Debug("matching CI trigger condition")
 
 	repositoryUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
+	repositorySSHUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_SSH_URL_NAME]
 
 	if len(repositoryUrl) == 0 {
 		impl.logger.Warn("repository url is blank. so skipping matching condition")
 		return nil
 	}
-
+	if len(repositorySSHUrl) == 0 {
+		repositoryUrlSplit := strings.Split(repositoryUrl, "/")
+		if len(repositoryUrlSplit) > 3 {
+			workspaceName := repositoryUrlSplit[3]
+			projectName := repositoryUrlSplit[4]
+			repositorySSHUrl = fmt.Sprintf("git@bitbucket.org:%s/%s.git", workspaceName, projectName)
+		}
+	}
 	// get materials by Urls
 	var repoUrls []string
 	repoUrls = append(repoUrls, repositoryUrl)
 	repoUrls = append(repoUrls, fmt.Sprintf("%s%s", repositoryUrl, ".git"))
+	repoUrls = append(repoUrls, repositorySSHUrl)
 
 	impl.logger.Debug("getting CI materials for URLs : ", repoUrls)
 	materials, err := impl.materialRepository.FindAllActiveByUrls(repoUrls)
-
 	if err != nil {
 		impl.logger.Errorw("error in fetching active materials", "err", err)
 		return err
