@@ -200,6 +200,8 @@ VALUES (1, 'unique id', 'pull_request.id', 'f', 'f', 't', NULL, NOW()),
        (1, 'source branch name', 'pull_request.head.ref', 't', 't', 't', NULL, NOW()),
        (1, 'state', 'pull_request.state', 'f', 't', 't', 'open', NOW());
 
+
+
 ---- insert PR data for bitbucket into git_host_webhook_event_selectors
 ---- event_id : 1 - PR for github, 2 - PR for bitbucket
 INSERT INTO git_host_webhook_event_selectors (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
