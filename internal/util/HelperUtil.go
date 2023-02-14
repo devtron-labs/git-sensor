@@ -9,7 +9,7 @@ func BuildExtraEnvironmentVariablesForCi(filterResults []*sql.CiPipelineMaterial
 	extraEnvironmentVariables := make(map[string]string)
 	for _, filterResult := range filterResults {
 		for k, v := range filterResult.MatchedGroups {
-			extraEnvironmentVariables[fmt.Sprintf("%s.%s", filterResult.SelectorName, k)] = v
+			extraEnvironmentVariables[fmt.Sprintf("%s_%s", filterResult.SelectorName, k)] = v
 		}
 	}
 	return extraEnvironmentVariables
