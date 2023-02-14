@@ -81,7 +81,8 @@ type CommitMetadataRequest struct {
 }
 
 type WebhookDataRequest struct {
-	Id int `json:"id"`
+	Id                   int `json:"id"`
+	CiPipelineMaterialId int `json:"ciPipelineMaterialId"`
 }
 
 type WebhookEventConfigRequest struct {

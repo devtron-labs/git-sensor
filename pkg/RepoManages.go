@@ -45,7 +45,7 @@ type RepoManager interface {
 	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
-	GetWebhookAndCiDataById(id int) (*git.WebhookAndCiData, error)
+	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
 	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
@@ -730,7 +730,7 @@ func (impl RepoManagerImpl) RefreshGitMaterial(req *git.RefreshGitMaterialReques
 	return res, err
 }
 
-func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int) (*git.WebhookAndCiData, error) {
+func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error) {
 
 	impl.logger.Debugw("Getting webhook data ", "id", id)
 
@@ -741,7 +741,7 @@ func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int) (*git.WebhookAndCiDa
 		return nil, err
 	}
 
-	filterData, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadFilterDataForWebhookParsedId(id)
+	filterData, err := impl.webhookEventDataMappingRepository.GetWebhookPayloadFilterDataForPipelineMaterialId(ciPipelineMaterialId, id)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook payload filter data for webhookParsedId ", "Id", id, "err", err)
 		return nil, err
