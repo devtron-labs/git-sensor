@@ -21,6 +21,7 @@ import (
 	"fmt"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internal/util"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"regexp"
@@ -186,7 +187,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 
 			// if condition is match, then notify for CI
 			if overallMatch {
-				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData))
+				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData, filterResults))
 			}
 		}
 	}
@@ -244,6 +245,9 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 			match, err := regexp.MatchString(conditionRegexValue, actualValue)
 			if err != nil || !match {
 				filterResult.ConditionMatched = false
+			} else {
+				matchedGroups := impl.GetRegexGroupData(conditionRegexValue, actualValue)
+				filterResult.MatchedGroups = matchedGroups
 			}
 			if overallMatch && !filterResult.ConditionMatched {
 				overallMatch = false
@@ -259,8 +263,21 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 	return filterResults, overallMatch, nil
 }
 
-func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData) *CiPipelineMaterialBean {
+func (impl WebhookEventServiceImpl) GetRegexGroupData(regex string, val string) map[string]string {
+	matchedGroups := make(map[string]string)
+	r := regexp.MustCompile(regex)
+	matches := r.FindStringSubmatch(val)
+	subexpNames := r.SubexpNames()
+	for i, name := range subexpNames {
+		if len(name) != 0 && len(matches) > i {
+			matchedGroups[name] = matches[i]
+		}
+	}
+	return matchedGroups
+}
 
+func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData, filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) *CiPipelineMaterialBean {
+	extraEnvironmentVariables := util.BuildExtraEnvironmentVariablesForCi(filterResults)
 	notifyObject := &CiPipelineMaterialBean{
 		Id:            ciPipelineMaterial.Id,
 		Value:         ciPipelineMaterial.Value,
@@ -270,7 +287,9 @@ func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.
 		GitCommit: &GitCommit{
 			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventParsedData),
 		},
+		ExtraEnvironmentVariables: extraEnvironmentVariables,
 	}
+
 	return notifyObject
 }
 

@@ -44,6 +44,7 @@ type WebhookEventDataMappingRepository interface {
 	InactivateWebhookDataMappingForPipelineMaterials(ciPipelineMaterialIds []int) error
 	GetWebhookPayloadDataForPipelineMaterialId(ciPipelineMaterialId int, limit int, offset int, eventTimeSortOrder string) ([]*CiPipelineMaterialWebhookDataMapping, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(ciPipelineMaterialId int, webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
+	GetWebhookPayloadFilterDataForWebhookParsedId(webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error)
 }
 
 type WebhookEventDataMappingRepositoryImpl struct {
@@ -146,6 +147,27 @@ func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadFilterDataFor
 			return q.Where("is_active IS TRUE"), nil
 		}).
 		Where("ci_pipeline_material_id =? ", ciPipelineMaterialId).
+		Where("webhook_data_id =? ", webhookParsedDataId).
+		Where("is_active = TRUE ").
+		Select()
+
+	if err != nil {
+		if util.IsErrNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &mapping, nil
+}
+
+func (impl WebhookEventDataMappingRepositoryImpl) GetWebhookPayloadFilterDataForWebhookParsedId(webhookParsedDataId int) (*CiPipelineMaterialWebhookDataMapping, error) {
+	var mapping CiPipelineMaterialWebhookDataMapping
+	err := impl.dbConnection.Model(&mapping).
+		Column("ci_pipeline_material_webhook_data_mapping.*").
+		Relation("FilterResults", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
 		Where("webhook_data_id =? ", webhookParsedDataId).
 		Where("is_active = TRUE ").
 		Select()

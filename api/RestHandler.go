@@ -338,7 +338,7 @@ func (handler RestHandlerImpl) GetWebhookData(w http.ResponseWriter, r *http.Req
 		return
 	}
 	handler.logger.Debugw("webhook data request ", "req", request)
-	webhookData, err := handler.repositoryManager.GetWebhookDataById(request.Id)
+	webhookData, err := handler.repositoryManager.GetWebhookAndCiDataById(request.Id)
 
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
