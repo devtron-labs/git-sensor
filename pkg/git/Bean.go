@@ -34,12 +34,13 @@ type HeadRequest struct {
 }
 
 type CiPipelineMaterialBean struct {
-	Id            int
-	GitMaterialId int
-	Type          sql.SourceType
-	Value         string
-	Active        bool
-	GitCommit     *GitCommit
+	Id                        int
+	GitMaterialId             int
+	Type                      sql.SourceType
+	Value                     string
+	Active                    bool
+	GitCommit                 *GitCommit
+	ExtraEnvironmentVariables map[string]string // extra env variables which will be used for CI
 }
 
 type MaterialChangeResp struct {
@@ -61,6 +62,11 @@ type GitCommit struct {
 	WebhookData *WebhookData      `json:"webhookData"`
 }
 
+type WebhookAndCiData struct {
+	ExtraEnvironmentVariables map[string]string `json:"extraEnvironmentVariables"` // extra env variables which will be used for CI
+	WebhookData               *WebhookData      `json:"webhookData"`
+}
+
 type WebhookData struct {
 	Id              int               `json:"id"`
 	EventActionType string            `json:"eventActionType"`
@@ -75,7 +81,8 @@ type CommitMetadataRequest struct {
 }
 
 type WebhookDataRequest struct {
-	Id int `json:"id"`
+	Id                   int `json:"id"`
+	CiPipelineMaterialId int `json:"ciPipelineMaterialId"`
 }
 
 type WebhookEventConfigRequest struct {

@@ -22,15 +22,16 @@ import (
 )
 
 type CiPipelineMaterialWebhookDataMappingFilterResult struct {
-	tableName            struct{}  `sql:"ci_pipeline_material_webhook_data_mapping_filter_result" pg:",discard_unknown_columns"`
-	Id                   int       `sql:"id,pk"`
-	WebhookDataMappingId int       `sql:"webhook_data_mapping_id,notnull"`
-	SelectorName         string    `sql:"selector_name,notnull"`
-	SelectorCondition    string    `sql:"selector_condition"`
-	SelectorValue        string    `sql:"selector_value"`
-	ConditionMatched     bool      `sql:"condition_matched,notnull"`
-	IsActive             bool      `sql:"is_active,notnull"`
-	CreatedOn            time.Time `sql:"created_on,notnull"`
+	tableName            struct{}          `sql:"ci_pipeline_material_webhook_data_mapping_filter_result" pg:",discard_unknown_columns"`
+	Id                   int               `sql:"id,pk"`
+	WebhookDataMappingId int               `sql:"webhook_data_mapping_id,notnull"`
+	SelectorName         string            `sql:"selector_name,notnull"`
+	SelectorCondition    string            `sql:"selector_condition"`
+	SelectorValue        string            `sql:"selector_value"`
+	ConditionMatched     bool              `sql:"condition_matched,notnull"`
+	MatchedGroups        map[string]string `sql:"matched_groups"`
+	IsActive             bool              `sql:"is_active,notnull"`
+	CreatedOn            time.Time         `sql:"created_on,notnull"`
 }
 
 type WebhookEventDataMappingFilterResultRepository interface {
