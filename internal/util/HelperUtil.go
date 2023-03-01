@@ -5,16 +5,25 @@ import (
 	"strings"
 )
 
-func BuildExtraEnvironmentVariablesForCi(filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) map[string]string {
+func BuildExtraEnvironmentVariablesForCi(filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult, extEnvVariable map[string]string) map[string]string {
 	extraEnvironmentVariables := make(map[string]string)
 	for _, filterResult := range filterResults {
 		for k, v := range filterResult.MatchedGroups {
-			// upper case
-			key := strings.ToUpper(k)
-			// replace space with underscore
-			key = strings.ReplaceAll(key, " ", "_")
+			key := buildEnvVariableKey(k)
 			extraEnvironmentVariables[key] = v
 		}
 	}
+	for k, v := range extEnvVariable {
+		key := buildEnvVariableKey(k)
+		extraEnvironmentVariables[key] = v
+	}
 	return extraEnvironmentVariables
+}
+
+func buildEnvVariableKey(originalKey string) string {
+	// upper case
+	key := strings.ToUpper(originalKey)
+	// replace space with underscore
+	key = strings.ReplaceAll(key, " ", "_")
+	return key
 }

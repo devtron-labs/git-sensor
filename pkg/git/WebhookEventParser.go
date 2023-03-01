@@ -60,6 +60,7 @@ func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEve
 
 	showData := make(map[string]string)
 	wholeData := make(map[string]string)
+	ciEnvVariableData := make(map[string]string)
 
 	// loop in for all selectors
 	for _, selector := range selectors {
@@ -75,16 +76,23 @@ func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEve
 			if selector.ToShow {
 				showData[name] = selectorValueStr
 			}
+			if selector.ToUseInCiEnvVariable {
+				ciEnvVariableData[name] = selectorValueStr
+			}
 			wholeData[name] = selectorValueStr
 		default:
 			if selector.ToShow {
 				showData[name] = selectorValueStr
+			}
+			if selector.ToUseInCiEnvVariable {
+				ciEnvVariableData[name] = selectorValueStr
 			}
 			wholeData[name] = selectorValueStr
 		}
 	}
 
 	webhookEventParsedData.Data = showData
+	webhookEventParsedData.CiEnvVariableData = ciEnvVariableData
 
 	impl.logger.Debug("webhookEventParsedData : ", webhookEventParsedData)
 	impl.logger.Debug("wholeData : ", wholeData)
