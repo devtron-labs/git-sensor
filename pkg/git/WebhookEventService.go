@@ -21,9 +21,11 @@ import (
 	"fmt"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internal/util"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -109,20 +111,28 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 	impl.logger.Debug("matching CI trigger condition")
 
 	repositoryUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_URL_NAME]
+	repositorySSHUrl := fullDataMap[WEBHOOK_SELECTOR_REPOSITORY_SSH_URL_NAME]
 
 	if len(repositoryUrl) == 0 {
 		impl.logger.Warn("repository url is blank. so skipping matching condition")
 		return nil
 	}
-
+	if len(repositorySSHUrl) == 0 {
+		repositoryUrlSplit := strings.Split(repositoryUrl, "/")
+		if len(repositoryUrlSplit) > 3 {
+			workspaceName := repositoryUrlSplit[3]
+			projectName := repositoryUrlSplit[4]
+			repositorySSHUrl = fmt.Sprintf("git@bitbucket.org:%s/%s.git", workspaceName, projectName)
+		}
+	}
 	// get materials by Urls
 	var repoUrls []string
 	repoUrls = append(repoUrls, repositoryUrl)
 	repoUrls = append(repoUrls, fmt.Sprintf("%s%s", repositoryUrl, ".git"))
+	repoUrls = append(repoUrls, repositorySSHUrl)
 
 	impl.logger.Debug("getting CI materials for URLs : ", repoUrls)
 	materials, err := impl.materialRepository.FindAllActiveByUrls(repoUrls)
-
 	if err != nil {
 		impl.logger.Errorw("error in fetching active materials", "err", err)
 		return err
@@ -177,7 +187,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 
 			// if condition is match, then notify for CI
 			if overallMatch {
-				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData))
+				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData, filterResults))
 			}
 		}
 	}
@@ -235,6 +245,9 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 			match, err := regexp.MatchString(conditionRegexValue, actualValue)
 			if err != nil || !match {
 				filterResult.ConditionMatched = false
+			} else {
+				matchedGroups := impl.GetRegexGroupData(conditionRegexValue, actualValue)
+				filterResult.MatchedGroups = matchedGroups
 			}
 			if overallMatch && !filterResult.ConditionMatched {
 				overallMatch = false
@@ -250,8 +263,21 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 	return filterResults, overallMatch, nil
 }
 
-func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData) *CiPipelineMaterialBean {
+func (impl WebhookEventServiceImpl) GetRegexGroupData(regex string, val string) map[string]string {
+	matchedGroups := make(map[string]string)
+	r := regexp.MustCompile(regex)
+	matches := r.FindStringSubmatch(val)
+	subexpNames := r.SubexpNames()
+	for i, name := range subexpNames {
+		if len(name) != 0 && len(matches) > i {
+			matchedGroups[name] = matches[i]
+		}
+	}
+	return matchedGroups
+}
 
+func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData, filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) *CiPipelineMaterialBean {
+	extraEnvironmentVariables := util.BuildExtraEnvironmentVariablesForCi(filterResults, webhookEventParsedData.CiEnvVariableData)
 	notifyObject := &CiPipelineMaterialBean{
 		Id:            ciPipelineMaterial.Id,
 		Value:         ciPipelineMaterial.Value,
@@ -261,7 +287,9 @@ func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.
 		GitCommit: &GitCommit{
 			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventParsedData),
 		},
+		ExtraEnvironmentVariables: extraEnvironmentVariables,
 	}
+
 	return notifyObject
 }
 

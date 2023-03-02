@@ -37,18 +37,19 @@ type GitHostWebhookEvent struct {
 }
 
 type GitHostWebhookEventSelectors struct {
-	tableName        struct{}  `sql:"git_host_webhook_event_selectors" pg:",discard_unknown_columns"`
-	Id               int       `sql:"id,pk"`
-	EventId          int       `sql:"event_id,notnull"`
-	Name             string    `sql:"name,notnull"`
-	Selector         string    `sql:"selector,notnull"`
-	ToShow           bool      `sql:"to_show,notnull"`
-	ToShowInCiFilter bool      `sql:"to_show_in_ci_filter,notnull"`
-	FixValue         string    `sql:"fix_value"`
-	PossibleValues   string    `sql:"possible_values"`
-	IsActive         bool      `sql:"is_active,notnull"`
-	CreatedOn        time.Time `sql:"created_on,notnull"`
-	UpdatedOn        time.Time `sql:"updated_on"`
+	tableName            struct{}  `sql:"git_host_webhook_event_selectors" pg:",discard_unknown_columns"`
+	Id                   int       `sql:"id,pk"`
+	EventId              int       `sql:"event_id,notnull"`
+	Name                 string    `sql:"name,notnull"`
+	Selector             string    `sql:"selector,notnull"`
+	ToShow               bool      `sql:"to_show,notnull"`
+	ToShowInCiFilter     bool      `sql:"to_show_in_ci_filter,notnull"`
+	ToUseInCiEnvVariable bool      `sql:"to_use_in_ci_env_variable"`
+	FixValue             string    `sql:"fix_value"`
+	PossibleValues       string    `sql:"possible_values"`
+	IsActive             bool      `sql:"is_active,notnull"`
+	CreatedOn            time.Time `sql:"created_on,notnull"`
+	UpdatedOn            time.Time `sql:"updated_on"`
 }
 
 type WebhookEventRepository interface {
