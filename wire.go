@@ -39,6 +39,7 @@ func InitializeApp() (*App, error) {
 		logger.NewSugaredLogger,
 		api.NewRestHandlerImpl,
 		wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
+		api.NewGrpcControllerImpl,
 		pkg.NewRepoManagerImpl,
 		wire.Bind(new(pkg.RepoManager), new(*pkg.RepoManagerImpl)),
 		sql.NewMaterialRepositoryImpl,

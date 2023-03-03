@@ -19,6 +19,10 @@ package main
 import (
 	"context"
 	"fmt"
+	pb "github.com/devtron-labs/git-sensor/protos"
+	"google.golang.org/grpc"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -33,21 +37,23 @@ import (
 )
 
 type App struct {
-	MuxRouter    *api.MuxRouter
-	Logger       *zap.SugaredLogger
-	watcher      *git.GitWatcherImpl
-	server       *http.Server
-	db           *pg.DB
-	pubSubClient *pubsub.PubSubClientServiceImpl
+	MuxRouter          *api.MuxRouter
+	Logger             *zap.SugaredLogger
+	watcher            *git.GitWatcherImpl
+	server             *http.Server
+	db                 *pg.DB
+	pubSubClient       *pubsub.PubSubClientServiceImpl
+	GrpcControllerImpl *api.GrpcControllerImpl
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcControllerImpl) *App {
 	return &App{
-		MuxRouter:    MuxRouter,
-		Logger:       Logger,
-		watcher:      impl,
-		db:           db,
-		pubSubClient: pubSubClient,
+		MuxRouter:          MuxRouter,
+		Logger:             Logger,
+		watcher:            impl,
+		db:                 db,
+		pubSubClient:       pubSubClient,
+		GrpcControllerImpl: GrpcControllerImpl,
 	}
 }
 
@@ -76,6 +82,26 @@ func (app *App) Start() {
 	if err != nil {
 		app.Logger.Errorw("error in startup", "err", err)
 		os.Exit(2)
+	}
+
+	app.initGrpcServer()
+}
+
+func (app *App) initGrpcServer() {
+
+	//listen on the port
+	lis, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatalf("Failed to start server %v", err)
+	}
+	// create a new gRPC server
+	grpcServer := grpc.NewServer()
+	// register the greet service
+	pb.RegisterGitServiceServer(grpcServer, app.GrpcControllerImpl)
+	log.Printf("Server started at %v", lis.Addr())
+	//list is the port, the grpc server needs to start there
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("Failed to start: %v", err)
 	}
 }
 
