@@ -79,9 +79,8 @@ func (app *App) Start() {
 		os.Exit(2)
 	}
 
-	app.Logger.Infow("grpcServer protocol configured "+app.StartupConfig.Protocol,
+	app.Logger.Infow("server protocol configured "+app.StartupConfig.Protocol,
 		"protocol", app.StartupConfig.Protocol)
-	app.Logger.Infow("starting grpcServer on ", "port", app.StartupConfig.Port)
 
 	if app.StartupConfig.Protocol == "GRPC" {
 		err = app.initGrpcServer(app.StartupConfig.Port)
@@ -102,18 +101,20 @@ func (app *App) Start() {
 }
 
 func (app *App) initRestServer(port int) error {
+	app.Logger.Infow("rest server starting", "port", app.StartupConfig.Port)
 	app.MuxRouter.Init()
 	//authEnforcer := casbin2.Create()
 
 	h := handlers.RecoveryHandler(handlers.RecoveryLogger(&PanicLogger{Logger: app.Logger}))(app.MuxRouter.Router)
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: h}
+	app.restServer = &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: h}
 	app.MuxRouter.Router.Use(middleware.PrometheusMiddleware)
 
-	return server.ListenAndServe()
+	return app.restServer.ListenAndServe()
 }
 
 func (app *App) initGrpcServer(port int) error {
+	app.Logger.Infow("gRPC server starting", "port", app.StartupConfig.Port)
 
 	//listen on the port
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

@@ -733,13 +733,15 @@ func (controller *GrpcControllerImpl) mapGitCommit(commit *git.GitCommit) (*pb.G
 
 	// mapping FileStats
 	mappedFileStats := make([]*pb.FileStat, 0)
-	for _, item := range *commit.FileStats {
+	if commit.FileStats != nil {
+		for _, item := range *commit.FileStats {
 
-		mappedFileStats = append(mappedFileStats, &pb.FileStat{
-			Name:     item.Name,
-			Addition: int64(item.Addition),
-			Deletion: int64(item.Deletion),
-		})
+			mappedFileStats = append(mappedFileStats, &pb.FileStat{
+				Name:     item.Name,
+				Addition: int64(item.Addition),
+				Deletion: int64(item.Deletion),
+			})
+		}
 	}
 
 	// Mapping GitCommit
