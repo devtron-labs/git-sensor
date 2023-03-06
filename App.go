@@ -17,31 +17,41 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/caarlos0/env"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
+	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	pb "github.com/devtron-labs/protos/git-sensor"
 	"github.com/go-pg/pg"
+	"github.com/gorilla/handlers"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"time"
 )
 
 type App struct {
+	MuxRouter          *api.MuxRouter
 	Logger             *zap.SugaredLogger
 	watcher            *git.GitWatcherImpl
-	server             *grpc.Server
+	restServer         *http.Server
+	grpcServer         *grpc.Server
 	db                 *pg.DB
 	pubSubClient       *pubsub.PubSubClientServiceImpl
 	GrpcControllerImpl *api.GrpcControllerImpl
+	StartupConfig      *bean.StartupConfig
 }
 
-func NewApp(Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcControllerImpl) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcControllerImpl) *App {
 	return &App{
+		MuxRouter:          MuxRouter,
 		Logger:             Logger,
 		watcher:            impl,
 		db:                 db,
@@ -60,23 +70,47 @@ func (impl *PanicLogger) Println(param ...interface{}) {
 }
 
 func (app *App) Start() {
-	port := 8080 //TODO: extract from environment variable
-	app.Logger.Infow("starting server on ", "port", port)
-	err := app.initGrpcServer(port)
-	//app.MuxRouter.Init()
-	//authEnforcer := casbin2.Create()
-	//
-	//h := handlers.RecoveryHandler(handlers.RecoveryLogger(&PanicLogger{Logger: app.Logger}))(app.MuxRouter.Router)
-	//
-	//server := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: h}
-	//app.MuxRouter.Router.Use(middleware.PrometheusMiddleware)
-	//app.server = server
-	//err := server.ListenAndServe()
-	//
+
+	// Parse configuration
+	app.StartupConfig = &bean.StartupConfig{}
+	err := env.Parse(app.StartupConfig)
+	if err != nil {
+		app.Logger.Errorw("failed to parse configuration")
+		os.Exit(2)
+	}
+
+	app.Logger.Infow("grpcServer protocol configured "+app.StartupConfig.Protocol,
+		"protocol", app.StartupConfig.Protocol)
+	app.Logger.Infow("starting grpcServer on ", "port", app.StartupConfig.Port)
+
+	if app.StartupConfig.Protocol == "GRPC" {
+		err = app.initGrpcServer(app.StartupConfig.Port)
+
+	} else if app.StartupConfig.Protocol == "REST" {
+		err = app.initRestServer(app.StartupConfig.Port)
+
+	} else {
+		app.Logger.Errorw("unknown protocol provided", "protocol", app.StartupConfig.Protocol)
+		os.Exit(2)
+	}
+
+	// Stop if encountered error
 	if err != nil {
 		app.Logger.Errorw("error in startup", "err", err)
 		os.Exit(2)
 	}
+}
+
+func (app *App) initRestServer(port int) error {
+	app.MuxRouter.Init()
+	//authEnforcer := casbin2.Create()
+
+	h := handlers.RecoveryHandler(handlers.RecoveryLogger(&PanicLogger{Logger: app.Logger}))(app.MuxRouter.Router)
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: h}
+	app.MuxRouter.Router.Use(middleware.PrometheusMiddleware)
+
+	return server.ListenAndServe()
 }
 
 func (app *App) initGrpcServer(port int) error {
@@ -84,35 +118,45 @@ func (app *App) initGrpcServer(port int) error {
 	//listen on the port
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		log.Fatalf("failed to start server %v", err)
+		log.Fatalf("failed to start grpcServer %v", err)
 		return err
 	}
 
-	// create a new gRPC server
-	app.server = grpc.NewServer()
+	// create a new gRPC grpcServer
+	app.grpcServer = grpc.NewServer()
 
 	// register GitSensor service
-	pb.RegisterGitSensorServiceServer(app.server, app.GrpcControllerImpl)
+	pb.RegisterGitSensorServiceServer(app.grpcServer, app.GrpcControllerImpl)
 
 	// start listening on address
-	if err = app.server.Serve(lis); err != nil {
+	if err = app.grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to start: %v", err)
 		return err
 	}
 
-	log.Printf("server started at %v", lis.Addr())
+	log.Printf("grpcServer started at %v", lis.Addr())
 	return nil
 }
 
-// Stop stops the server and cleans resources. Called during shutdown
+// Stop stops the grpcServer and cleans resources. Called during shutdown
 func (app *App) Stop() {
 	app.Logger.Infow("orchestrator shutdown initiating")
 
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
 
-	app.Logger.Infow("gracefully stopping GitSensor")
-	app.server.GracefulStop()
+	if app.StartupConfig.Protocol == "GRPC" {
+		app.Logger.Infow("gracefully stopping GitSensor")
+		app.grpcServer.GracefulStop()
+
+	} else {
+		timeoutContext, _ := context.WithTimeout(context.Background(), 5*time.Second)
+		app.Logger.Infow("closing router")
+		err := app.restServer.Shutdown(timeoutContext)
+		if err != nil {
+			app.Logger.Errorw("error in mux router shutdown", "err", err)
+		}
+	}
 
 	app.Logger.Infow("closing db connection")
 	err := app.db.Close()

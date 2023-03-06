@@ -20,12 +20,6 @@ import (
 
 func InitializeApp() (*App, error) {
 	sugaredLogger := logger.NewSugaredLogger()
-	gitUtil := git.NewGitUtil(sugaredLogger)
-	configuration, err := internal.ParseConfiguration()
-	if err != nil {
-		return nil, err
-	}
-	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil, configuration)
 	config, err := sql.GetConfig()
 	if err != nil {
 		return nil, err
@@ -35,6 +29,13 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	materialRepositoryImpl := sql.NewMaterialRepositoryImpl(db)
+	gitUtil := git.NewGitUtil(sugaredLogger)
+	configuration, err := internal.ParseConfiguration()
+	if err != nil {
+		return nil, err
+	}
+	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, gitUtil, configuration)
+	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internal.NewRepositoryLocker(sugaredLogger)
 	pubSubClientServiceImpl := pubsub_lib.NewPubSubClientServiceImpl(sugaredLogger)
@@ -50,9 +51,10 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl, webhookEventParsedDataRepositoryImpl, webhookEventDataMappingRepositoryImpl, webhookEventDataMappingFilterResultRepositoryImpl, webhookEventBeanConverterImpl)
+	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger)
+	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
 	grpcControllerImpl := api.NewGrpcControllerImpl(repoManagerImpl, sugaredLogger)
-	app := NewApp(sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcControllerImpl)
+	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcControllerImpl)
 	return app, nil
 }

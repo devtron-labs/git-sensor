@@ -34,11 +34,11 @@ func InitializeApp() (*App, error) {
 
 	wire.Build(
 		NewApp,
-		//api.NewMuxRouter,
+		api.NewMuxRouter,
 		internal.ParseConfiguration,
 		logger.NewSugaredLogger,
-		//api.NewRestHandlerImpl,
-		//wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
+		api.NewRestHandlerImpl,
+		wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
 		api.NewGrpcControllerImpl,
 		pkg.NewRepoManagerImpl,
 		wire.Bind(new(pkg.RepoManager), new(*pkg.RepoManagerImpl)),
