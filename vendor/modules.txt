@@ -14,7 +14,7 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.18
 github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
-# github.com/devtron-labs/protos v0.0.0-20230306071754-ace08ea8f902
+# github.com/devtron-labs/protos v0.0.0-20230306074100-0c6d80ec3e05
 ## explicit; go 1.17
 github.com/devtron-labs/protos/git-sensor
 # github.com/emirpasic/gods v1.12.0
