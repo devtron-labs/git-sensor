@@ -7,7 +7,7 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/devtron-labs/git-sensor/pkg/mocks"
-	pb "github.com/devtron-labs/git-sensor/protos"
+	pb "github.com/devtron-labs/protos/git-sensor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -40,7 +40,7 @@ func initServer(t *testing.T, repositoryManager pkg.RepoManager) (*grpc.ClientCo
 	}
 
 	// Register service
-	pb.RegisterGitServiceServer(srv, &gitService)
+	pb.RegisterGitSensorServiceServer(srv, &gitService)
 
 	// Start serving requests
 	go func() {
@@ -74,7 +74,7 @@ func initServer(t *testing.T, repositoryManager pkg.RepoManager) (*grpc.ClientCo
 // Test SaveGitProvider handler - happy path
 func TestSaveGitProvider(t *testing.T) {
 
-	providedGitProvider := &pb.GitProviderExchange{
+	providedGitProvider := &pb.GitProvider{
 		Id:            1,
 		Name:          "test",
 		UserName:      "username",
@@ -85,25 +85,10 @@ func TestSaveGitProvider(t *testing.T) {
 		AuthMode:      "SSH",
 	}
 
-	sqlGitProvider := sql.GitProvider{
-		Id:            int(providedGitProvider.Id),
-		Name:          providedGitProvider.Name,
-		UserName:      providedGitProvider.UserName,
-		Password:      providedGitProvider.Password,
-		SshPrivateKey: providedGitProvider.SshPrivateKey,
-		AccessToken:   providedGitProvider.AccessToken,
-		Active:        providedGitProvider.Active,
-		AuthMode:      sql.AuthMode(providedGitProvider.AuthMode),
-	}
-
-	// Simulating a property change by RepositoryManager.SaveGitProvider
-	modifiedSqlGitProvider := sqlGitProvider
-	modifiedSqlGitProvider.Url = "localhost:1234"
-
 	// Mock repository manager
 	repositoryManager := mocks.NewRepoManager(t)
-	repositoryManager.On("SaveGitProvider", &sqlGitProvider).
-		Return(&modifiedSqlGitProvider, nil)
+	repositoryManager.On("SaveGitProvider", mock.IsType(&sql.GitProvider{})).
+		Return(&sql.GitProvider{}, nil)
 
 	// Initialize gRPC server
 	conn, err := initServer(t, repositoryManager)
@@ -112,14 +97,13 @@ func TestSaveGitProvider(t *testing.T) {
 	}
 
 	// Get the gRPC client
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
-	actualGitProvider, err := client.SaveGitProvider(context.Background(), providedGitProvider)
+	_, err = client.SaveGitProvider(context.Background(), providedGitProvider)
 
 	// Assert
-	assert.Equal(t,
-		actualGitProvider.Url, "localhost:1234")
+	assert.True(t, err == nil)
 }
 
 // Test AddRepo
@@ -130,35 +114,27 @@ func TestAddRepo(t *testing.T) {
 		Id: 1,
 	}
 	gitMaterialList := []*pb.GitMaterial{gitMaterial}
-	addRepoRequest := &pb.AddRepoExchange{
+	addRepoRequest := &pb.AddRepoRequest{
 		GitMaterialList: gitMaterialList,
 	}
 
-	// Mapping
-	sqlGitMaterialList := []*sql.GitMaterial{{
-		Id: 1,
-	}}
-
 	// Mocking
 	repositoryManager := mocks.NewRepoManager(t)
-	repositoryManager.On("AddRepo", sqlGitMaterialList).
-		Return([]*sql.GitMaterial{{
-			Id:   1,
-			Name: "test",
-		}}, nil)
+	repositoryManager.On("AddRepo", mock.IsType([]*sql.GitMaterial{})).
+		Return([]*sql.GitMaterial{}, nil)
 
 	// Initializing gRPC server and client connection
 	conn, err := initServer(t, repositoryManager)
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
-	res, err := client.AddRepo(context.Background(), addRepoRequest)
+	_, err = client.AddRepo(context.Background(), addRepoRequest)
 
 	// Assert
-	assert.Equal(t, res.GitMaterialList[0].Name, "test")
+	assert.True(t, err == nil)
 }
 
 // Test UpdateRepo
@@ -169,31 +145,23 @@ func TestUpdateRepo(t *testing.T) {
 		Id: 1,
 	}
 
-	// Mapping
-	sqlGitMaterial := &sql.GitMaterial{
-		Id: 1,
-	}
-
 	// Mocking
 	repositoryManager := mocks.NewRepoManager(t)
-	repositoryManager.On("UpdateRepo", sqlGitMaterial).
-		Return(&sql.GitMaterial{
-			Id:   1,
-			Name: "test",
-		}, nil)
+	repositoryManager.On("UpdateRepo", mock.IsType(&sql.GitMaterial{})).
+		Return(&sql.GitMaterial{}, nil)
 
 	// Initializing gRPC server and client connection
 	conn, err := initServer(t, repositoryManager)
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
-	res, err := client.UpdateRepo(context.Background(), gitMaterial)
+	_, err = client.UpdateRepo(context.Background(), gitMaterial)
 
 	// Assert
-	assert.Equal(t, res.Name, "test")
+	assert.True(t, err == nil)
 }
 
 // Test FetchChanges
@@ -244,7 +212,7 @@ func TestFetchChanges(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.FetchChanges(context.Background(), req)
@@ -281,7 +249,7 @@ func TestGetHeadForPipelineMaterials(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetHeadForPipelineMaterials(context.Background(), req)
@@ -324,7 +292,7 @@ func TestGetCommitMetadata(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetCommitMetadata(context.Background(), req)
@@ -370,7 +338,7 @@ func TestGetCommitMetadataForPipelineMaterial(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetCommitMetadataForPipelineMaterial(context.Background(), req)
@@ -416,7 +384,7 @@ func TestGetCommitInfoForTag(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetCommitInfoForTag(context.Background(), req)
@@ -454,7 +422,7 @@ func TestRefreshGitMaterial(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.RefreshGitMaterial(context.Background(), req)
@@ -479,7 +447,7 @@ func TestReloadAllMaterial(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	_, err = client.ReloadAllMaterial(context.Background(), req)
@@ -506,7 +474,7 @@ func TestReloadMaterial(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.ReloadMaterial(context.Background(), req)
@@ -541,7 +509,7 @@ func TestGetChangesInRelease(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetChangesInRelease(context.Background(), req)
@@ -575,7 +543,7 @@ func TestGetWebhookData(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetWebhookData(context.Background(), req)
@@ -606,7 +574,7 @@ func TestGetAllWebhookEventConfigForHosta(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetAllWebhookEventConfigForHost(context.Background(), req)
@@ -637,7 +605,7 @@ func TestGetWebhookEventConfig(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetWebhookEventConfig(context.Background(), req)
@@ -668,7 +636,7 @@ func TestGetWebhookPayloadDataForPipelineMaterialId(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetWebhookPayloadDataForPipelineMaterialId(context.Background(), req)
@@ -697,7 +665,7 @@ func TestGetWebhookPayloadFilterDataForPipelineMaterialId(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	client := pb.NewGitServiceClient(conn)
+	client := pb.NewGitSensorServiceClient(conn)
 
 	// Action
 	res, err := client.GetWebhookPayloadFilterDataForPipelineMaterialId(context.Background(), req)

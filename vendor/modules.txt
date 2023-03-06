@@ -14,6 +14,9 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.18
 github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
+# github.com/devtron-labs/protos v0.0.0-20230306071754-ace08ea8f902
+## explicit; go 1.17
+github.com/devtron-labs/protos/git-sensor
 # github.com/emirpasic/gods v1.12.0
 ## explicit
 github.com/emirpasic/gods/containers
@@ -49,7 +52,6 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/google/wire
 # github.com/gorilla/handlers v1.4.2
 ## explicit
-github.com/gorilla/handlers
 # github.com/gorilla/mux v1.7.4
 ## explicit; go 1.12
 github.com/gorilla/mux

@@ -2,20 +2,24 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
-	pb "github.com/devtron-labs/git-sensor/protos"
+	pb "github.com/devtron-labs/protos/git-sensor"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type GrpcController interface {
-	SaveGitProvider(ctx context.Context, req *pb.GitProviderExchange) (*pb.GitProviderExchange, error)
-	AddRepo(ctx context.Context, req *pb.AddRepoExchange) (*pb.AddRepoExchange, error)
-	UpdateRepo(ctx context.Context, req *pb.GitMaterial) (*pb.GitMaterial, error)
-	SavePipelineMaterial(ctx context.Context, req *pb.SavePipelineMaterialExchange) (*pb.SavePipelineMaterialExchange, error)
+	SaveGitProvider(ctx context.Context, req *pb.GitProvider) (*pb.Empty, error)
+	AddRepo(ctx context.Context, req *pb.AddRepoRequest) (*pb.Empty, error)
+	UpdateRepo(ctx context.Context, req *pb.GitMaterial) (*pb.Empty, error)
+	SavePipelineMaterial(ctx context.Context, req *pb.SavePipelineMaterialRequest) (*pb.Empty, error)
+
+	// ----
+	FetchChanges(ctx context.Context, req *pb.FetchScmChangesRequest) (*pb.MaterialChangeResponse, error)
 	GetHeadForPipelineMaterials(ctx context.Context, req *pb.HeadRequest) (*pb.GetHeadForPipelineMaterialsResponse, error)
 	GetCommitMetadata(ctx context.Context, req *pb.CommitMetadataRequest) (*pb.GitCommit, error)
 	GetCommitMetadataForPipelineMaterial(ctx context.Context, req *pb.CommitMetadataRequest) (*pb.GitCommit, error)
@@ -32,7 +36,7 @@ type GrpcController interface {
 }
 
 type GrpcControllerImpl struct {
-	pb.UnimplementedGitServiceServer
+	pb.GitSensorServiceServer
 	logger            *zap.SugaredLogger
 	repositoryManager pkg.RepoManager
 }
@@ -46,9 +50,11 @@ func NewGrpcControllerImpl(
 	}
 }
 
-func (controller *GrpcControllerImpl) SaveGitProvider(ctx context.Context, req *pb.GitProviderExchange) (
-	*pb.GitProviderExchange, error) {
+// SaveGitProvider saves the GitProvider details
+func (controller *GrpcControllerImpl) SaveGitProvider(ctx context.Context, req *pb.GitProvider) (
+	*pb.Empty, error) {
 
+	// mapping req
 	gitProvider := &sql.GitProvider{
 		Id:            int(req.Id),
 		Name:          req.Name,
@@ -61,32 +67,20 @@ func (controller *GrpcControllerImpl) SaveGitProvider(ctx context.Context, req *
 		Active:        req.Active,
 	}
 
-	res, err := controller.repositoryManager.SaveGitProvider(gitProvider)
-
+	_, err := controller.repositoryManager.SaveGitProvider(gitProvider)
 	if err != nil {
-
 		controller.logger.Errorw("error while saving git provider",
 			"authMode", gitProvider.AuthMode,
 			"err", err)
 
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	return &pb.GitProviderExchange{
-		Id:            int64(res.Id),
-		Name:          res.Name,
-		Url:           res.Url,
-		UserName:      res.UserName,
-		Password:      res.Password,
-		AccessToken:   res.AccessToken,
-		SshPrivateKey: res.SshPrivateKey,
-		AuthMode:      string(res.AuthMode),
-		Active:        res.Active,
-	}, nil
+	return &pb.Empty{}, nil
 }
 
-func (controller *GrpcControllerImpl) AddRepo(ctx context.Context, req *pb.AddRepoExchange) (
-	*pb.AddRepoExchange, error) {
+// AddRepo save git materials
+func (controller *GrpcControllerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest) (
+	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
 	gitMaterials := make([]*sql.GitMaterial, 0)
@@ -105,38 +99,18 @@ func (controller *GrpcControllerImpl) AddRepo(ctx context.Context, req *pb.AddRe
 		})
 	}
 
-	savedGitMaterials, err := controller.repositoryManager.AddRepo(gitMaterials)
-
+	_, err := controller.repositoryManager.AddRepo(gitMaterials)
 	if err != nil {
 		controller.logger.Errorw("error while adding repo",
 			"err", err)
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	// Mapping to gRPC-specified type
-	gitMaterialsForRes := make([]*pb.GitMaterial, 0)
-	for _, item := range savedGitMaterials {
-
-		gitMaterialsForRes = append(gitMaterialsForRes, &pb.GitMaterial{
-			Id:               int64(item.Id),
-			GitProviderId:    int64(item.GitProviderId),
-			Url:              item.Url,
-			FetchSubmodules:  item.FetchSubmodules,
-			Name:             item.Name,
-			CheckoutLocation: item.CheckoutLocation,
-			CheckoutStatus:   item.CheckoutStatus,
-			CheckoutMsgAny:   item.CheckoutMsgAny,
-			Deleted:          item.Deleted,
-		})
-	}
-
-	return &pb.AddRepoExchange{
-		GitMaterialList: gitMaterialsForRes,
-	}, nil
+	return &pb.Empty{}, nil
 }
 
+// UpdateRepo updates GitMaterial
 func (controller *GrpcControllerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
-	*pb.GitMaterial, error) {
+	*pb.Empty, error) {
 
 	// Mapping
 	mappedGitMaterial := &sql.GitMaterial{
@@ -152,34 +126,23 @@ func (controller *GrpcControllerImpl) UpdateRepo(ctx context.Context, req *pb.Gi
 	}
 
 	// Update repo
-	res, err := controller.repositoryManager.UpdateRepo(mappedGitMaterial)
-
+	_, err := controller.repositoryManager.UpdateRepo(mappedGitMaterial)
 	if err != nil {
 		controller.logger.Errorw("error while updating repo",
 			"name", mappedGitMaterial.Name,
 			"err", err)
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	return &pb.GitMaterial{
-		Id:               int64(res.Id),
-		GitProviderId:    int64(res.GitProviderId),
-		Url:              res.Url,
-		FetchSubmodules:  res.FetchSubmodules,
-		Name:             res.Name,
-		CheckoutLocation: res.CheckoutLocation,
-		CheckoutStatus:   res.CheckoutStatus,
-		CheckoutMsgAny:   res.CheckoutMsgAny,
-		Deleted:          res.Deleted,
-	}, nil
+	return &pb.Empty{}, nil
 }
 
-func (controller *GrpcControllerImpl) SavePipelineMaterial(ctx context.Context, req *pb.SavePipelineMaterialExchange) (
-	*pb.SavePipelineMaterialExchange, error) {
+// SavePipelineMaterial saves pipeline material
+func (controller *GrpcControllerImpl) SavePipelineMaterial(ctx context.Context, req *pb.SavePipelineMaterialRequest) (
+	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
 	ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0)
-	for _, item := range req.CiPipelineMaterialList {
+	for _, item := range req.CiPipelineMaterials {
 
 		ciPipelineMaterials = append(ciPipelineMaterials, &sql.CiPipelineMaterial{
 			Id:            int(item.Id),
@@ -196,47 +159,29 @@ func (controller *GrpcControllerImpl) SavePipelineMaterial(ctx context.Context, 
 		})
 	}
 
-	res, err := controller.repositoryManager.SavePipelineMaterial(ciPipelineMaterials)
+	// TODO: Check if we can change the argument type for the below method to avoid mapping
+	_, err := controller.repositoryManager.SavePipelineMaterial(ciPipelineMaterials)
 	if err != nil {
 		controller.logger.Errorw("error while adding repo",
 			"err", err)
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	// Mapping to grpc package specified struct type
-	savedCiPipelineMaterials := make([]*pb.CiPipelineMaterial, 0)
-	for _, item := range res {
-
-		savedCiPipelineMaterials = append(savedCiPipelineMaterials, &pb.CiPipelineMaterial{
-			Id:            int64(item.Id),
-			GitMaterialId: int64(item.GitMaterialId),
-			Type:          string(item.Type),
-			Value:         item.Value,
-			Active:        item.Active,
-			LastSeenHash:  item.LastSeenHash,
-			CommitAuthor:  item.CommitAuthor,
-			CommitDate:    timestamppb.New(item.CommitDate),
-			CommitHistory: item.CommitHistory,
-			Errored:       item.Errored,
-			ErrorMsg:      item.ErrorMsg,
-		})
-	}
-	return &pb.SavePipelineMaterialExchange{
-		CiPipelineMaterialList: savedCiPipelineMaterials,
-	}, nil
+	return &pb.Empty{}, nil
 }
 
+// FetchChanges
 func (controller *GrpcControllerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmChangesRequest) (
 	*pb.MaterialChangeResponse, error) {
 
-	res, err := controller.repositoryManager.
-		FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count))
-
+	res, err := controller.repositoryManager.FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count))
 	if err != nil {
 		controller.logger.Errorw("error while fetching scm changes",
 			"pipelineMaterialId", req.PipelineMaterialId,
 			"err", err)
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if res == nil {
+		return nil, nil
 	}
 
 	// Mapping GitCommit
@@ -275,6 +220,9 @@ func (controller *GrpcControllerImpl) GetHeadForPipelineMaterials(ctx context.Co
 		controller.logger.Errorw("error while fetching head for pipeline materials",
 			"err", err)
 		return nil, err
+	}
+	if res == nil {
+		return nil, nil
 	}
 
 	// Mapping to pb type
@@ -337,6 +285,9 @@ func (controller *GrpcControllerImpl) GetCommitMetadata(ctx context.Context, req
 
 		return nil, err
 	}
+	if gitCommit == nil {
+		return nil, nil
+	}
 
 	// Mapping GitCommit
 	mappedGitCommit, err := controller.mapGitCommit(gitCommit)
@@ -370,6 +321,9 @@ func (controller *GrpcControllerImpl) GetCommitMetadataForPipelineMaterial(ctx c
 			"err", err)
 
 		return nil, err
+	}
+	if res == nil {
+		return nil, nil
 	}
 
 	// Mapping GitCommit
@@ -405,6 +359,9 @@ func (controller *GrpcControllerImpl) GetCommitInfoForTag(ctx context.Context, r
 
 		return nil, err
 	}
+	if res == nil {
+		return nil, nil
+	}
 
 	// Mapping GitCommit
 	mappedGitCommit, err := controller.mapGitCommit(res)
@@ -434,12 +391,20 @@ func (controller *GrpcControllerImpl) RefreshGitMaterial(ctx context.Context, re
 
 		return nil, err
 	}
+	if res == nil {
+		return nil, nil
+	}
 
-	return &pb.RefreshGitMaterialResponse{
-		Message:       res.Message,
-		ErrorMsg:      res.ErrorMsg,
-		LastFetchTime: timestamppb.New(res.LastFetchTime),
-	}, nil
+	// mapping res
+	mappedRes := &pb.RefreshGitMaterialResponse{
+		Message:  res.Message,
+		ErrorMsg: res.ErrorMsg,
+	}
+	if !res.LastFetchTime.IsZero() {
+		mappedRes.LastFetchTime = timestamppb.New(res.LastFetchTime)
+	}
+
+	return mappedRes, nil
 }
 
 func (controller *GrpcControllerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
@@ -481,6 +446,9 @@ func (controller *GrpcControllerImpl) GetChangesInRelease(ctx context.Context, r
 
 		return nil, err
 	}
+	if res == nil {
+		return nil, nil
+	}
 
 	return controller.mapGitChanges(res), nil
 }
@@ -496,13 +464,12 @@ func (controller *GrpcControllerImpl) GetWebhookData(ctx context.Context, req *p
 
 		return nil, err
 	}
-
-	mappedResponse := &pb.WebhookAndCiData{}
 	if res == nil {
-		return mappedResponse, nil
+		return nil, nil
 	}
 
 	// Mapping response
+	mappedResponse := &pb.WebhookAndCiData{}
 	mappedResponse.ExtraEnvironmentVariables = res.ExtraEnvironmentVariables
 	if res.WebhookData != nil {
 		mappedResponse.WebhookData = &pb.WebhookData{
@@ -525,10 +492,8 @@ func (controller *GrpcControllerImpl) GetAllWebhookEventConfigForHost(ctx contex
 
 		return nil, err
 	}
-
-	mappedRes := &pb.WebhookEventConfigResponse{}
 	if res == nil {
-		return mappedRes, nil
+		return nil, nil
 	}
 
 	// Mapping response
@@ -554,7 +519,7 @@ func (controller *GrpcControllerImpl) GetWebhookEventConfig(ctx context.Context,
 		return nil, err
 	}
 	if res == nil {
-		return &pb.WebhookEventConfig{}, nil
+		return nil, nil
 	}
 	return controller.mapWebhookEventConfig(res), nil
 }
@@ -578,7 +543,7 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadDataForPipelineMaterialId
 		return nil, err
 	}
 	if res == nil {
-		return &pb.WebhookPayloadDataResponse{}, nil
+		return nil, nil
 	}
 
 	// Mapping payloads
@@ -622,7 +587,7 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadFilterDataForPipelineMate
 		return nil, err
 	}
 	if res == nil {
-		return &pb.WebhookPayloadFilterDataResponse{}, nil
+		return nil, nil
 	}
 
 	// Mapping response
@@ -766,38 +731,35 @@ func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) 
 
 func (controller *GrpcControllerImpl) mapGitCommit(commit *git.GitCommit) (*pb.GitCommit, error) {
 
+	// mapping FileStats
 	mappedFileStats := make([]*pb.FileStat, 0)
-	if commit.FileStats != nil {
+	for _, item := range *commit.FileStats {
 
-		// Mapping FileStats
-		serializedFileStat, err := json.Marshal(commit.FileStats)
-		if err != nil {
-			controller.logger.Errorw("error serializing commit file stats",
-				"fileStats", commit.FileStats,
-				"err", err)
-
-			return nil, err
-
-		} else {
-			err = json.Unmarshal(serializedFileStat, &mappedFileStats)
-			if err != nil {
-				return nil, err
-			}
-		}
+		mappedFileStats = append(mappedFileStats, &pb.FileStat{
+			Name:     item.Name,
+			Addition: int64(item.Addition),
+			Deletion: int64(item.Deletion),
+		})
 	}
 
 	// Mapping GitCommit
-	return &pb.GitCommit{
+	mappedRes := &pb.GitCommit{
 		Commit:    commit.Commit,
 		Author:    commit.Author,
-		Date:      timestamppb.New(commit.Date),
 		Message:   commit.Message,
 		Changes:   commit.Changes,
 		FileStats: mappedFileStats,
-		WebhookData: &pb.WebhookData{
+	}
+
+	if commit.WebhookData != nil {
+		mappedRes.WebhookData = &pb.WebhookData{
 			Id:              int64(commit.WebhookData.Id),
 			EventActionType: commit.WebhookData.EventActionType,
 			Data:            commit.WebhookData.Data,
-		},
-	}, nil
+		}
+	}
+	if !commit.Date.IsZero() {
+		mappedRes.Date = timestamppb.New(commit.Date)
+	}
+	return mappedRes, nil
 }
