@@ -25,7 +25,7 @@ import (
 	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
-	pb "github.com/devtron-labs/protos/git-sensor"
+	pb "github.com/devtron-labs/protos/gitSensor"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"

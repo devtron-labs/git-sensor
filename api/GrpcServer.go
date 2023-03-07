@@ -5,7 +5,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
-	pb "github.com/devtron-labs/protos/git-sensor"
+	pb "github.com/devtron-labs/protos/gitSensor"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

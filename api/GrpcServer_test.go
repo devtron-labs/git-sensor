@@ -7,7 +7,7 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/devtron-labs/git-sensor/pkg/mocks"
-	pb "github.com/devtron-labs/protos/git-sensor"
+	pb "github.com/devtron-labs/protos/gitSensor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
