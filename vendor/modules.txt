@@ -56,6 +56,9 @@ github.com/gorilla/handlers
 # github.com/gorilla/mux v1.7.4
 ## explicit; go 1.12
 github.com/gorilla/mux
+# github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+## explicit
+github.com/grpc-ecosystem/go-grpc-prometheus
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 ## explicit
 github.com/jbenet/go-context/io

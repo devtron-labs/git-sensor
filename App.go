@@ -28,8 +28,10 @@ import (
 	pb "github.com/devtron-labs/protos/git-sensor"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"log"
 	"net"
 	"net/http"
@@ -123,19 +125,29 @@ func (app *App) initGrpcServer(port int) error {
 		return err
 	}
 
+	opts := []grpc.ServerOption{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionAge: 10 * time.Second,
+		}),
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+	}
 	// create a new gRPC grpcServer
-	app.grpcServer = grpc.NewServer()
+	app.grpcServer = grpc.NewServer(opts...)
 
 	// register GitSensor service
 	pb.RegisterGitSensorServiceServer(app.grpcServer, app.GrpcControllerImpl)
+	grpc_prometheus.Register(app.grpcServer)
+	grpc_prometheus.EnableHandlingTimeHistogram()
+
+	// Register Prometheus metrics handler.
+	// http.Handle("/metrics", promhttp.Handler())
 
 	// start listening on address
 	if err = app.grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to start: %v", err)
 		return err
 	}
-
-	log.Printf("grpcServer started at %v", lis.Addr())
 	return nil
 }
 
