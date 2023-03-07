@@ -277,7 +277,7 @@ func (impl WebhookEventServiceImpl) GetRegexGroupData(regex string, val string) 
 }
 
 func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.CiPipelineMaterial, webhookEventParsedData *sql.WebhookEventParsedData, filterResults []*sql.CiPipelineMaterialWebhookDataMappingFilterResult) *CiPipelineMaterialBean {
-	extraEnvironmentVariables := util.BuildExtraEnvironmentVariablesForCi(filterResults)
+	extraEnvironmentVariables := util.BuildExtraEnvironmentVariablesForCi(filterResults, webhookEventParsedData.CiEnvVariableData)
 	notifyObject := &CiPipelineMaterialBean{
 		Id:            ciPipelineMaterial.Id,
 		Value:         ciPipelineMaterial.Value,

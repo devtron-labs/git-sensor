@@ -752,8 +752,9 @@ func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int, ciPipelineMaterialId
 	webhookAndCiData := &git.WebhookAndCiData{
 		WebhookData: webhookData,
 	}
+
 	if filterData != nil {
-		webhookAndCiData.ExtraEnvironmentVariables = util.BuildExtraEnvironmentVariablesForCi(filterData.FilterResults)
+		webhookAndCiData.ExtraEnvironmentVariables = util.BuildExtraEnvironmentVariablesForCi(filterData.FilterResults, webhookDataFromDb.CiEnvVariableData)
 	}
 
 	return webhookAndCiData, nil
