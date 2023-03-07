@@ -1,6 +1,6 @@
 package bean
 
 type StartupConfig struct {
-	Protocol string `env:"SERVER_PROTOCOL" envDefault:"REST"`
-	Port     int    `env:"SERVER_PORT" envDefault:"8080"`
+	RestPort int `env:"SERVER_REST_PORT" envDefault:"8080"`
+	GrpcPort int `env:"SERVER_GRPC_PORT" envDefault:"8081"`
 }

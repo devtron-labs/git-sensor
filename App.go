@@ -73,7 +73,7 @@ func (impl *PanicLogger) Println(param ...interface{}) {
 
 func (app *App) Start() {
 
-	// Parse configuration
+	// Parse config
 	app.StartupConfig = &bean.StartupConfig{}
 	err := env.Parse(app.StartupConfig)
 	if err != nil {
@@ -81,29 +81,25 @@ func (app *App) Start() {
 		os.Exit(2)
 	}
 
-	app.Logger.Infow("server protocol configured "+app.StartupConfig.Protocol,
-		"protocol", app.StartupConfig.Protocol)
+	go func() {
+		// Start REST server
+		err = app.initRestServer(app.StartupConfig.RestPort)
+		if err != nil {
+			app.Logger.Errorw("error starting rest server", "err", err)
+			os.Exit(2)
+		}
+	}()
 
-	if app.StartupConfig.Protocol == "GRPC" {
-		err = app.initGrpcServer(app.StartupConfig.Port)
-
-	} else if app.StartupConfig.Protocol == "REST" {
-		err = app.initRestServer(app.StartupConfig.Port)
-
-	} else {
-		app.Logger.Errorw("unknown protocol provided", "protocol", app.StartupConfig.Protocol)
-		os.Exit(2)
-	}
-
-	// Stop if encountered error
+	// Start gRPC server
+	err = app.initGrpcServer(app.StartupConfig.GrpcPort)
 	if err != nil {
-		app.Logger.Errorw("error in startup", "err", err)
+		app.Logger.Errorw("error starting grpc server", "err", err)
 		os.Exit(2)
 	}
 }
 
 func (app *App) initRestServer(port int) error {
-	app.Logger.Infow("rest server starting", "port", app.StartupConfig.Port)
+	app.Logger.Infow("rest server starting", "port", app.StartupConfig.RestPort)
 	app.MuxRouter.Init()
 	//authEnforcer := casbin2.Create()
 
@@ -116,7 +112,7 @@ func (app *App) initRestServer(port int) error {
 }
 
 func (app *App) initGrpcServer(port int) error {
-	app.Logger.Infow("gRPC server starting", "port", app.StartupConfig.Port)
+	app.Logger.Infow("gRPC server starting", "port", app.StartupConfig.GrpcPort)
 
 	//listen on the port
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -140,9 +136,6 @@ func (app *App) initGrpcServer(port int) error {
 	grpc_prometheus.Register(app.grpcServer)
 	grpc_prometheus.EnableHandlingTimeHistogram()
 
-	// Register Prometheus metrics handler.
-	// http.Handle("/metrics", promhttp.Handler())
-
 	// start listening on address
 	if err = app.grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to start: %v", err)
@@ -158,21 +151,18 @@ func (app *App) Stop() {
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
 
-	if app.StartupConfig.Protocol == "GRPC" {
-		app.Logger.Infow("gracefully stopping GitSensor")
-		app.grpcServer.GracefulStop()
+	app.Logger.Infow("gracefully stopping GitSensor")
+	app.grpcServer.GracefulStop()
 
-	} else {
-		timeoutContext, _ := context.WithTimeout(context.Background(), 5*time.Second)
-		app.Logger.Infow("closing router")
-		err := app.restServer.Shutdown(timeoutContext)
-		if err != nil {
-			app.Logger.Errorw("error in mux router shutdown", "err", err)
-		}
+	timeoutContext, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	app.Logger.Infow("closing router")
+	err := app.restServer.Shutdown(timeoutContext)
+	if err != nil {
+		app.Logger.Errorw("error in mux router shutdown", "err", err)
 	}
 
 	app.Logger.Infow("closing db connection")
-	err := app.db.Close()
+	err = app.db.Close()
 	if err != nil {
 		app.Logger.Errorw("error in closing db connection", "err", err)
 	}
