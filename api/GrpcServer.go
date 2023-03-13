@@ -83,7 +83,7 @@ func (controller *GrpcControllerImpl) AddRepo(ctx context.Context, req *pb.AddRe
 	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
-	gitMaterials := make([]*sql.GitMaterial, 0)
+	gitMaterials := make([]*sql.GitMaterial, 0, len(req.GitMaterialList))
 	for _, item := range req.GitMaterialList {
 
 		gitMaterials = append(gitMaterials, &sql.GitMaterial{
@@ -141,7 +141,7 @@ func (controller *GrpcControllerImpl) SavePipelineMaterial(ctx context.Context, 
 	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
-	ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0)
+	ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0, len(req.CiPipelineMaterials))
 	for _, item := range req.CiPipelineMaterials {
 
 		ciPipelineMaterials = append(ciPipelineMaterials, &sql.CiPipelineMaterial{
@@ -185,11 +185,13 @@ func (controller *GrpcControllerImpl) FetchChanges(ctx context.Context, req *pb.
 	}
 
 	// Mapping GitCommit
-	pbGitCommits := make([]*pb.GitCommit, 0)
+	pbGitCommits := make([]*pb.GitCommit, 0, len(res.Commits))
 	for _, item := range res.Commits {
 
 		mappedCommit, err := controller.mapGitCommit(item)
 		if err != nil {
+			controller.logger.Debugw("failed to map git commit from bean to proto specified type",
+				"err", err)
 			continue
 		}
 		pbGitCommits = append(pbGitCommits, mappedCommit)
@@ -209,7 +211,7 @@ func (controller *GrpcControllerImpl) GetHeadForPipelineMaterials(ctx context.Co
 	*pb.GetHeadForPipelineMaterialsResponse, error) {
 
 	// Map int64 to int
-	materialIds := make([]int, 0)
+	materialIds := make([]int, 0, len(req.MaterialIds))
 	for _, id := range req.MaterialIds {
 		materialIds = append(materialIds, int(id))
 	}
@@ -222,11 +224,13 @@ func (controller *GrpcControllerImpl) GetHeadForPipelineMaterials(ctx context.Co
 		return nil, err
 	}
 	if res == nil {
+		controller.logger.Debugw("received nil response from GetHeadForPipelineMaterials",
+			"materialIds", materialIds)
 		return nil, nil
 	}
 
 	// Mapping to pb type
-	ciPipelineMaterialBeans := make([]*pb.CiPipelineMaterialBean, 0)
+	ciPipelineMaterialBeans := make([]*pb.CiPipelineMaterialBean, 0, len(res))
 	for _, item := range res {
 
 		var mappedGitCommit *pb.GitCommit
@@ -497,7 +501,7 @@ func (controller *GrpcControllerImpl) GetAllWebhookEventConfigForHost(ctx contex
 	}
 
 	// Mapping response
-	mappedEventConfig := make([]*pb.WebhookEventConfig, 0)
+	mappedEventConfig := make([]*pb.WebhookEventConfig, 0, len(res))
 	for _, item := range res {
 		mappedEventConfig = append(mappedEventConfig, controller.mapWebhookEventConfig(item))
 	}
@@ -547,7 +551,7 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadDataForPipelineMaterialId
 	}
 
 	// Mapping payloads
-	payloads := make([]*pb.WebhookPayload, 0)
+	payloads := make([]*pb.WebhookPayload, 0, len(res.Payloads))
 	for _, item := range res.Payloads {
 
 		payload := &pb.WebhookPayload{
@@ -591,7 +595,7 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadFilterDataForPipelineMate
 	}
 
 	// Mapping response
-	selectorsData := make([]*pb.WebhookPayloadFilterDataSelectorResponse, 0)
+	selectorsData := make([]*pb.WebhookPayloadFilterDataSelectorResponse, 0, len(res.SelectorsData))
 	for _, item := range res.SelectorsData {
 
 		selectorsData = append(selectorsData, &pb.WebhookPayloadFilterDataSelectorResponse{
@@ -610,7 +614,7 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadFilterDataForPipelineMate
 
 func (controller *GrpcControllerImpl) mapWebhookEventConfig(config *git.WebhookEventConfig) *pb.WebhookEventConfig {
 
-	selectors := make([]*pb.WebhookEventSelectors, 0)
+	selectors := make([]*pb.WebhookEventSelectors, 0, len(config.Selectors))
 	for _, item := range config.Selectors {
 
 		selector := &pb.WebhookEventSelectors{
@@ -653,7 +657,7 @@ func (controller *GrpcControllerImpl) mapWebhookEventConfig(config *git.WebhookE
 func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) *pb.GitChanges {
 
 	// Mapping Commits
-	commitsPb := make([]*pb.Commit, 0)
+	commitsPb := make([]*pb.Commit, 0, len(gitChanges.Commits))
 	for _, item := range gitChanges.Commits {
 
 		commitPb := &pb.Commit{}
@@ -713,7 +717,7 @@ func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) 
 	}
 
 	// Mapping FileStats
-	mappedFileStats := make([]*pb.FileStat, 0)
+	mappedFileStats := make([]*pb.FileStat, 0, len(gitChanges.FileStats))
 	for _, item := range gitChanges.FileStats {
 
 		mappedFileStats = append(mappedFileStats, &pb.FileStat{
@@ -732,7 +736,7 @@ func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) 
 func (controller *GrpcControllerImpl) mapGitCommit(commit *git.GitCommit) (*pb.GitCommit, error) {
 
 	// mapping FileStats
-	mappedFileStats := make([]*pb.FileStat, 0)
+	mappedFileStats := make([]*pb.FileStat, 0, len(*commit.FileStats))
 	if commit.FileStats != nil {
 		for _, item := range *commit.FileStats {
 
