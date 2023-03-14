@@ -83,20 +83,23 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
-	gitMaterials := make([]*sql.GitMaterial, 0, len(req.GitMaterialList))
-	for _, item := range req.GitMaterialList {
+	var gitMaterials []*sql.GitMaterial
+	if req.GitMaterialList != nil {
+		gitMaterials = make([]*sql.GitMaterial, 0, len(req.GitMaterialList))
+		for _, item := range req.GitMaterialList {
 
-		gitMaterials = append(gitMaterials, &sql.GitMaterial{
-			Id:               int(item.Id),
-			GitProviderId:    int(item.GitProviderId),
-			Url:              item.Url,
-			FetchSubmodules:  item.FetchSubmodules,
-			Name:             item.Name,
-			CheckoutLocation: item.CheckoutLocation,
-			CheckoutStatus:   item.CheckoutStatus,
-			CheckoutMsgAny:   item.CheckoutMsgAny,
-			Deleted:          item.Deleted,
-		})
+			gitMaterials = append(gitMaterials, &sql.GitMaterial{
+				Id:               int(item.Id),
+				GitProviderId:    int(item.GitProviderId),
+				Url:              item.Url,
+				FetchSubmodules:  item.FetchSubmodules,
+				Name:             item.Name,
+				CheckoutLocation: item.CheckoutLocation,
+				CheckoutStatus:   item.CheckoutStatus,
+				CheckoutMsgAny:   item.CheckoutMsgAny,
+				Deleted:          item.Deleted,
+			})
+		}
 	}
 
 	_, err := impl.repositoryManager.AddRepo(gitMaterials)
@@ -141,22 +144,25 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 	*pb.Empty, error) {
 
 	// Mapping to sql package specified struct type
-	ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0, len(req.CiPipelineMaterials))
-	for _, item := range req.CiPipelineMaterials {
+	var ciPipelineMaterials []*sql.CiPipelineMaterial
+	if req.CiPipelineMaterials != nil {
+		ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0, len(req.CiPipelineMaterials))
+		for _, item := range req.CiPipelineMaterials {
 
-		ciPipelineMaterials = append(ciPipelineMaterials, &sql.CiPipelineMaterial{
-			Id:            int(item.Id),
-			GitMaterialId: int(item.GitMaterialId),
-			Type:          sql.SourceType(item.Type),
-			Value:         item.Value,
-			Active:        item.Active,
-			LastSeenHash:  item.LastSeenHash,
-			CommitAuthor:  item.CommitAuthor,
-			CommitDate:    item.CommitDate.AsTime(),
-			CommitHistory: item.CommitHistory,
-			Errored:       item.Errored,
-			ErrorMsg:      item.ErrorMsg,
-		})
+			ciPipelineMaterials = append(ciPipelineMaterials, &sql.CiPipelineMaterial{
+				Id:            int(item.Id),
+				GitMaterialId: int(item.GitMaterialId),
+				Type:          sql.SourceType(item.Type),
+				Value:         item.Value,
+				Active:        item.Active,
+				LastSeenHash:  item.LastSeenHash,
+				CommitAuthor:  item.CommitAuthor,
+				CommitDate:    item.CommitDate.AsTime(),
+				CommitHistory: item.CommitHistory,
+				Errored:       item.Errored,
+				ErrorMsg:      item.ErrorMsg,
+			})
+		}
 	}
 
 	// TODO: Check if we can change the argument type for the below method to avoid mapping
@@ -185,16 +191,19 @@ func (impl *GrpcHandlerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmC
 	}
 
 	// Mapping GitCommit
-	pbGitCommits := make([]*pb.GitCommit, 0, len(res.Commits))
-	for _, item := range res.Commits {
+	var pbGitCommits []*pb.GitCommit
+	if res.Commits != nil {
+		pbGitCommits = make([]*pb.GitCommit, 0, len(res.Commits))
+		for _, item := range res.Commits {
 
-		mappedCommit, err := impl.mapGitCommit(item)
-		if err != nil {
-			impl.logger.Debugw("failed to map git commit from bean to proto specified type",
-				"err", err)
-			continue
+			mappedCommit, err := impl.mapGitCommit(item)
+			if err != nil {
+				impl.logger.Debugw("failed to map git commit from bean to proto specified type",
+					"err", err)
+				continue
+			}
+			pbGitCommits = append(pbGitCommits, mappedCommit)
 		}
-		pbGitCommits = append(pbGitCommits, mappedCommit)
 	}
 
 	return &pb.MaterialChangeResponse{
