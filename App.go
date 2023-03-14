@@ -47,11 +47,11 @@ type App struct {
 	grpcServer         *grpc.Server
 	db                 *pg.DB
 	pubSubClient       *pubsub.PubSubClientServiceImpl
-	GrpcControllerImpl *api.GrpcControllerImpl
+	GrpcControllerImpl *api.GrpcHandlerImpl
 	StartupConfig      *bean.StartupConfig
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcControllerImpl) *App {
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcHandlerImpl) *App {
 	return &App{
 		MuxRouter:          MuxRouter,
 		Logger:             Logger,

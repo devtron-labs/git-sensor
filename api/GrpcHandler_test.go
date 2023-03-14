@@ -35,7 +35,7 @@ func initServer(t *testing.T, repositoryManager pkg.RepoManager) (*grpc.ClientCo
 	})
 
 	// Initialize service implementation
-	gitService := GrpcControllerImpl{
+	gitService := GrpcHandlerImpl{
 		repositoryManager: repositoryManager,
 	}
 
