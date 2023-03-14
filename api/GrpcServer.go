@@ -211,9 +211,12 @@ func (controller *GrpcControllerImpl) GetHeadForPipelineMaterials(ctx context.Co
 	*pb.GetHeadForPipelineMaterialsResponse, error) {
 
 	// Map int64 to int
-	materialIds := make([]int, 0, len(req.MaterialIds))
-	for _, id := range req.MaterialIds {
-		materialIds = append(materialIds, int(id))
+	var materialIds []int
+	if req.MaterialIds != nil {
+		materialIds = make([]int, 0, len(req.MaterialIds))
+		for _, id := range req.MaterialIds {
+			materialIds = append(materialIds, int(id))
+		}
 	}
 
 	// Fetch
@@ -551,19 +554,22 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadDataForPipelineMaterialId
 	}
 
 	// Mapping payloads
-	payloads := make([]*pb.WebhookPayload, 0, len(res.Payloads))
-	for _, item := range res.Payloads {
+	var payloads []*pb.WebhookPayload
+	if res.Payloads != nil {
+		payloads = make([]*pb.WebhookPayload, 0, len(res.Payloads))
+		for _, item := range res.Payloads {
 
-		payload := &pb.WebhookPayload{
-			ParsedDataId:        int64(item.ParsedDataId),
-			MatchedFiltersCount: int64(item.MatchedFiltersCount),
-			FailedFiltersCount:  int64(item.FailedFiltersCount),
-			MatchedFilters:      item.MatchedFilters,
+			payload := &pb.WebhookPayload{
+				ParsedDataId:        int64(item.ParsedDataId),
+				MatchedFiltersCount: int64(item.MatchedFiltersCount),
+				FailedFiltersCount:  int64(item.FailedFiltersCount),
+				MatchedFilters:      item.MatchedFilters,
+			}
+			if !item.EventTime.IsZero() {
+				payload.EventTime = timestamppb.New(item.EventTime)
+			}
+			payloads = append(payloads, payload)
 		}
-		if !item.EventTime.IsZero() {
-			payload.EventTime = timestamppb.New(item.EventTime)
-		}
-		payloads = append(payloads, payload)
 	}
 
 	return &pb.WebhookPayloadDataResponse{
@@ -595,15 +601,18 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadFilterDataForPipelineMate
 	}
 
 	// Mapping response
-	selectorsData := make([]*pb.WebhookPayloadFilterDataSelectorResponse, 0, len(res.SelectorsData))
-	for _, item := range res.SelectorsData {
+	var selectorsData []*pb.WebhookPayloadFilterDataSelectorResponse
+	if res.SelectorsData != nil {
+		selectorsData = make([]*pb.WebhookPayloadFilterDataSelectorResponse, 0, len(res.SelectorsData))
+		for _, item := range res.SelectorsData {
 
-		selectorsData = append(selectorsData, &pb.WebhookPayloadFilterDataSelectorResponse{
-			SelectorName:      item.SelectorName,
-			SelectorCondition: item.SelectorCondition,
-			SelectorValue:     item.SelectorValue,
-			Match:             item.Match,
-		})
+			selectorsData = append(selectorsData, &pb.WebhookPayloadFilterDataSelectorResponse{
+				SelectorName:      item.SelectorName,
+				SelectorCondition: item.SelectorCondition,
+				SelectorValue:     item.SelectorValue,
+				Match:             item.Match,
+			})
+		}
 	}
 
 	return &pb.WebhookPayloadFilterDataResponse{
@@ -614,26 +623,29 @@ func (controller *GrpcControllerImpl) GetWebhookPayloadFilterDataForPipelineMate
 
 func (controller *GrpcControllerImpl) mapWebhookEventConfig(config *git.WebhookEventConfig) *pb.WebhookEventConfig {
 
-	selectors := make([]*pb.WebhookEventSelectors, 0, len(config.Selectors))
-	for _, item := range config.Selectors {
+	var selectors []*pb.WebhookEventSelectors
+	if config.Selectors != nil {
+		selectors = make([]*pb.WebhookEventSelectors, 0, len(config.Selectors))
+		for _, item := range config.Selectors {
 
-		selector := &pb.WebhookEventSelectors{
-			Id:               int64(item.Id),
-			EventId:          int64(item.EventId),
-			Name:             item.Name,
-			ToShow:           item.ToShow,
-			ToShowInCiFilter: item.ToShowInCiFilter,
-			FixValue:         item.FixValue,
-			PossibleValues:   item.PossibleValues,
-			IsActive:         item.IsActive,
+			selector := &pb.WebhookEventSelectors{
+				Id:               int64(item.Id),
+				EventId:          int64(item.EventId),
+				Name:             item.Name,
+				ToShow:           item.ToShow,
+				ToShowInCiFilter: item.ToShowInCiFilter,
+				FixValue:         item.FixValue,
+				PossibleValues:   item.PossibleValues,
+				IsActive:         item.IsActive,
+			}
+			if !item.CreatedOn.IsZero() {
+				selector.CreatedOn = timestamppb.New(item.CreatedOn)
+			}
+			if !item.UpdatedOn.IsZero() {
+				selector.UpdatedOn = timestamppb.New(item.UpdatedOn)
+			}
+			selectors = append(selectors, selector)
 		}
-		if !item.CreatedOn.IsZero() {
-			selector.CreatedOn = timestamppb.New(item.CreatedOn)
-		}
-		if !item.UpdatedOn.IsZero() {
-			selector.UpdatedOn = timestamppb.New(item.UpdatedOn)
-		}
-		selectors = append(selectors, selector)
 	}
 
 	mappedConfig := &pb.WebhookEventConfig{
@@ -657,74 +669,80 @@ func (controller *GrpcControllerImpl) mapWebhookEventConfig(config *git.WebhookE
 func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) *pb.GitChanges {
 
 	// Mapping Commits
-	commitsPb := make([]*pb.Commit, 0, len(gitChanges.Commits))
-	for _, item := range gitChanges.Commits {
+	var commitsPb []*pb.Commit
+	if gitChanges.Commits != nil {
+		commitsPb = make([]*pb.Commit, 0, len(gitChanges.Commits))
+		for _, item := range gitChanges.Commits {
 
-		commitPb := &pb.Commit{}
+			commitPb := &pb.Commit{}
 
-		// Map Hash
-		if item.Hash != nil {
-			commitPb.Hash = &pb.Hash{
-				Long:  item.Hash.Long,
-				Short: item.Hash.Short,
+			// Map Hash
+			if item.Hash != nil {
+				commitPb.Hash = &pb.Hash{
+					Long:  item.Hash.Long,
+					Short: item.Hash.Short,
+				}
 			}
+
+			// Map Tree
+			if item.Tree != nil {
+				commitPb.Tree = &pb.Tree{
+					Long:  item.Tree.Long,
+					Short: item.Tree.Short,
+				}
+			}
+
+			// Map Author
+			if item.Author != nil {
+				commitPb.Author = &pb.Author{
+					Name:  item.Author.Name,
+					Email: item.Author.Email,
+				}
+				if !item.Author.Date.IsZero() {
+					commitPb.Author.Date = timestamppb.New(item.Author.Date)
+				}
+			}
+
+			// Map Committer
+			if item.Committer != nil {
+				commitPb.Committer = &pb.Committer{
+					Name:  item.Committer.Name,
+					Email: item.Committer.Email,
+				}
+				if !item.Committer.Date.IsZero() {
+					commitPb.Committer.Date = timestamppb.New(item.Committer.Date)
+				}
+			}
+
+			// Map Tag
+			if item.Tag != nil {
+				commitPb.Tag = &pb.Tag{
+					Name: item.Tag.Name,
+				}
+				if !item.Tag.Date.IsZero() {
+					commitPb.Tag.Date = timestamppb.New(item.Tag.Date)
+				}
+			}
+
+			commitPb.Subject = item.Subject
+			commitPb.Body = item.Body
+
+			commitsPb = append(commitsPb, commitPb)
 		}
-
-		// Map Tree
-		if item.Tree != nil {
-			commitPb.Tree = &pb.Tree{
-				Long:  item.Tree.Long,
-				Short: item.Tree.Short,
-			}
-		}
-
-		// Map Author
-		if item.Author != nil {
-			commitPb.Author = &pb.Author{
-				Name:  item.Author.Name,
-				Email: item.Author.Email,
-			}
-			if !item.Author.Date.IsZero() {
-				commitPb.Author.Date = timestamppb.New(item.Author.Date)
-			}
-		}
-
-		// Map Committer
-		if item.Committer != nil {
-			commitPb.Committer = &pb.Committer{
-				Name:  item.Committer.Name,
-				Email: item.Committer.Email,
-			}
-			if !item.Committer.Date.IsZero() {
-				commitPb.Committer.Date = timestamppb.New(item.Committer.Date)
-			}
-		}
-
-		// Map Tag
-		if item.Tag != nil {
-			commitPb.Tag = &pb.Tag{
-				Name: item.Tag.Name,
-			}
-			if !item.Tag.Date.IsZero() {
-				commitPb.Tag.Date = timestamppb.New(item.Tag.Date)
-			}
-		}
-
-		commitPb.Subject = item.Subject
-		commitPb.Body = item.Body
-
-		commitsPb = append(commitsPb, commitPb)
 	}
 
 	// Mapping FileStats
-	mappedFileStats := make([]*pb.FileStat, 0, len(gitChanges.FileStats))
-	for _, item := range gitChanges.FileStats {
+	var mappedFileStats []*pb.FileStat
+	if gitChanges.FileStats != nil {
+		mappedFileStats = make([]*pb.FileStat, 0, len(gitChanges.FileStats))
+		for _, item := range gitChanges.FileStats {
 
-		mappedFileStats = append(mappedFileStats, &pb.FileStat{
-			Name:     item.Name,
-			Addition: int64(item.Addition),
-			Deletion: int64(item.Deletion),
-		})
+			mappedFileStats = append(mappedFileStats, &pb.FileStat{
+				Name:     item.Name,
+				Addition: int64(item.Addition),
+				Deletion: int64(item.Deletion),
+			})
+		}
 	}
 
 	return &pb.GitChanges{
@@ -736,8 +754,9 @@ func (controller *GrpcControllerImpl) mapGitChanges(gitChanges *git.GitChanges) 
 func (controller *GrpcControllerImpl) mapGitCommit(commit *git.GitCommit) (*pb.GitCommit, error) {
 
 	// mapping FileStats
-	mappedFileStats := make([]*pb.FileStat, 0, len(*commit.FileStats))
+	var mappedFileStats []*pb.FileStat
 	if commit.FileStats != nil {
+		mappedFileStats = make([]*pb.FileStat, 0, len(*commit.FileStats))
 		for _, item := range *commit.FileStats {
 
 			mappedFileStats = append(mappedFileStats, &pb.FileStat{
