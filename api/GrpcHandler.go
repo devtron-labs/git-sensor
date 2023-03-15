@@ -206,14 +206,18 @@ func (impl *GrpcHandlerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmC
 		}
 	}
 
-	return &pb.MaterialChangeResponse{
+	mappedRes := &pb.MaterialChangeResponse{
 		Commits:        pbGitCommits,
-		LastFetchTime:  timestamppb.New(res.LastFetchTime),
 		IsRepoError:    res.IsRepoError,
 		RepoErrorMsg:   res.RepoErrorMsg,
 		IsBranchError:  res.IsBranchError,
 		BranchErrorMsg: res.BranchErrorMsg,
-	}, nil
+	}
+
+	if !res.LastFetchTime.IsZero() {
+		mappedRes.LastFetchTime = timestamppb.New(res.LastFetchTime)
+	}
+	return mappedRes, nil
 }
 
 func (impl *GrpcHandlerImpl) GetHeadForPipelineMaterials(ctx context.Context, req *pb.HeadRequest) (
