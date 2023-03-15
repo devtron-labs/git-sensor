@@ -146,7 +146,7 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 	// Mapping to sql package specified struct type
 	var ciPipelineMaterials []*sql.CiPipelineMaterial
 	if req.CiPipelineMaterials != nil {
-		ciPipelineMaterials := make([]*sql.CiPipelineMaterial, 0, len(req.CiPipelineMaterials))
+		ciPipelineMaterials = make([]*sql.CiPipelineMaterial, 0, len(req.CiPipelineMaterials))
 		for _, item := range req.CiPipelineMaterials {
 
 			ciPipelineMaterials = append(ciPipelineMaterials, &sql.CiPipelineMaterial{
