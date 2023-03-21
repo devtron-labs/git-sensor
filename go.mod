@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/prometheus/client_golang v1.11.1
 	github.com/robfig/cron/v3 v3.0.0
-	github.com/tidwall/gjson v1.8.0
+	github.com/tidwall/gjson v1.9.3
 	go.uber.org/zap v1.21.0
 	gopkg.in/src-d/go-git.v4 v4.13.1
 )
@@ -42,7 +42,7 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
-	github.com/tidwall/match v1.0.3 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
