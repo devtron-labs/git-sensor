@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
+	"github.com/devtron-labs/git-sensor/util"
 	"io"
 	"log"
 	"os"
@@ -58,7 +59,10 @@ func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, confi
 }
 
 func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
-	err := os.RemoveAll(location)
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("Add", start, err)
+	err = os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
 		return err
@@ -87,11 +91,17 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 }
 
 func (impl RepositoryManagerImpl) Clean(dir string) error {
-	err := os.RemoveAll(dir)
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("Clean", start, err)
+	err = os.RemoveAll(dir)
 	return err
 }
 
 func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir string, url string) (*git.Repository, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("clone", start, err)
 	timeoutContext, _ := context.WithTimeout(context.Background(), CLONE_TIMEOUT_SEC*time.Second)
 	impl.logger.Infow("cloning repository ", "url", url, "cloneDir", cloneDir)
 	repo, err := git.PlainCloneContext(timeoutContext, cloneDir, true, &git.CloneOptions{
@@ -108,6 +118,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 
 func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
+	defer util.TriggerGitOperationMetrics("Fetch", start, err)
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
 	if err != nil {
@@ -132,6 +143,9 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 }
 
 func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*GitCommit, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("GetCommitForTag", start, err)
 	tag = strings.TrimSpace(tag)
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
@@ -157,6 +171,9 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 }
 
 func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("GetCommitMetadata", start, err)
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
 		return nil, err
@@ -175,13 +192,15 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	return gitCommit, nil
 }
 
-//from -> old commit
-//to -> new commit
-//
+// from -> old commit
+// to -> new commit
 func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("ChangesSinceByRepository", start, err)
 	if strings.HasPrefix(branch, "refs/heads/") {
 		branch = strings.ReplaceAll(branch, "refs/heads/", "")
 	}
@@ -238,6 +257,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("ChangesSince", start, err)
 	if count == 0 {
 		count = 15
 	}
@@ -261,9 +283,12 @@ type FileStatsResult struct {
 	Error     error
 }
 
-//from -> old commit
-//to -> new commit
+// from -> old commit
+// to -> new commit
 func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("ChangesSinceByRepositoryForAnalytics", start, err)
 	GitChanges := &GitChanges{}
 	repository, err := git.PlainOpen(checkoutPath)
 	if err != nil {
@@ -313,6 +338,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 
 func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
 	// add private key
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("CreateSshFileIfNotExistsAndConfigureSshCommand", start, err)
 	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
 		impl.logger.Errorw("error in creating ssh private key", "err", err)
@@ -330,6 +358,9 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 }
 
 func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("computeDiff", start, err)
 	processed := make(map[string]*object.Commit, 0)
 	//t := time.Now()
 	h := newHash  //plumbing.NewHash(newHash)
@@ -404,6 +435,9 @@ func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Ha
 }
 
 func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff, parents []*object.Commit) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("getDiffTillBranchingOrDest", start, err)
 	if in(src, dst) {
 		return
 	}
@@ -433,6 +467,9 @@ func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff,
 }
 
 func in(obj *object.Commit, list []*object.Commit) bool {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("in", start, err)
 	for _, v := range list {
 		if v.Hash.String() == obj.Hash.String() {
 			return true
@@ -442,6 +479,9 @@ func in(obj *object.Commit, list []*object.Commit) bool {
 }
 
 func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
+	var err error
+	start := time.Now()
+	defer util.TriggerGitOperationMetrics("transform", start, err)
 	if src == nil {
 		return nil
 	}
