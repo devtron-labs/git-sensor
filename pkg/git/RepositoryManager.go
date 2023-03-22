@@ -103,11 +103,6 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 }
 
 func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir string, url string) (*git.Repository, error) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("clone", start, err)
-	}()
 	timeoutContext, _ := context.WithTimeout(context.Background(), CLONE_TIMEOUT_SEC*time.Second)
 	impl.logger.Infow("cloning repository ", "url", url, "cloneDir", cloneDir)
 	repo, err := git.PlainCloneContext(timeoutContext, cloneDir, true, &git.CloneOptions{
