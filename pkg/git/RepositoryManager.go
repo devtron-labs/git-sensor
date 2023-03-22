@@ -378,11 +378,6 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 }
 
 func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("computeDiff", start, err)
-	}()
 	processed := make(map[string]*object.Commit, 0)
 	//t := time.Now()
 	h := newHash  //plumbing.NewHash(newHash)
@@ -457,11 +452,6 @@ func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Ha
 }
 
 func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff, parents []*object.Commit) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("getDiffTillBranchingOrDest", start, err)
-	}()
 	if in(src, dst) {
 		return
 	}
@@ -491,11 +481,6 @@ func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff,
 }
 
 func in(obj *object.Commit, list []*object.Commit) bool {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("in", start, err)
-	}()
 	for _, v := range list {
 		if v.Hash.String() == obj.Hash.String() {
 			return true
@@ -505,11 +490,6 @@ func in(obj *object.Commit, list []*object.Commit) bool {
 }
 
 func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("transform", start, err)
-	}()
 	if src == nil {
 		return nil
 	}
