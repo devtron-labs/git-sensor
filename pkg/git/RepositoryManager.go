@@ -62,7 +62,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("Add", start, err)
+		util.TriggerGitOperationMetrics("add", start, err)
 	}()
 	err = os.RemoveAll(location)
 	if err != nil {
@@ -96,7 +96,7 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("Clean", start, err)
+		util.TriggerGitOperationMetrics("clean", start, err)
 	}()
 	err = os.RemoveAll(dir)
 	return err
@@ -120,7 +120,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("Fetch", start, err)
+		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
@@ -149,7 +149,7 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("GetCommitForTag", start, err)
+		util.TriggerGitOperationMetrics("getCommitForTag", start, err)
 	}()
 	tag = strings.TrimSpace(tag)
 	r, err := git.PlainOpen(checkoutPath)
@@ -179,7 +179,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("GetCommitMetadata", start, err)
+		util.TriggerGitOperationMetrics("getCommitMetadata", start, err)
 	}()
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
@@ -208,7 +208,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("ChangesSinceByRepository", start, err)
+		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
 	if strings.HasPrefix(branch, "refs/heads/") {
 		branch = strings.ReplaceAll(branch, "refs/heads/", "")
@@ -269,7 +269,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("ChangesSince", start, err)
+		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
 		count = 15
@@ -300,7 +300,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("ChangesSinceByRepositoryForAnalytics", start, err)
+		util.TriggerGitOperationMetrics("changesSinceByRepositoryForAnalytics", start, err)
 	}()
 	GitChanges := &GitChanges{}
 	repository, err := git.PlainOpen(checkoutPath)
@@ -354,7 +354,7 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	var err error
 	start := time.Now()
 	defer func() {
-		util.TriggerGitOperationMetrics("CreateSshFileIfNotExistsAndConfigureSshCommand", start, err)
+		util.TriggerGitOperationMetrics("createSshFileIfNotExistsAndConfigureSshCommand", start, err)
 	}()
 	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
