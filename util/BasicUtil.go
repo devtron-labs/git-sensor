@@ -37,9 +37,9 @@ func Generate(size int) string {
 }
 
 func TriggerGitOperationMetrics(method string, startTime time.Time, err error) {
+	status := "Success"
 	if err != nil {
-		middleware.GitOperationDuration.WithLabelValues(method, "Failed").Observe(time.Since(startTime).Seconds())
-	} else {
-		middleware.GitOperationDuration.WithLabelValues(method, "Success").Observe(time.Since(startTime).Seconds())
+		status = "Failed"
 	}
+	middleware.GitOperationDuration.WithLabelValues(method, status).Observe(time.Since(startTime).Seconds())
 }
