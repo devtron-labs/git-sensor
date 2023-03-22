@@ -100,7 +100,7 @@ var GitPullDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 var GitOperationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 	Name: "git_operation_duration_seconds",
 	Help: "Duration of git operation request",
-}, []string{"Method", "Status"})
+}, []string{"method", "status"})
 
 var GitMaterialPollCounter = promauto.NewCounterVec(
 	prometheus.CounterOpts{
