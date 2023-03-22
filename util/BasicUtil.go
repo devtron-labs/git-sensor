@@ -17,6 +17,7 @@
 package util
 
 import (
+	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"math/rand"
 	"strings"
 	"time"
@@ -24,7 +25,7 @@ import (
 
 var chars = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 
-//Generates random string
+// Generates random string
 func Generate(size int) string {
 	rand.Seed(time.Now().UnixNano())
 	var b strings.Builder
@@ -33,4 +34,12 @@ func Generate(size int) string {
 	}
 	str := b.String()
 	return str
+}
+
+func TriggerGitOperationMetrics(method string, startTime time.Time, err error) {
+	status := "Success"
+	if err != nil {
+		status = "Failed"
+	}
+	middleware.GitOperationDuration.WithLabelValues(method, status).Observe(time.Since(startTime).Seconds())
 }
