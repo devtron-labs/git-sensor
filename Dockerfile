@@ -17,6 +17,7 @@ COPY --from=build-env  /go/src/github.com/devtron-labs/git-sensor/git-sensor .
 
 RUN adduser -D devtron
 RUN chown -R devtron:devtron ./git-sensor
+RUN mkdir -p /git-base
 RUN chown -R devtron:devtron /git-base
 USER devtron
 
