@@ -146,7 +146,7 @@ func (impl GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 
 	for _, material := range materials {
 		wp.Submit(func() {
-			err := impl.PollAndUpdateGitMaterial(material)
+			_, err := impl.PollAndUpdateGitMaterial(material)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material",
 					"material", material,
@@ -157,7 +157,7 @@ func (impl GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp.StopWait()
 }
 
-func (impl GitWatcherImpl) PollAndUpdateGitMaterial(material *sql.GitMaterial) error {
+func (impl GitWatcherImpl) PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	repoLock := impl.locker.LeaseLocker(material.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
@@ -183,7 +183,7 @@ func (impl GitWatcherImpl) PollAndUpdateGitMaterial(material *sql.GitMaterial) e
 	if err != nil {
 		impl.logger.Errorw("error in updating fetch status", "material", material, "err", err)
 	}
-	return err
+	return material, err
 }
 
 func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) error {

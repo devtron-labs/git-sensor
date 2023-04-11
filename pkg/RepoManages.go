@@ -24,6 +24,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/internal/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
+	"github.com/go-pg/pg"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )
@@ -238,7 +239,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	return provider, err
 }
 
-//handle update
+// handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
@@ -307,11 +308,82 @@ func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
 }
 
 func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	err := impl.materialRepository.Save(material)
-	if err != nil {
-		impl.logger.Errorw("error in saving material ", "material", material, "err", err)
+
+	updateRefWithOwnId := false
+
+	// Get the ref_material_id of the material (same url) that already exists
+	existingMaterial, err := impl.materialRepository.GetMaterialWithSameRepoUrl(material.Url, 1)
+	if err != nil && err != pg.ErrNoRows {
+		impl.logger.Errorw("error fetching existing git material with same url",
+			"material", material,
+			"err", err)
+
 		return material, err
 	}
+
+	// if no existing material found
+	if err == pg.ErrNoRows {
+		// Use own id as ref
+		updateRefWithOwnId = true
+	} else {
+		// else use existing ones ref id
+		material.RefGitMaterialId = existingMaterial.RefGitMaterialId
+	}
+
+	// perform in transaction
+	tx, err := impl.materialRepository.
+		GetConnection().
+		Begin()
+
+	err = impl.materialRepository.SaveWithTransaction(material, tx)
+	if err != nil {
+		impl.logger.Errorw("error in saving material ",
+			"material", material,
+			"err", err)
+
+		return material, err
+	}
+
+	// if updateRefWithOwnId is true, update ref column
+	if !updateRefWithOwnId {
+		err := tx.Commit()
+		if err != nil {
+			impl.logger.Errorw("error while committing changes",
+				"operation", "save git material",
+				"err", err)
+
+			return material, err
+		}
+	} else {
+
+		material.RefGitMaterialId = material.Id
+		err := impl.materialRepository.UpdateRefMaterialId(material, tx)
+		if err != nil {
+
+			// rollback
+			impl.logger.Errorw("error updating ref material id with self id. performing rollback",
+				"material", material,
+				"err", err)
+
+			err := tx.Rollback()
+			if err != nil {
+				impl.logger.Errorw("error while performing rollback", "err", err)
+				return material, err
+			}
+
+			return material, err
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			impl.logger.Errorw("error while committing changes",
+				"operation", "updating ref material id",
+				"err", err)
+
+			return material, err
+		}
+	}
+
 	return impl.checkoutRepo(material)
 }
 

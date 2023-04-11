@@ -54,13 +54,17 @@ type GitMaterial struct {
 }
 
 type MaterialRepository interface {
+	GetConnection() *pg.DB
 	FindById(id int) (*GitMaterial, error)
 	Update(material *GitMaterial) error
 	Save(material *GitMaterial) error
+	SaveWithTransaction(material *GitMaterial, tx *pg.Tx) error
 	FindActive() ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
 	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
 	FindReferencedGitMaterial() ([]*GitMaterial, error)
+	GetMaterialWithSameRepoUrl(repoUrl string, limit int) (*GitMaterial, error)
+	UpdateRefMaterialId(material *GitMaterial, tx *pg.Tx) error
 }
 type MaterialRepositoryImpl struct {
 	dbConnection *pg.DB
@@ -70,8 +74,17 @@ func NewMaterialRepositoryImpl(dbConnection *pg.DB) *MaterialRepositoryImpl {
 	return &MaterialRepositoryImpl{dbConnection: dbConnection}
 }
 
+func (repo MaterialRepositoryImpl) GetConnection() *pg.DB {
+	return repo.dbConnection
+}
+
 func (repo MaterialRepositoryImpl) Save(material *GitMaterial) error {
 	err := repo.dbConnection.Insert(material)
+	return err
+}
+
+func (repo MaterialRepositoryImpl) SaveWithTransaction(material *GitMaterial, tx *pg.Tx) error {
+	err := tx.Insert(material)
 	return err
 }
 
@@ -129,8 +142,8 @@ func (repo MaterialRepositoryImpl) FindReferencedGitMaterial() ([]*GitMaterial, 
 
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
+		ColumnExpr("DISTINCT(gm.id)").
 		Column("gm.*", "gm.GitProvider").
-		ColumnExpr("DISTINCT gm.id").
 		Join("INNER JOIN git_material gm ON git_material.ref_git_material_id = gm.id").
 		Where("git_material.deleted = ? ", false).
 		Where("git_material.checkout_status = ? ", true).
@@ -138,4 +151,25 @@ func (repo MaterialRepositoryImpl) FindReferencedGitMaterial() ([]*GitMaterial, 
 		Select()
 
 	return materials, err
+}
+
+func (repo MaterialRepositoryImpl) GetMaterialWithSameRepoUrl(repoUrl string, limit int) (*GitMaterial, error) {
+
+	material := &GitMaterial{}
+	err := repo.dbConnection.Model(material).
+		Where("url = ?", repoUrl).
+		Limit(limit).
+		Select()
+
+	return material, err
+}
+
+func (repo MaterialRepositoryImpl) UpdateRefMaterialId(material *GitMaterial, tx *pg.Tx) error {
+
+	_, err := tx.Model(material).
+		Column("ref_git_material_id").
+		WherePK().
+		Update()
+
+	return err
 }
