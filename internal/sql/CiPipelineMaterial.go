@@ -32,12 +32,11 @@ type CiPipelineMaterial struct {
 	LastSeenHash  string     `sql:"last_seen_hash,notnull"`
 	CommitAuthor  string     `sql:"commit_author"`
 	CommitDate    time.Time  `sql:"commit_date"`
-	
-	CommitHistory string     `sql:"commit_history"` //last five commit for caching purpose1
-	Errored       bool       `sql:"errored,notnull"`
-	ErrorMsg      string     `sql:"error_msg,notnull"`
-}
 
+	CommitHistory string `sql:"commit_history"` //last five commit for caching purpose1
+	Errored       bool   `sql:"errored,notnull"`
+	ErrorMsg      string `sql:"error_msg,notnull"`
+}
 
 type CiPipelineMaterialRepository interface {
 	FindByGitMaterialId(gitMaterialId int) ([]*CiPipelineMaterial, error)
@@ -46,6 +45,9 @@ type CiPipelineMaterialRepository interface {
 	FindById(id int) (*CiPipelineMaterial, error)
 	Exists(id int) (bool, error)
 	Save(material []*CiPipelineMaterial) ([]*CiPipelineMaterial, error)
+	FindAllCiPipelineMaterialsReferencingGivenMaterial(gitMaterialId int) ([]*CiPipelineMaterial, error)
+	UpdateErroredCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error
+	UpdateCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error
 }
 
 type CiPipelineMaterialRepositoryImpl struct {
@@ -103,4 +105,42 @@ func (impl CiPipelineMaterialRepositoryImpl) FindById(id int) (*CiPipelineMateri
 		Where("id =?", id).
 		Where("active = ?", true).Select()
 	return materials, err
+}
+
+func (impl CiPipelineMaterialRepositoryImpl) FindAllCiPipelineMaterialsReferencingGivenMaterial(gitMaterialId int) ([]*CiPipelineMaterial, error) {
+	ciPipelineMaterials := make([]*CiPipelineMaterial, 0)
+	err := impl.dbConnection.Model(&ciPipelineMaterials).
+		ColumnExpr("DISTINCT ci_pipeline_material.value").
+		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+		Where("gm.ref_git_material_id = ?", gitMaterialId).
+		Where("gm.deleted = false").
+		Where("ci_pipeline_material.active = true").
+		Where("ci_pipeline_material.type = SOURCE_TYPE_BRANCH_FIXED").
+		Select()
+
+	return ciPipelineMaterials, err
+}
+
+func (impl CiPipelineMaterialRepositoryImpl) UpdateErroredCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error {
+
+	_, err := impl.dbConnection.Model(material).
+		Column("errored", "error_msg").
+		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+		Where("gm.ref_git_material_id = ?", gitMaterialId).
+		Where("ci_pipeline_material.value = ?", branch).
+		Update()
+
+	return err
+}
+
+func (impl CiPipelineMaterialRepositoryImpl) UpdateCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error {
+
+	_, err := impl.dbConnection.Model(material).
+		Column("last_seen_hash", "commit_author", "commit_date", "commit_history", "errored", "error_msg").
+		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+		Where("gm.ref_git_material_id = ?", gitMaterialId).
+		Where("ci_pipeline_material.value = ?", branch).
+		Update()
+
+	return err
 }

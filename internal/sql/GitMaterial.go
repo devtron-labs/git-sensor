@@ -31,7 +31,7 @@ const (
 	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
-//TODO: add support for submodule
+// TODO: add support for submodule
 type GitMaterial struct {
 	tableName        struct{} `sql:"git_material"`
 	Id               int      `sql:"id,pk"`
@@ -48,6 +48,7 @@ type GitMaterial struct {
 	FetchStatus         bool      `json:"fetch_status"`
 	LastFetchErrorCount int       `json:"last_fetch_error_count"` //continues fetch error
 	FetchErrorMessage   string    `json:"fetch_error_message"`
+	RefGitMaterialId    int       `sql:"ref_git_material_id"`
 	GitProvider         *GitProvider
 	CiPipelineMaterials []*CiPipelineMaterial
 }
@@ -59,6 +60,7 @@ type MaterialRepository interface {
 	FindActive() ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
 	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
+	FindReferencedGitMaterial() ([]*GitMaterial, error)
 }
 type MaterialRepositoryImpl struct {
 	dbConnection *pg.DB
@@ -81,7 +83,7 @@ func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 func (repo MaterialRepositoryImpl) FindActive() ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
-		Column("git_material.*", "GitProvider", ).
+		Column("git_material.*", "GitProvider").
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
 			return q.Where("active IS TRUE"), nil
 		}).
@@ -111,7 +113,7 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	return &material, err
 }
 
-func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
@@ -120,5 +122,20 @@ func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMat
 		Where("deleted =? ", false).
 		Where("url in (?) ", pg.In(urls)).
 		Select()
+	return materials, err
+}
+
+func (repo MaterialRepositoryImpl) FindReferencedGitMaterial() ([]*GitMaterial, error) {
+
+	var materials []*GitMaterial
+	err := repo.dbConnection.Model(&materials).
+		Column("gm.*", "gm.GitProvider").
+		ColumnExpr("DISTINCT gm.id").
+		Join("INNER JOIN git_material gm ON git_material.ref_git_material_id = gm.id").
+		Where("git_material.deleted = ? ", false).
+		Where("git_material.checkout_status = ? ", true).
+		Order("gm.id ASC").
+		Select()
+
 	return materials, err
 }
