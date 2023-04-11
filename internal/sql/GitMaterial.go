@@ -62,9 +62,13 @@ type MaterialRepository interface {
 	FindActive() ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
 	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
-	FindReferencedGitMaterial() ([]*GitMaterial, error)
+	FindAllReferencedGitMaterials() ([]*GitMaterial, error)
+	FindReferencedGitMaterial(materialId int) (*GitMaterial, error)
 	GetMaterialWithSameRepoUrl(repoUrl string, limit int) (*GitMaterial, error)
 	UpdateRefMaterialId(material *GitMaterial, tx *pg.Tx) error
+	FindByReferenceId(refGitMaterialId int, limit int, excludingIds []int) (*GitMaterial, error)
+	UpdateWithTransaction(material *GitMaterial, tx *pg.Tx) error
+	UpdateRefMaterialIdForAllWithSameUrl(url string, refGitMaterialId int, tx *pg.Tx) error
 }
 type MaterialRepositoryImpl struct {
 	dbConnection *pg.DB
@@ -90,6 +94,14 @@ func (repo MaterialRepositoryImpl) SaveWithTransaction(material *GitMaterial, tx
 
 func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 	_, err := repo.dbConnection.Model(material).WherePK().Update()
+	return err
+}
+
+func (repo MaterialRepositoryImpl) UpdateWithTransaction(material *GitMaterial, tx *pg.Tx) error {
+	_, err := tx.Model(material).
+		WherePK().
+		Update()
+
 	return err
 }
 
@@ -138,7 +150,7 @@ func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMat
 	return materials, err
 }
 
-func (repo MaterialRepositoryImpl) FindReferencedGitMaterial() ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllReferencedGitMaterials() ([]*GitMaterial, error) {
 
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
@@ -153,11 +165,24 @@ func (repo MaterialRepositoryImpl) FindReferencedGitMaterial() ([]*GitMaterial, 
 	return materials, err
 }
 
+func (repo MaterialRepositoryImpl) FindReferencedGitMaterial(materialId int) (*GitMaterial, error) {
+
+	material := &GitMaterial{}
+	err := repo.dbConnection.Model(material).
+		Column("gm.*", "gm.GitProvider").
+		Join("INNER JOIN git_material gm ON git_material.ref_git_material_id = gm.id").
+		Where("git_material.id = ? ", materialId).
+		Select()
+
+	return material, err
+}
+
 func (repo MaterialRepositoryImpl) GetMaterialWithSameRepoUrl(repoUrl string, limit int) (*GitMaterial, error) {
 
 	material := &GitMaterial{}
 	err := repo.dbConnection.Model(material).
 		Where("url = ?", repoUrl).
+		Where("deleted = false").
 		Limit(limit).
 		Select()
 
@@ -172,4 +197,32 @@ func (repo MaterialRepositoryImpl) UpdateRefMaterialId(material *GitMaterial, tx
 		Update()
 
 	return err
+}
+
+func (repo MaterialRepositoryImpl) UpdateRefMaterialIdForAllWithSameUrl(url string, refGitMaterialId int, tx *pg.Tx) error {
+
+	material := &GitMaterial{}
+	_, err := tx.Model(material).
+		Set("ref_git_material_id", refGitMaterialId).
+		Where("url = ?", url).
+		Where("deleted = ?", false).
+		Update()
+
+	return err
+}
+
+func (repo MaterialRepositoryImpl) FindByReferenceId(refGitMaterialId int, limit int, excludingIds []int) (*GitMaterial, error) {
+	var material GitMaterial
+	qry := repo.dbConnection.Model(&material).
+		Column("git_material.*", "GitProvider").
+		Where("git_material.ref_git_material_id = ? ", refGitMaterialId).
+		Where("git_material.deleted =? ", false).
+		Limit(limit)
+
+	if len(excludingIds) > 0 {
+		qry = qry.Where("git_material.id not in (?)", pg.In(excludingIds))
+	}
+
+	err := qry.Select()
+	return &material, err
 }

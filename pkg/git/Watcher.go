@@ -130,7 +130,7 @@ func (impl GitWatcherImpl) Watch() {
 	impl.logger.Infow("Starting git watcher thread")
 
 	// Get the list of git materials which are referenced by other materials
-	refGitMaterials, err := impl.materialRepo.FindReferencedGitMaterial()
+	refGitMaterials, err := impl.materialRepo.FindAllReferencedGitMaterials()
 	if err != nil {
 		impl.logger.Errorw("Error getting list of referenced git materials",
 			"err", err)
