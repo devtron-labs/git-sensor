@@ -170,9 +170,8 @@ func (impl CiPipelineMaterialRepositoryImpl) UpdateCiPipelineMaterialsReferencin
 		"AND (gm.ref_git_material_id = ?) " +
 		"AND (cpm.value = ?)"
 
-	_, err := impl.dbConnection.Query(material, query, material.Errored, material.LastSeenHash,
-		material.CommitAuthor, material.CommitDate, material.CommitHistory,
-		material.ErrorMsg, gitMaterialId, branch)
+	_, err := impl.dbConnection.Query(material, query, material.Errored, material.ErrorMsg, material.LastSeenHash,
+		material.CommitAuthor, material.CommitDate, material.CommitHistory, gitMaterialId, branch)
 
 	return err
 }
