@@ -261,6 +261,9 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	isSelfReferenced := existingMaterial.Id == existingMaterial.RefGitMaterialId
 	tx, err := impl.materialRepository.GetConnection().
 		Begin()
+
+	defer tx.Rollback()
+
 	if err != nil {
 		impl.logger.Errorw("error while starting transaction",
 			"err", err)
@@ -273,6 +276,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 
 		if isSelfReferenced {
 			// as it is self referenced, need to update ref of other git materials
+
 			excludingIds := []int{existingMaterial.Id}
 			nxtMaterial, err := impl.materialRepository.FindByReferenceId(existingMaterial.Id, 1, excludingIds)
 			if err != nil && err != pg.ErrNoRows {
@@ -280,18 +284,20 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 					"err", err)
 
 				return nil, err
+
 			} else {
 				if err == nil {
 					// If other materials found
+
+					// update ref for all materials with same repo url
 					err = impl.materialRepository.UpdateRefMaterialIdForAllWithSameUrl(nxtMaterial.Url, nxtMaterial.Id, tx)
 					if err != nil {
 						impl.logger.Errorw("error while updating ref git material id",
 							"err", err)
-
-						_ = tx.Rollback()
 						return nil, err
 					}
 
+					// refresh git material
 					resp, err := impl.RefreshGitMaterial(&git.RefreshGitMaterialRequest{
 						GitMaterialId: nxtMaterial.Id,
 					})
@@ -299,8 +305,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 						impl.logger.Errorw("error while refreshing new referenced material",
 							"response", resp,
 							"err", err)
-
-						_ = tx.Rollback()
 						return nil, err
 					}
 
@@ -338,8 +342,8 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 		if err != nil && err != pg.ErrNoRows {
 			impl.logger.Errorw("error while getting next material with same repo url",
 				"err", err)
-
 			return nil, err
+
 		} else {
 			if err == nil {
 				// If other materials found
@@ -348,7 +352,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 					impl.logger.Errorw("error while updating ref git material id",
 						"err", err)
 
-					_ = tx.Rollback()
 					return nil, err
 				}
 
@@ -360,7 +363,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 						"response", resp,
 						"err", err)
 
-					_ = tx.Rollback()
 					return nil, err
 				}
 
@@ -382,7 +384,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	err = impl.materialRepository.UpdateWithTransaction(existingMaterial, tx)
 	if err != nil {
 		impl.logger.Errorw("error in updating material ", "material", material, "err", err)
-		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -396,7 +397,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	err = impl.repositoryManager.Clean(existingMaterial.CheckoutLocation)
 	if err != nil {
 		impl.logger.Errorw("error in refreshing material ", "err", err)
-		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -404,7 +404,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 		err = impl.checkoutUpdatedRepo(material.Id)
 		if err != nil {
 			impl.logger.Errorw("error in checking out updated repo", "err", err)
-			_ = tx.Rollback()
 			return nil, err
 		}
 	}
@@ -413,7 +412,6 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	if err != nil {
 		impl.logger.Errorw("error while committing transaction",
 			"err", err)
-		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -462,6 +460,8 @@ func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial
 		GetConnection().
 		Begin()
 
+	defer tx.Rollback()
+
 	err = impl.materialRepository.SaveWithTransaction(material, tx)
 	if err != nil {
 		impl.logger.Errorw("error in saving material ",
@@ -486,17 +486,9 @@ func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial
 		material.RefGitMaterialId = material.Id
 		err := impl.materialRepository.UpdateRefMaterialId(material, tx)
 		if err != nil {
-
-			// rollback
 			impl.logger.Errorw("error updating ref material id with self id. performing rollback",
 				"material", material,
 				"err", err)
-
-			err := tx.Rollback()
-			if err != nil {
-				impl.logger.Errorw("error while performing rollback", "err", err)
-				return material, err
-			}
 
 			return material, err
 		}

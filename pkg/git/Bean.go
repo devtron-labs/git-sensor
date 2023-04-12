@@ -43,13 +43,6 @@ type CiPipelineMaterialBean struct {
 	ExtraEnvironmentVariables map[string]string // extra env variables which will be used for CI
 }
 
-type CiPipelineMaterialUpdateEvent struct {
-	GitRepoUrl                string            `json:"gitRepoUrl"`
-	Value                     string            `json:"value"`
-	GitCommit                 *GitCommit        `json:"gitCommit"`
-	ExtraEnvironmentVariables map[string]string `json:"extraEnvironmentVariables,omitempty"`
-}
-
 type MaterialChangeResp struct {
 	Commits        []*GitCommit `json:"commits"`
 	LastFetchTime  time.Time    `json:"lastFetchTime"`

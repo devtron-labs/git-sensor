@@ -45,6 +45,7 @@ type CiPipelineMaterialRepository interface {
 	FindById(id int) (*CiPipelineMaterial, error)
 	Exists(id int) (bool, error)
 	Save(material []*CiPipelineMaterial) ([]*CiPipelineMaterial, error)
+	FindSimilarCiPipelineMaterials(repoUrl string, branch string) ([]*CiPipelineMaterial, error)
 	FindAllCiPipelineMaterialsReferencingGivenMaterial(gitMaterialId int) ([]*CiPipelineMaterial, error)
 	UpdateErroredCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error
 	UpdateCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error
@@ -90,6 +91,19 @@ func (impl CiPipelineMaterialRepositoryImpl) Update(materials []*CiPipelineMater
 		return nil
 	})
 	return err
+}
+
+func (impl CiPipelineMaterialRepositoryImpl) FindSimilarCiPipelineMaterials(repoUrl string, branch string) ([]*CiPipelineMaterial, error) {
+	materials := make([]*CiPipelineMaterial, 0)
+	err := impl.dbConnection.Model(&materials).
+		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+		Where("gm.url = ?", repoUrl).
+		Where("gm.deleted = ?", false).
+		Where("ci_pipeline_material.value = ?", branch).
+		Where("ci_pipeline_material.active = ?", true).
+		Select()
+
+	return materials, err
 }
 
 func (impl CiPipelineMaterialRepositoryImpl) FindByIds(ids []int) (materials []*CiPipelineMaterial, err error) {

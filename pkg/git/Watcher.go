@@ -314,11 +314,7 @@ func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) e
 			}
 
 			// Notify
-			_ = impl.NotifyForMaterialUpdate(&CiPipelineMaterialUpdateEvent{
-				GitRepoUrl: material.Url,
-				Value:      ciMaterial.Value,
-				GitCommit:  latestCommit,
-			})
+			_ = impl.NotifyForMaterialUpdate(material.Url, ciMaterial.Value, latestCommit)
 
 			middleware.GitMaterialUpdateCounter.WithLabelValues().Inc()
 		}
@@ -326,24 +322,45 @@ func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) e
 	return nil
 }
 
-func (impl GitWatcherImpl) NotifyForMaterialUpdate(event *CiPipelineMaterialUpdateEvent) error {
+func (impl GitWatcherImpl) NotifyForMaterialUpdate(repoUrl string, branch string, commit *GitCommit) error {
 
-	payload, err := json.Marshal(event)
+	ciMaterials, err := impl.ciPipelineMaterialRepository.FindSimilarCiPipelineMaterials(repoUrl, branch)
 	if err != nil {
-		impl.logger.Error("err in json marshaling",
-			"event", event,
+		impl.logger.Errorw("error while fetching similar ci pipeline materials",
+			"repoUrl", repoUrl,
+			"branch", branch,
 			"err", err)
-
 		return err
 	}
 
-	err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(payload))
-	if err != nil {
-		impl.logger.Errorw("error in publishing material modification msg ",
-			"payload", payload,
-			"err", err)
+	for _, ciMaterial := range ciMaterials {
 
-		return err
+		event := &CiPipelineMaterialBean{
+			Id:            ciMaterial.Id,
+			GitMaterialId: ciMaterial.GitMaterialId,
+			Active:        ciMaterial.Active,
+			GitCommit:     commit,
+			Type:          ciMaterial.Type,
+			Value:         ciMaterial.Value,
+		}
+
+		payload, err := json.Marshal(event)
+		if err != nil {
+			impl.logger.Error("err in json marshaling",
+				"event", event,
+				"err", err)
+
+			return err
+		}
+
+		err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(payload))
+		if err != nil {
+			impl.logger.Errorw("error in publishing material modification msg ",
+				"payload", payload,
+				"err", err)
+
+			return err
+		}
 	}
 	return nil
 }
