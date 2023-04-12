@@ -258,7 +258,9 @@ func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) e
 
 	if !updated {
 		impl.logger.Infow("no new updates found",
-			"material", material)
+			"materialId", material.Id,
+			"refMaterialId", material.RefGitMaterialId,
+			"url", material.Url)
 		return nil
 	}
 
