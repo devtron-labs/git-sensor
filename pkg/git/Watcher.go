@@ -311,11 +311,10 @@ func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) e
 					impl.logger.Errorw("error while updating ci pipeline materials",
 						"err", err)
 				}
+
+				// Notify only if new changes are detected
+				_ = impl.NotifyForMaterialUpdate(material.Url, ciMaterial.Value, latestCommit)
 			}
-
-			// Notify
-			_ = impl.NotifyForMaterialUpdate(material.Url, ciMaterial.Value, latestCommit)
-
 			middleware.GitMaterialUpdateCounter.WithLabelValues().Inc()
 		}
 	}
