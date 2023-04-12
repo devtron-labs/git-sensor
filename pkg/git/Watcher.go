@@ -146,7 +146,26 @@ func (impl GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 
 	for _, material := range materials {
 		wp.Submit(func() {
-			_, err := impl.PollAndUpdateGitMaterial(material)
+
+			nMaterial := &sql.GitMaterial{
+				Id:                  material.Id,
+				GitProviderId:       material.GitProviderId,
+				GitProvider:         material.GitProvider,
+				Url:                 material.Url,
+				FetchSubmodules:     material.FetchSubmodules,
+				Name:                material.Name,
+				CheckoutLocation:    material.CheckoutLocation,
+				CheckoutStatus:      material.CheckoutStatus,
+				CheckoutMsgAny:      material.CheckoutMsgAny,
+				Deleted:             material.Deleted,
+				LastFetchTime:       material.LastFetchTime,
+				LastFetchErrorCount: material.LastFetchErrorCount,
+				FetchErrorMessage:   material.FetchErrorMessage,
+				RefGitMaterialId:    material.RefGitMaterialId,
+				CiPipelineMaterials: material.CiPipelineMaterials,
+			}
+
+			_, err := impl.PollAndUpdateGitMaterial(nMaterial)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material",
 					"material", material,
@@ -238,6 +257,8 @@ func (impl GitWatcherImpl) PollGitMaterialAndNotify(material *sql.GitMaterial) e
 	}
 
 	if !updated {
+		impl.logger.Infow("no new updates found",
+			"material", material)
 		return nil
 	}
 
