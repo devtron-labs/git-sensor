@@ -165,7 +165,7 @@ func (impl CiPipelineMaterialRepositoryImpl) UpdateCiPipelineMaterialsReferencin
 		"ci_pipeline_material.last_seen_hash = ?, " +
 		"ci_pipeline_material.commit_author = ?, " +
 		"ci_pipeline_material.commit_date = ?, " +
-		"ci_pipeline_material.commit_history = ?, " +
+		"ci_pipeline_material.commit_history = ? " +
 		"FROM git_material gm WHERE (ci_pipeline_material.git_material_id = gm.id) " +
 		"AND (gm.ref_git_material_id = ?) " +
 		"AND (ci_pipeline_material.value = ?)"
