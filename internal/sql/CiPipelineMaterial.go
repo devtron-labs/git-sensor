@@ -23,7 +23,7 @@ import (
 )
 
 type CiPipelineMaterial struct {
-	tableName     struct{}   `sql:"ci_pipeline_material"`
+	tableName     struct{}   `sql:"ci_pipeline_material" pg:",discard_unknown_columns"`
 	Id            int        `sql:"id"`
 	GitMaterialId int        `sql:"git_material_id"` //id stored in db GitMaterial( foreign key)
 	Type          SourceType `sql:"type"`
@@ -109,15 +109,23 @@ func (impl CiPipelineMaterialRepositoryImpl) FindById(id int) (*CiPipelineMateri
 
 func (impl CiPipelineMaterialRepositoryImpl) FindAllCiPipelineMaterialsReferencingGivenMaterial(gitMaterialId int) ([]*CiPipelineMaterial, error) {
 	ciPipelineMaterials := make([]*CiPipelineMaterial, 0)
-	err := impl.dbConnection.Model(&ciPipelineMaterials).
-		ColumnExpr("DISTINCT ci_pipeline_material.value").
-		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
-		Where("gm.ref_git_material_id = ?", gitMaterialId).
-		Where("gm.deleted = false").
-		Where("ci_pipeline_material.active = true").
-		Where("ci_pipeline_material.type = SOURCE_TYPE_BRANCH_FIXED").
-		Select()
+	//err := impl.dbConnection.Model(&ciPipelineMaterials).
+	//	ColumnExpr("DISTINCT ci_pipeline_material.value").
+	//	Column("ci_pipeline_material.*").
+	//	Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+	//	Where("gm.ref_git_material_id = ?", gitMaterialId).
+	//	Where("gm.deleted = ?", false).
+	//	Where("ci_pipeline_material.active = ?", true).
+	//	Where("ci_pipeline_material.type = ?", "SOURCE_TYPE_BRANCH_FIXED").
+	//	Select()
 
+	query := "select * from (" +
+		"select *, row_number() over (partition by value order by commit_date desc) as row_num from ci_pipeline_material cpm " +
+		"inner join git_material gm on gm.id = cpm.git_material_id " +
+		"where (gm.ref_git_material_id  = ?) and (gm.deleted = false) and (cpm.active = true) and (cpm.\"type\" = 'SOURCE_TYPE_BRANCH_FIXED')" +
+		") materials where row_num <= 1"
+
+	_, err := impl.dbConnection.Query(&ciPipelineMaterials, query, gitMaterialId)
 	return ciPipelineMaterials, err
 }
 
