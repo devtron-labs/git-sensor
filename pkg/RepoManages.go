@@ -752,20 +752,20 @@ func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash st
 	if err != nil {
 		return nil, err
 	}
-	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(pipelineMaterial.GitMaterialId)
 	if err != nil {
 		return nil, err
 	}
-	if !gitMaterial.CheckoutStatus {
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	if !referencedGitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
-	commit, err := impl.repositoryManager.GetCommitMetadata(gitMaterial.CheckoutLocation, gitHash)
+	commit, err := impl.repositoryManager.GetCommitMetadata(referencedGitMaterial.CheckoutLocation, gitHash)
 	return commit, err
 }
 
@@ -777,25 +777,25 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		return nil, err
 	}
 
-	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(pipelineMaterial.GitMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting material ", "gitMaterialId", pipelineMaterial.GitMaterialId, "err", err)
 		return nil, err
 	}
 
-	if !gitMaterial.CheckoutStatus {
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	if !referencedGitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
 
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
 
-	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	userName, password, err := git.GetUserNamePassword(referencedGitMaterial.GitProvider)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, referencedGitMaterial.Url, referencedGitMaterial.CheckoutLocation)
 
 	if err != nil {
 		impl.logger.Errorw("error in fetching the repository ", "err", err)
@@ -838,27 +838,27 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 
 	// fetch gitMaterial
 	gitMaterialId := pipelineMaterial.GitMaterialId
-	gitMaterial, err := impl.materialRepository.FindById(gitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(gitMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error while fetching gitMaterial", "gitMaterialId", gitMaterialId, "err", err)
 		return nil, err
 	}
 
 	// validate checkout status of gitMaterial
-	if !gitMaterial.CheckoutStatus {
+	if !referencedGitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
 
 	// lock-unlock
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
 
-	commits, err := impl.repositoryManager.ChangesSince(gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
+	commits, err := impl.repositoryManager.ChangesSince(referencedGitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
