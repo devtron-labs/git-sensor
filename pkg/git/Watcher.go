@@ -145,26 +145,26 @@ func (impl GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp := workerpool.New(impl.pollConfig.PollWorker)
 
 	for _, material := range materials {
+
+		nMaterial := &sql.GitMaterial{
+			Id:                  material.Id,
+			GitProviderId:       material.GitProviderId,
+			GitProvider:         material.GitProvider,
+			Url:                 material.Url,
+			FetchSubmodules:     material.FetchSubmodules,
+			Name:                material.Name,
+			CheckoutLocation:    material.CheckoutLocation,
+			CheckoutStatus:      material.CheckoutStatus,
+			CheckoutMsgAny:      material.CheckoutMsgAny,
+			Deleted:             material.Deleted,
+			LastFetchTime:       material.LastFetchTime,
+			LastFetchErrorCount: material.LastFetchErrorCount,
+			FetchErrorMessage:   material.FetchErrorMessage,
+			RefGitMaterialId:    material.RefGitMaterialId,
+			CiPipelineMaterials: material.CiPipelineMaterials,
+		}
+
 		wp.Submit(func() {
-
-			nMaterial := &sql.GitMaterial{
-				Id:                  material.Id,
-				GitProviderId:       material.GitProviderId,
-				GitProvider:         material.GitProvider,
-				Url:                 material.Url,
-				FetchSubmodules:     material.FetchSubmodules,
-				Name:                material.Name,
-				CheckoutLocation:    material.CheckoutLocation,
-				CheckoutStatus:      material.CheckoutStatus,
-				CheckoutMsgAny:      material.CheckoutMsgAny,
-				Deleted:             material.Deleted,
-				LastFetchTime:       material.LastFetchTime,
-				LastFetchErrorCount: material.LastFetchErrorCount,
-				FetchErrorMessage:   material.FetchErrorMessage,
-				RefGitMaterialId:    material.RefGitMaterialId,
-				CiPipelineMaterials: material.CiPipelineMaterials,
-			}
-
 			_, err := impl.PollAndUpdateGitMaterial(nMaterial)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material",
