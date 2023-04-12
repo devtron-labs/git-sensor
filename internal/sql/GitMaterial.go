@@ -204,7 +204,7 @@ func (repo MaterialRepositoryImpl) UpdateRefMaterialIdForAllWithSameUrl(url stri
 
 	material := &GitMaterial{}
 	_, err := tx.Model(material).
-		Set("ref_git_material_id", refGitMaterialId).
+		Set("ref_git_material_id = ?", refGitMaterialId).
 		Where("url = ?", url).
 		Where("deleted = ?", false).
 		Update()
