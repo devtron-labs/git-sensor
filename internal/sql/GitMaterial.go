@@ -153,13 +153,14 @@ func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMat
 func (repo MaterialRepositoryImpl) FindAllReferencedGitMaterials() ([]*GitMaterial, error) {
 
 	var materials []*GitMaterial
+
 	err := repo.dbConnection.Model(&materials).
-		ColumnExpr("DISTINCT(gm.id)").
-		Column("gm.*", "gm.GitProvider").
-		Join("INNER JOIN git_material gm ON git_material.ref_git_material_id = gm.id").
-		Where("git_material.deleted = ? ", false).
-		Where("git_material.checkout_status = ? ", true).
-		Order("gm.id ASC").
+		ColumnExpr("DISTINCT(git_material.id)").
+		Column("git_material.*", "GitProvider").
+		Join("RIGHT JOIN git_material gm ON git_material.id = gm.ref_git_material_id").
+		Where("gm.deleted = ? ", false).
+		Where("gm.checkout_status = ? ", true).
+		Order("git_material.id ASC").
 		Select()
 
 	return materials, err
@@ -169,9 +170,9 @@ func (repo MaterialRepositoryImpl) FindReferencedGitMaterial(materialId int) (*G
 
 	material := &GitMaterial{}
 	err := repo.dbConnection.Model(material).
-		Column("gm.*", "gm.GitProvider").
-		Join("INNER JOIN git_material gm ON git_material.ref_git_material_id = gm.id").
-		Where("git_material.id = ? ", materialId).
+		Column("git_material.*", "GitProvider").
+		Join("RIGHT JOIN git_material gm ON git_material.id = gm.ref_git_material_id").
+		Where("gm.id = ? ", materialId).
 		Select()
 
 	return material, err
