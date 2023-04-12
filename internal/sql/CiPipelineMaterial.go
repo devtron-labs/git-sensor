@@ -131,24 +131,48 @@ func (impl CiPipelineMaterialRepositoryImpl) FindAllCiPipelineMaterialsReferenci
 
 func (impl CiPipelineMaterialRepositoryImpl) UpdateErroredCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error {
 
-	_, err := impl.dbConnection.Model(material).
-		Column("errored", "error_msg").
-		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
-		Where("gm.ref_git_material_id = ?", gitMaterialId).
-		Where("ci_pipeline_material.value = ?", branch).
-		Update()
+	//_, err := impl.dbConnection.Model(material).
+	//	Column("ci_pipeline_material.errored", "ci_pipeline_material.error_msg").
+	//	Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+	//	Where("gm.ref_git_material_id = ?", gitMaterialId).
+	//	Where("ci_pipeline_material.value = ?", branch).
+	//	Update()
 
+	query := "UPDATE ci_pipeline_material " +
+		"SET ci_pipeline_material.errored = ?, " +
+		"ci_pipeline_material.error_msg = ? " +
+		"FROM git_material gm WHERE (ci_pipeline_material.git_material_id = gm.id) " +
+		"AND (gm.ref_git_material_id = ?) " +
+		"AND (ci_pipeline_material.value = ?)"
+
+	_, err := impl.dbConnection.Query(material, query, material.Errored, material.ErrorMsg, gitMaterialId, branch)
 	return err
 }
 
 func (impl CiPipelineMaterialRepositoryImpl) UpdateCiPipelineMaterialsReferencingGivenGitMaterial(gitMaterialId int, branch string, material *CiPipelineMaterial) error {
 
-	_, err := impl.dbConnection.Model(material).
-		Column("last_seen_hash", "commit_author", "commit_date", "commit_history", "errored", "error_msg").
-		Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
-		Where("gm.ref_git_material_id = ?", gitMaterialId).
-		Where("ci_pipeline_material.value = ?", branch).
-		Update()
+	//_, err := impl.dbConnection.Model(material).
+	//	Column("ci_pipeline_material.last_seen_hash", "ci_pipeline_material.commit_author", "ci_pipeline_material.commit_date",
+	//		"ci_pipeline_material.commit_history", "ci_pipeline_material.errored", "ci_pipeline_material.error_msg").
+	//	Join("INNER JOIN git_material gm ON gm.id = ci_pipeline_material.git_material_id").
+	//	Where("gm.ref_git_material_id = ?", gitMaterialId).
+	//	Where("ci_pipeline_material.value = ?", branch).
+	//	Update()
+
+	query := "UPDATE ci_pipeline_material " +
+		"SET ci_pipeline_material.errored = ?, " +
+		"ci_pipeline_material.error_msg = ? " +
+		"ci_pipeline_material.last_seen_hash = ? " +
+		"ci_pipeline_material.commit_author = ? " +
+		"ci_pipeline_material.commit_date = ? " +
+		"ci_pipeline_material.commit_history = ? " +
+		"FROM git_material gm WHERE (ci_pipeline_material.git_material_id = gm.id) " +
+		"AND (gm.ref_git_material_id = ?) " +
+		"AND (ci_pipeline_material.value = ?)"
+
+	_, err := impl.dbConnection.Query(material, query, material.Errored, material.LastSeenHash,
+		material.CommitAuthor, material.CommitDate, material.CommitHistory,
+		material.ErrorMsg, gitMaterialId, branch)
 
 	return err
 }
