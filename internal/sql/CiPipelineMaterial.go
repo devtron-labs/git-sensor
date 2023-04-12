@@ -138,12 +138,12 @@ func (impl CiPipelineMaterialRepositoryImpl) UpdateErroredCiPipelineMaterialsRef
 	//	Where("ci_pipeline_material.value = ?", branch).
 	//	Update()
 
-	query := "UPDATE ci_pipeline_material " +
-		"SET ci_pipeline_material.errored = ?, " +
-		"ci_pipeline_material.error_msg = ? " +
-		"FROM git_material gm WHERE (ci_pipeline_material.git_material_id = gm.id) " +
+	query := "UPDATE ci_pipeline_material cpm " +
+		"SET errored = ?, " +
+		"error_msg = ? " +
+		"FROM git_material gm WHERE (cpm.git_material_id = gm.id) " +
 		"AND (gm.ref_git_material_id = ?) " +
-		"AND (ci_pipeline_material.value = ?)"
+		"AND (cpm.value = ?)"
 
 	_, err := impl.dbConnection.Query(material, query, material.Errored, material.ErrorMsg, gitMaterialId, branch)
 	return err
@@ -159,16 +159,16 @@ func (impl CiPipelineMaterialRepositoryImpl) UpdateCiPipelineMaterialsReferencin
 	//	Where("ci_pipeline_material.value = ?", branch).
 	//	Update()
 
-	query := "UPDATE ci_pipeline_material " +
-		"SET ci_pipeline_material.errored = ?, " +
-		"ci_pipeline_material.error_msg = ?, " +
-		"ci_pipeline_material.last_seen_hash = ?, " +
-		"ci_pipeline_material.commit_author = ?, " +
-		"ci_pipeline_material.commit_date = ?, " +
-		"ci_pipeline_material.commit_history = ? " +
-		"FROM git_material gm WHERE (ci_pipeline_material.git_material_id = gm.id) " +
+	query := "UPDATE ci_pipeline_material cpm " +
+		"SET errored = ?, " +
+		"error_msg = ?, " +
+		"last_seen_hash = ?, " +
+		"commit_author = ?, " +
+		"commit_date = ?, " +
+		"commit_history = ? " +
+		"FROM git_material gm WHERE (cpm.git_material_id = gm.id) " +
 		"AND (gm.ref_git_material_id = ?) " +
-		"AND (ci_pipeline_material.value = ?)"
+		"AND (cpm.value = ?)"
 
 	_, err := impl.dbConnection.Query(material, query, material.Errored, material.LastSeenHash,
 		material.CommitAuthor, material.CommitDate, material.CommitHistory,
