@@ -33,7 +33,7 @@ const (
 
 // TODO: add support for submodule
 type GitMaterial struct {
-	tableName        struct{} `sql:"git_material"`
+	tableName        struct{} `sql:"git_material" pg:",discard_unknown_columns"`
 	Id               int      `sql:"id,pk"`
 	GitProviderId    int      `sql:"git_provider_id,notnull"`
 	Url              string   `sql:"url,omitempty"`
