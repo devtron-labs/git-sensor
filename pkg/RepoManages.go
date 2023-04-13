@@ -522,12 +522,6 @@ func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial
 }
 
 func (impl RepoManagerImpl) CheckoutMaterialWithTransaction(material *sql.GitMaterial, tx *pg.Tx) (*sql.GitMaterial, error) {
-	repoLock := impl.locker.LeaseLocker(material.Id)
-	repoLock.Mutex.Lock()
-	defer func() {
-		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(material.Id)
-	}()
 
 	username, password, err := git.GetUserNamePassword(material.GitProvider)
 	location, err := git.GetLocationForMaterial(material)
