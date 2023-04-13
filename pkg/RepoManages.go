@@ -27,6 +27,7 @@ import (
 	"github.com/go-pg/pg"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"time"
 )
 
 type RepoManager interface {
@@ -251,6 +252,70 @@ func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMat
 	return materials, nil
 }
 
+func (impl RepoManagerImpl) ReconfigureRefGitMaterialId(currentRef int, tx *pg.Tx) (*sql.GitMaterial, error) {
+
+	excludingIds := []int{currentRef}
+	nxtMaterial, err := impl.materialRepository.FindByReferenceId(currentRef, 1, excludingIds)
+	if err != nil && err != pg.ErrNoRows {
+		impl.logger.Errorw("error while getting next material with same repo url",
+			"err", err)
+
+		return nil, err
+
+	} else if err == pg.ErrNoRows {
+		// If no other materials found with same url
+		impl.logger.Infow("no other git materials found referencing given material id",
+			"materialId", currentRef)
+		return nil, nil
+	}
+
+	// If other materials found
+	// update ref for all materials with same repo url
+	err = impl.materialRepository.UpdateRefMaterialIdForAllWithSameUrl(nxtMaterial.Url, nxtMaterial.Id, tx)
+	if err != nil {
+		impl.logger.Errorw("error while updating ref git material id",
+			"err", err)
+		return nil, err
+	} else {
+		impl.logger.Infow("ref updated for other git materials",
+			"new ref git material id", nxtMaterial.Id)
+	}
+
+	// refresh git material
+	nxtMaterial.RefGitMaterialId = nxtMaterial.Id
+
+	// poll and update git material with transaction
+	repoLock := impl.locker.LeaseLocker(nxtMaterial.Id)
+	repoLock.Mutex.Lock()
+	defer func() {
+		repoLock.Mutex.Unlock()
+		impl.locker.ReturnLocker(nxtMaterial.Id)
+	}()
+
+	err = impl.gitWatcher.PollGitMaterialAndNotify(nxtMaterial)
+
+	// update last fetch status, counters and time
+	nxtMaterial.LastFetchTime = time.Now()
+	nxtMaterial.FetchStatus = err == nil
+	if err != nil {
+		nxtMaterial.LastFetchErrorCount = nxtMaterial.LastFetchErrorCount + 1
+		nxtMaterial.FetchErrorMessage = err.Error()
+	} else {
+		nxtMaterial.LastFetchErrorCount = 0
+		nxtMaterial.FetchErrorMessage = ""
+	}
+
+	err = impl.materialRepository.UpdateWithTransaction(nxtMaterial, tx)
+	if err != nil {
+		impl.logger.Errorw("error in updating fetch status",
+			"material", nxtMaterial,
+			"err", err)
+
+		return nil, err
+	}
+	return nxtMaterial, nil
+}
+
 func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	existingMaterial, err := impl.materialRepository.FindById(material.Id)
 	if err != nil {
@@ -283,43 +348,11 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 			impl.logger.Infow("git material is referenced by other git materials, changing ref for other git materials",
 				"materialId", material.Id)
 
-			excludingIds := []int{existingMaterial.Id}
-			nxtMaterial, err := impl.materialRepository.FindByReferenceId(existingMaterial.Id, 1, excludingIds)
-			if err != nil && err != pg.ErrNoRows {
-				impl.logger.Errorw("error while getting next material with same repo url",
+			_, err := impl.ReconfigureRefGitMaterialId(existingMaterial.RefGitMaterialId, tx)
+			if err != nil {
+				impl.logger.Errorw("error reconfiguring ref for other materials",
 					"err", err)
-
 				return nil, err
-
-			} else {
-				if err == nil {
-					// If other materials found
-
-					// update ref for all materials with same repo url
-					err = impl.materialRepository.UpdateRefMaterialIdForAllWithSameUrl(nxtMaterial.Url, nxtMaterial.Id, tx)
-					if err != nil {
-						impl.logger.Errorw("error while updating ref git material id",
-							"err", err)
-						return nil, err
-					} else {
-						impl.logger.Infow("ref updated for other git materials",
-							"new ref git material id", nxtMaterial.Id)
-					}
-
-					// refresh git material
-					nxtMaterial.RefGitMaterialId = nxtMaterial.Id
-					_, err := impl.gitWatcher.PollAndUpdateGitMaterial(nxtMaterial)
-					if err != nil {
-						impl.logger.Errorw("error while refreshing new referenced material",
-							"err", err)
-						return nil, err
-					}
-
-				} else if err == pg.ErrNoRows {
-					// If no other materials found with same url
-					impl.logger.Infow("no other git materials found referencing given material id",
-						"materialId", existingMaterial.Id)
-				}
 			}
 		}
 
@@ -346,41 +379,11 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 		// as it is self referenced, need to update ref of other git materials
 		impl.logger.Info("git material delete request. updating ref of other git materials")
 
-		excludingIds := []int{existingMaterial.Id}
-		nxtMaterial, err := impl.materialRepository.FindByReferenceId(existingMaterial.Id, 1, excludingIds)
-		if err != nil && err != pg.ErrNoRows {
-			impl.logger.Errorw("error while getting next material with same repo url",
+		_, err := impl.ReconfigureRefGitMaterialId(existingMaterial.RefGitMaterialId, tx)
+		if err != nil {
+			impl.logger.Errorw("error reconfiguring ref for other materials",
 				"err", err)
 			return nil, err
-
-		} else {
-			if err == nil {
-				// If other materials found
-				err = impl.materialRepository.UpdateRefMaterialIdForAllWithSameUrl(nxtMaterial.Url, nxtMaterial.Id, tx)
-				if err != nil {
-					impl.logger.Errorw("error while updating ref git material id",
-						"err", err)
-
-					return nil, err
-				} else {
-					impl.logger.Infow("ref updated for other git materials",
-						"new ref git material id", nxtMaterial.Id)
-				}
-
-				nxtMaterial.RefGitMaterialId = nxtMaterial.Id
-				_, err := impl.gitWatcher.PollAndUpdateGitMaterial(nxtMaterial)
-				if err != nil {
-					impl.logger.Errorw("error while refreshing new referenced material",
-						"err", err)
-
-					return nil, err
-				}
-
-			} else if err == pg.ErrNoRows {
-				// If no other materials found with same url
-				impl.logger.Infow("no other git materials found referencing given material id",
-					"materialId", existingMaterial.Id)
-			}
 		}
 	}
 

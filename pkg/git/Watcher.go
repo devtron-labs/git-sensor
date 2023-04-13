@@ -44,6 +44,7 @@ type GitWatcherImpl struct {
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
+	PollGitMaterialAndNotify(material *sql.GitMaterial) error
 }
 
 type PollConfig struct {
