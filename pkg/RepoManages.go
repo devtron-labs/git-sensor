@@ -174,6 +174,44 @@ func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(old
 	return nil
 }
 
+func (impl RepoManagerImpl) UpdatePipelineMaterialCommitWithTransaction(material *sql.GitMaterial, tx *pg.Tx) error {
+	newCiMaterials := make([]*sql.CiPipelineMaterial, 0, len(material.CiPipelineMaterials))
+
+	for _, ciMaterial := range material.CiPipelineMaterials {
+
+		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, ciMaterial.Value, "", "", 0)
+		if err != nil {
+			ciMaterial.Errored = true
+			ciMaterial.ErrorMsg = err.Error()
+			ciMaterial.LastSeenHash = ""
+
+		} else {
+
+			// commits found
+			b, err := json.Marshal(commits)
+			if err != nil {
+				ciMaterial.Errored = true
+				ciMaterial.ErrorMsg = err.Error()
+				ciMaterial.LastSeenHash = ""
+
+			} else {
+				ciMaterial.CommitHistory = string(b)
+				if len(commits) > 0 {
+					latestCommit := commits[0]
+					ciMaterial.LastSeenHash = latestCommit.Commit
+					ciMaterial.CommitAuthor = latestCommit.Author
+					ciMaterial.CommitDate = latestCommit.Date
+				}
+				ciMaterial.Errored = false
+				ciMaterial.ErrorMsg = ""
+			}
+		}
+		newCiMaterials = append(newCiMaterials, ciMaterial)
+	}
+	err := impl.ciPipelineMaterialRepository.UpdateWithTransaction(newCiMaterials, tx)
+	return err
+}
+
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
 	for _, pipelineMaterial := range materials {
@@ -319,7 +357,7 @@ func (impl RepoManagerImpl) ReconfigureRefGitMaterialId(currentRef int, tx *pg.T
 }
 
 func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	existingMaterial, err := impl.materialRepository.FindById(material.Id)
+	existingMaterial, err := impl.materialRepository.FindByIdWithCiMaterials(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", err)
 		return nil, err
@@ -555,8 +593,13 @@ func (impl RepoManagerImpl) CheckoutMaterialWithTransaction(material *sql.GitMat
 		return nil, err
 	}
 
-	// Not updating ci pipeline materials, as it will be polled in the referenced repo
-	// if the material is self-referenced, then watcher will perform it.
+	err = impl.UpdatePipelineMaterialCommitWithTransaction(material, tx)
+	if err != nil {
+		impl.logger.Errorw("error while updating pipeline material commit",
+			"err", err)
+		return nil, err
+	}
+
 	return material, nil
 }
 

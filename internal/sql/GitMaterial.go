@@ -56,6 +56,7 @@ type GitMaterial struct {
 type MaterialRepository interface {
 	GetConnection() *pg.DB
 	FindById(id int) (*GitMaterial, error)
+	FindByIdWithCiMaterials(id int) (*GitMaterial, error)
 	Update(material *GitMaterial) error
 	Save(material *GitMaterial) error
 	SaveWithTransaction(material *GitMaterial, tx *pg.Tx) error
@@ -132,6 +133,19 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	var material GitMaterial
 	err := repo.dbConnection.Model(&material).
 		Column("git_material.*", "GitProvider").
+		Where("git_material.id =? ", id).
+		Where("git_material.deleted =? ", false).
+		Select()
+	return &material, err
+}
+
+func (repo MaterialRepositoryImpl) FindByIdWithCiMaterials(id int) (*GitMaterial, error) {
+	var material GitMaterial
+	err := repo.dbConnection.Model(&material).
+		Column("git_material.*", "GitProvider").
+		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
+			return q.Where("active IS TRUE"), nil
+		}).
 		Where("git_material.id =? ", id).
 		Where("git_material.deleted =? ", false).
 		Select()

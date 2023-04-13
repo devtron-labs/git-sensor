@@ -41,6 +41,7 @@ type CiPipelineMaterial struct {
 type CiPipelineMaterialRepository interface {
 	FindByGitMaterialId(gitMaterialId int) ([]*CiPipelineMaterial, error)
 	Update(material []*CiPipelineMaterial) error
+	UpdateWithTransaction(materials []*CiPipelineMaterial, tx *pg.Tx) error
 	FindByIds(ids []int) ([]*CiPipelineMaterial, error)
 	FindById(id int) (*CiPipelineMaterial, error)
 	Exists(id int) (bool, error)
@@ -91,6 +92,20 @@ func (impl CiPipelineMaterialRepositoryImpl) Update(materials []*CiPipelineMater
 		return nil
 	})
 	return err
+}
+
+func (impl CiPipelineMaterialRepositoryImpl) UpdateWithTransaction(materials []*CiPipelineMaterial, tx *pg.Tx) error {
+
+	for _, material := range materials {
+		_, err := tx.Model(material).
+			WherePK().
+			UpdateNotNull()
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (impl CiPipelineMaterialRepositoryImpl) FindSimilarCiPipelineMaterials(repoUrl string, branch string) ([]*CiPipelineMaterial, error) {
