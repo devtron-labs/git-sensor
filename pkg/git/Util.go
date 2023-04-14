@@ -28,11 +28,11 @@ import (
 )
 
 const (
-	GIT_BASE_DIR        = "/git-base/"
-	SSH_PRIVATE_KEY_DIR = GIT_BASE_DIR + "ssh-keys/"
+	GIT_BASE_DIR              = "/git-base/"
+	SSH_PRIVATE_KEY_DIR       = GIT_BASE_DIR + "ssh-keys/"
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
-	CLONE_TIMEOUT_SEC   = 600
-	FETCH_TIMEOUT_SEC   = 30
+	CLONE_TIMEOUT_SEC         = 600
+	FETCH_TIMEOUT_SEC         = 30
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -57,7 +57,7 @@ func GetLocationForMaterial(material *sql.GitMaterial) (location string, err err
 		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), material.Url)
 		return checkoutPath, nil
 	}
-	
+
 	return "", fmt.Errorf("unsupported format url %s", material.Url)
 }
 
@@ -78,6 +78,12 @@ func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password strin
 }
 
 func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) (privateKeyPath string, err error) {
+
+	err = os.Chmod(SSH_PRIVATE_KEY_DIR, 0700)
+	if err != nil {
+		return "", err
+	}
+
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
 	sshPrivateKeyFilePath := path.Join(sshPrivateKeyFolderPath, SSH_PRIVATE_KEY_FILE_NAME)
 
@@ -100,7 +106,6 @@ func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent stri
 
 	return sshPrivateKeyFilePath, nil
 }
-
 
 func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) error {
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
