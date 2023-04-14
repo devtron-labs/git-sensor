@@ -88,13 +88,13 @@ func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent stri
 	}
 
 	// create dirs
-	err = os.MkdirAll(sshPrivateKeyFolderPath, 744)
+	err = os.MkdirAll(sshPrivateKeyFolderPath, 0644)
 	if err != nil {
 		return "", err
 	}
 
 	// create file with content
-	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0600)
+	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0644)
 	if err != nil {
 		return "", err
 	}
@@ -113,13 +113,13 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 	}
 
 	// create dirs
-	err := os.MkdirAll(sshPrivateKeyFolderPath, os.ModeDir)
+	err := os.MkdirAll(sshPrivateKeyFolderPath, 0644)
 	if err != nil {
 		return err
 	}
 
 	// create file with content
-	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0600)
+	err = ioutil.WriteFile(sshPrivateKeyFilePath, []byte(sshPrivateKeyContent), 0644)
 	if err != nil {
 		return err
 	}
