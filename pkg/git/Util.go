@@ -79,9 +79,9 @@ func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password strin
 
 func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) (privateKeyPath string, err error) {
 
-	err = os.Chmod(SSH_PRIVATE_KEY_DIR, 0700)
-	if err != nil {
-		return "", err
+	permssionErr := os.Chmod(SSH_PRIVATE_KEY_DIR, 0700)
+	if permssionErr != nil {
+		return "", permssionErr
 	}
 
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
@@ -108,6 +108,10 @@ func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent stri
 }
 
 func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent string) error {
+	err := os.Chmod(SSH_PRIVATE_KEY_DIR, 0700)
+	if err != nil {
+		return err
+	}
 	sshPrivateKeyFolderPath := path.Join(SSH_PRIVATE_KEY_DIR, strconv.Itoa(gitProviderId))
 	sshPrivateKeyFilePath := path.Join(sshPrivateKeyFolderPath, SSH_PRIVATE_KEY_FILE_NAME)
 
