@@ -88,7 +88,7 @@ func GetOrCreateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent stri
 	}
 
 	// create dirs
-	err = os.MkdirAll(sshPrivateKeyFolderPath, os.ModeDir)
+	err = os.MkdirAll(sshPrivateKeyFolderPath, 644)
 	if err != nil {
 		return "", err
 	}
