@@ -17,7 +17,7 @@ COPY --from=build-env  /go/src/github.com/devtron-labs/git-sensor/git-sensor .
 
 RUN adduser -D devtron
 RUN chown -R devtron:devtron ./git-sensor
-RUN chmod 777 /root/.ssh/config
+RUN chmod 777 /git-base/ssh-keys
 USER devtron
 
 CMD ["./git-sensor"]
