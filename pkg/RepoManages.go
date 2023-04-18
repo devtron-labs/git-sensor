@@ -24,8 +24,10 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/internal/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
+	"github.com/go-pg/pg"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"time"
 )
 
 type RepoManager interface {
@@ -50,6 +52,8 @@ type RepoManager interface {
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
+
+	CheckoutMaterialWithTransaction(material *sql.GitMaterial, tx *pg.Tx) (*sql.GitMaterial, error)
 }
 
 type RepoManagerImpl struct {
@@ -170,6 +174,44 @@ func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(old
 	return nil
 }
 
+func (impl RepoManagerImpl) UpdatePipelineMaterialCommitWithTransaction(material *sql.GitMaterial, tx *pg.Tx) error {
+	newCiMaterials := make([]*sql.CiPipelineMaterial, 0, len(material.CiPipelineMaterials))
+
+	for _, ciMaterial := range material.CiPipelineMaterials {
+
+		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, ciMaterial.Value, "", "", 0)
+		if err != nil {
+			ciMaterial.Errored = true
+			ciMaterial.ErrorMsg = err.Error()
+			ciMaterial.LastSeenHash = ""
+
+		} else {
+
+			// commits found
+			b, err := json.Marshal(commits)
+			if err != nil {
+				ciMaterial.Errored = true
+				ciMaterial.ErrorMsg = err.Error()
+				ciMaterial.LastSeenHash = ""
+
+			} else {
+				ciMaterial.CommitHistory = string(b)
+				if len(commits) > 0 {
+					latestCommit := commits[0]
+					ciMaterial.LastSeenHash = latestCommit.Commit
+					ciMaterial.CommitAuthor = latestCommit.Author
+					ciMaterial.CommitDate = latestCommit.Date
+				}
+				ciMaterial.Errored = false
+				ciMaterial.ErrorMsg = ""
+			}
+		}
+		newCiMaterials = append(newCiMaterials, ciMaterial)
+	}
+	err := impl.ciPipelineMaterialRepository.UpdateWithTransaction(newCiMaterials, tx)
+	return err
+}
+
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
 	for _, pipelineMaterial := range materials {
@@ -238,7 +280,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	return provider, err
 }
 
-//handle update
+// handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
@@ -250,12 +292,141 @@ func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMat
 	return materials, nil
 }
 
+func (impl RepoManagerImpl) ReconfigureRefGitMaterialId(currentRef int, tx *pg.Tx) (*sql.GitMaterial, error) {
+
+	excludingIds := []int{currentRef}
+	nxtMaterial, err := impl.materialRepository.FindByReferenceId(currentRef, 1, excludingIds)
+	if err != nil && err != pg.ErrNoRows {
+		impl.logger.Errorw("error while getting next material with same repo url",
+			"err", err)
+
+		return nil, err
+
+	} else if err == pg.ErrNoRows {
+		// If no other materials found with same url
+		impl.logger.Infow("no other git materials found referencing given material id",
+			"materialId", currentRef)
+		return nil, nil
+	}
+
+	// If other materials found
+	// update ref for all materials with same repo url
+	err = impl.materialRepository.UpdateRefMaterialIdForAllWithSameUrl(nxtMaterial.Url, nxtMaterial.Id, tx)
+	if err != nil {
+		impl.logger.Errorw("error while updating ref git material id",
+			"err", err)
+		return nil, err
+	} else {
+		impl.logger.Infow("ref updated for other git materials",
+			"new ref git material id", nxtMaterial.Id)
+	}
+
+	// refresh git material
+	nxtMaterial.RefGitMaterialId = nxtMaterial.Id
+
+	// poll and update git material with transaction
+	repoLock := impl.locker.LeaseLocker(nxtMaterial.Id)
+	repoLock.Mutex.Lock()
+	defer func() {
+		repoLock.Mutex.Unlock()
+		impl.locker.ReturnLocker(nxtMaterial.Id)
+	}()
+
+	err = impl.gitWatcher.PollGitMaterialAndNotify(nxtMaterial)
+
+	// update last fetch status, counters and time
+	nxtMaterial.LastFetchTime = time.Now()
+	nxtMaterial.FetchStatus = err == nil
+	if err != nil {
+		nxtMaterial.LastFetchErrorCount = nxtMaterial.LastFetchErrorCount + 1
+		nxtMaterial.FetchErrorMessage = err.Error()
+	} else {
+		nxtMaterial.LastFetchErrorCount = 0
+		nxtMaterial.FetchErrorMessage = ""
+	}
+
+	err = impl.materialRepository.UpdateWithTransaction(nxtMaterial, tx)
+	if err != nil {
+		impl.logger.Errorw("error in updating fetch status",
+			"material", nxtMaterial,
+			"err", err)
+
+		return nil, err
+	}
+	return nxtMaterial, nil
+}
+
 func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	existingMaterial, err := impl.materialRepository.FindById(material.Id)
+	existingMaterial, err := impl.materialRepository.FindByIdWithCiMaterials(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", err)
 		return nil, err
 	}
+
+	isSelfReferenced := existingMaterial.Id == existingMaterial.RefGitMaterialId
+	tx, err := impl.materialRepository.GetConnection().
+		Begin()
+
+	defer tx.Rollback()
+
+	if err != nil {
+		impl.logger.Errorw("error while starting transaction",
+			"err", err)
+		return nil, err
+	}
+
+	// if url is updated, ref_git_material_id needs to be updated as well
+	if material.Url != existingMaterial.Url {
+		// url is updated
+		impl.logger.Infow("repo url is updated",
+			"materialId", material.Id,
+			"oldUrl", existingMaterial.Url,
+			"newUrl", material.Url)
+
+		if isSelfReferenced {
+			// as it is self referenced, need to update ref of other git materials
+			impl.logger.Infow("git material is referenced by other git materials, changing ref for other git materials",
+				"materialId", material.Id)
+
+			_, err := impl.ReconfigureRefGitMaterialId(existingMaterial.RefGitMaterialId, tx)
+			if err != nil {
+				impl.logger.Errorw("error reconfiguring ref for other materials",
+					"err", err)
+				return nil, err
+			}
+		}
+
+		materialWithSameUrl, err := impl.materialRepository.GetMaterialWithSameRepoUrl(material.Url, 1)
+		if err != nil && err != pg.ErrNoRows {
+			impl.logger.Errorw("error fetching existing git material with same url",
+				"material", material,
+				"err", err)
+
+			return nil, err
+		}
+
+		// if no existing material found
+		if err == pg.ErrNoRows {
+			existingMaterial.RefGitMaterialId = existingMaterial.Id
+
+		} else {
+			// else use existing ones ref id
+			existingMaterial.RefGitMaterialId = materialWithSameUrl.RefGitMaterialId
+		}
+	}
+
+	if material.Deleted && isSelfReferenced {
+		// as it is self referenced, need to update ref of other git materials
+		impl.logger.Info("git material delete request. updating ref of other git materials")
+
+		_, err := impl.ReconfigureRefGitMaterialId(existingMaterial.RefGitMaterialId, tx)
+		if err != nil {
+			impl.logger.Errorw("error reconfiguring ref for other materials",
+				"err", err)
+			return nil, err
+		}
+	}
+
 	existingMaterial.Name = material.Name
 	existingMaterial.Url = material.Url
 	existingMaterial.GitProviderId = material.GitProviderId
@@ -263,7 +434,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	existingMaterial.CheckoutStatus = false
 	existingMaterial.FetchSubmodules = material.FetchSubmodules
 
-	err = impl.materialRepository.Update(existingMaterial)
+	err = impl.materialRepository.UpdateWithTransaction(existingMaterial, tx)
 	if err != nil {
 		impl.logger.Errorw("error in updating material ", "material", material, "err", err)
 		return nil, err
@@ -283,12 +454,20 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	}
 
 	if !existingMaterial.Deleted {
-		err = impl.checkoutUpdatedRepo(material.Id)
+		_, err = impl.CheckoutMaterialWithTransaction(existingMaterial, tx)
 		if err != nil {
 			impl.logger.Errorw("error in checking out updated repo", "err", err)
 			return nil, err
 		}
 	}
+
+	err = tx.Commit()
+	if err != nil {
+		impl.logger.Errorw("error while committing transaction",
+			"err", err)
+		return nil, err
+	}
+
 	return existingMaterial, nil
 }
 
@@ -307,12 +486,121 @@ func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
 }
 
 func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	err := impl.materialRepository.Save(material)
-	if err != nil {
-		impl.logger.Errorw("error in saving material ", "material", material, "err", err)
+
+	updateRefWithOwnId := false
+
+	// Get the ref_material_id of the material (same url) that already exists
+	existingMaterial, err := impl.materialRepository.GetMaterialWithSameRepoUrl(material.Url, 1)
+	if err != nil && err != pg.ErrNoRows {
+		impl.logger.Errorw("error fetching existing git material with same url",
+			"material", material,
+			"err", err)
+
 		return material, err
 	}
+
+	// if no existing material found
+	if err == pg.ErrNoRows {
+		// Use own id as ref
+		updateRefWithOwnId = true
+	} else {
+		// else use existing ones ref id
+		material.RefGitMaterialId = existingMaterial.RefGitMaterialId
+	}
+
+	// perform in transaction
+	tx, err := impl.materialRepository.
+		GetConnection().
+		Begin()
+
+	defer tx.Rollback()
+
+	err = impl.materialRepository.SaveWithTransaction(material, tx)
+	if err != nil {
+		impl.logger.Errorw("error in saving material ",
+			"material", material,
+			"err", err)
+
+		return material, err
+	}
+
+	// if updateRefWithOwnId is true, update ref column
+	if !updateRefWithOwnId {
+		err := tx.Commit()
+		if err != nil {
+			impl.logger.Errorw("error while committing changes",
+				"operation", "save git material",
+				"err", err)
+
+			return material, err
+		}
+	} else {
+
+		material.RefGitMaterialId = material.Id
+		err := impl.materialRepository.UpdateRefMaterialId(material, tx)
+		if err != nil {
+			impl.logger.Errorw("error updating ref material id with self id. performing rollback",
+				"material", material,
+				"err", err)
+
+			return material, err
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			impl.logger.Errorw("error while committing changes",
+				"operation", "updating ref material id",
+				"err", err)
+
+			return material, err
+		}
+	}
+
 	return impl.checkoutRepo(material)
+}
+
+func (impl RepoManagerImpl) CheckoutMaterialWithTransaction(material *sql.GitMaterial, tx *pg.Tx) (*sql.GitMaterial, error) {
+
+	username, password, err := git.GetUserNamePassword(material.GitProvider)
+	location, err := git.GetLocationForMaterial(material)
+	if err != nil {
+		impl.logger.Errorw("error in getting credentials/location",
+			"materialId", material.Id,
+			"authMode", material.GitProvider.AuthMode,
+			"url", material.Url,
+			"err", err)
+
+		return nil, err
+	}
+
+	err = impl.repositoryManager.Add(material.GitProviderId, location, material.Url, username, password,
+		material.GitProvider.AuthMode, material.GitProvider.SshPrivateKey)
+
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	} else {
+		material.CheckoutStatus = false
+		material.CheckoutMsgAny = err.Error()
+		material.FetchErrorMessage = err.Error()
+	}
+
+	err = impl.materialRepository.UpdateWithTransaction(material, tx)
+	if err != nil {
+		impl.logger.Errorw("error in updating material",
+			"err", err,
+			"material", material)
+		return nil, err
+	}
+
+	err = impl.UpdatePipelineMaterialCommitWithTransaction(material, tx)
+	if err != nil {
+		impl.logger.Errorw("error while updating pipeline material commit",
+			"err", err)
+		return nil, err
+	}
+
+	return material, nil
 }
 
 func (impl RepoManagerImpl) checkoutRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
@@ -553,20 +841,20 @@ func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash st
 	if err != nil {
 		return nil, err
 	}
-	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(pipelineMaterial.GitMaterialId)
 	if err != nil {
 		return nil, err
 	}
-	if !gitMaterial.CheckoutStatus {
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	if !referencedGitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
-	commit, err := impl.repositoryManager.GetCommitMetadata(gitMaterial.CheckoutLocation, gitHash)
+	commit, err := impl.repositoryManager.GetCommitMetadata(referencedGitMaterial.CheckoutLocation, gitHash)
 	return commit, err
 }
 
@@ -578,25 +866,25 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		return nil, err
 	}
 
-	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(pipelineMaterial.GitMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error in getting material ", "gitMaterialId", pipelineMaterial.GitMaterialId, "err", err)
 		return nil, err
 	}
 
-	if !gitMaterial.CheckoutStatus {
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	if !referencedGitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
 
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
 
-	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	userName, password, err := git.GetUserNamePassword(referencedGitMaterial.GitProvider)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, referencedGitMaterial.Url, referencedGitMaterial.CheckoutLocation)
 
 	if err != nil {
 		impl.logger.Errorw("error in fetching the repository ", "err", err)
@@ -639,27 +927,27 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 
 	// fetch gitMaterial
 	gitMaterialId := pipelineMaterial.GitMaterialId
-	gitMaterial, err := impl.materialRepository.FindById(gitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(gitMaterialId)
 	if err != nil {
 		impl.logger.Errorw("error while fetching gitMaterial", "gitMaterialId", gitMaterialId, "err", err)
 		return nil, err
 	}
 
 	// validate checkout status of gitMaterial
-	if !gitMaterial.CheckoutStatus {
+	if !referencedGitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
 
 	// lock-unlock
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
 
-	commits, err := impl.repositoryManager.ChangesSince(gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
+	commits, err := impl.repositoryManager.ChangesSince(referencedGitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
@@ -683,20 +971,20 @@ func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	gitMaterial, err := impl.materialRepository.FindById(pipelineMaterial.GitMaterialId)
+	referencedGitMaterial, err := impl.materialRepository.FindReferencedGitMaterial(pipelineMaterial.GitMaterialId)
 	if err != nil {
 		return nil, err
 	}
-	if !gitMaterial.CheckoutStatus {
-		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
+	if !referencedGitMaterial.CheckoutStatus {
+		return nil, fmt.Errorf("checkout not succeed please checkout first %s", referencedGitMaterial.Url)
 	}
-	repoLock := impl.locker.LeaseLocker(gitMaterial.Id)
+	repoLock := impl.locker.LeaseLocker(referencedGitMaterial.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
-		impl.locker.ReturnLocker(gitMaterial.Id)
+		impl.locker.ReturnLocker(referencedGitMaterial.Id)
 	}()
-	gitChanges, err := impl.repositoryManager.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
+	gitChanges, err := impl.repositoryManager.ChangesSinceByRepositoryForAnalytics(referencedGitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
 	if err != nil {
 		impl.logger.Errorw("error in computing changes", "req", request, "err", err)
 	} else {
@@ -713,11 +1001,21 @@ type ReleaseChangesRequest struct {
 }
 
 func (impl RepoManagerImpl) RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error) {
-	material := &sql.GitMaterial{Id: req.GitMaterialId}
 	res := &git.RefreshGitMaterialResponse{}
+
+	referencedMaterial, err := impl.materialRepository.FindReferencedGitMaterial(req.GitMaterialId)
+	if err != nil {
+		impl.logger.Errorw("error while getting referenced git material",
+			"materialId", req.GitMaterialId,
+			"err", err)
+
+		res.ErrorMsg = err.Error()
+		return res, err
+	}
+
 	//refresh repo. and notify all pipeline for changes
 	//lock inside watcher itself
-	material, err := impl.gitWatcher.PollAndUpdateGitMaterial(material)
+	material, err := impl.gitWatcher.PollAndUpdateGitMaterial(referencedMaterial)
 	if err != nil {
 		res.ErrorMsg = err.Error()
 	} else if material.LastFetchErrorCount > 0 {
