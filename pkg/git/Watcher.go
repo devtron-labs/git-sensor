@@ -27,6 +27,8 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -98,7 +100,19 @@ func (impl GitWatcherImpl) StopCron() {
 }
 func (impl GitWatcherImpl) Watch() {
 	impl.logger.Infow("starting git watch thread")
-	materials, err := impl.materialRepo.FindActive()
+
+	// Get pod ordeal index
+	nodeConfig := &NodeConfig{}
+	err := env.Parse(nodeConfig)
+	if err != nil || nodeConfig.Hostname == "" {
+		impl.logger.Errorw("error determining ordinal index",
+			"err", err)
+		return
+	}
+	s := strings.Split(nodeConfig.Hostname, "-")
+	ordinalIndex, err := strconv.Atoi(s[len(s)-1])
+
+	materials, err := impl.materialRepo.FindActiveForOrdinalIndex(ordinalIndex)
 	if err != nil {
 		impl.logger.Error("error in fetching watchlist", "err", err)
 		return

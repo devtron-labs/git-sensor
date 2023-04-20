@@ -22,6 +22,10 @@ import (
 	"time"
 )
 
+type NodeConfig struct {
+	Hostname string `env:"HOSTNAME" envDefault:""`
+}
+
 type FetchScmChangesRequest struct {
 	PipelineMaterialId int    `json:"pipelineMaterialId"`
 	From               string `json:"from"`

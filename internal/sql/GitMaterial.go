@@ -31,7 +31,7 @@ const (
 	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
-//TODO: add support for submodule
+// TODO: add support for submodule
 type GitMaterial struct {
 	tableName        struct{} `sql:"git_material"`
 	Id               int      `sql:"id,pk"`
@@ -53,10 +53,13 @@ type GitMaterial struct {
 }
 
 type MaterialRepository interface {
+	GetConnection() *pg.DB
 	FindById(id int) (*GitMaterial, error)
 	Update(material *GitMaterial) error
 	Save(material *GitMaterial) error
+	SaveWithTransaction(material *GitMaterial, tx *pg.Tx) error
 	FindActive() ([]*GitMaterial, error)
+	FindActiveForOrdinalIndex(ordinalIndex int) ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
 	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
 }
@@ -68,8 +71,17 @@ func NewMaterialRepositoryImpl(dbConnection *pg.DB) *MaterialRepositoryImpl {
 	return &MaterialRepositoryImpl{dbConnection: dbConnection}
 }
 
+func (repo MaterialRepositoryImpl) GetConnection() *pg.DB {
+	return repo.dbConnection
+}
+
 func (repo MaterialRepositoryImpl) Save(material *GitMaterial) error {
 	err := repo.dbConnection.Insert(material)
+	return err
+}
+
+func (repo MaterialRepositoryImpl) SaveWithTransaction(material *GitMaterial, tx *pg.Tx) error {
+	err := tx.Insert(material)
 	return err
 }
 
@@ -81,12 +93,28 @@ func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 func (repo MaterialRepositoryImpl) FindActive() ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
-		Column("git_material.*", "GitProvider", ).
+		Column("git_material.*", "GitProvider").
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
 			return q.Where("active IS TRUE"), nil
 		}).
 		Where("deleted =? ", false).
 		Where("checkout_status=? ", true).
+		Order("id ASC").
+		Select()
+	return materials, err
+}
+
+func (repo MaterialRepositoryImpl) FindActiveForOrdinalIndex(ordinalIndex int) ([]*GitMaterial, error) {
+	var materials []*GitMaterial
+	err := repo.dbConnection.Model(&materials).
+		Column("git_material.*", "GitProvider").
+		Join("INNER JOIN git_material_node_mapping gmnp ON gmnp.git_material_id = git_material.id").
+		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
+			return q.Where("active IS TRUE"), nil
+		}).
+		Where("deleted =? ", false).
+		Where("checkout_status=? ", true).
+		Where("gmnp.ordinal_index = ?", ordinalIndex).
 		Order("id ASC").
 		Select()
 	return materials, err
@@ -111,7 +139,7 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	return &material, err
 }
 
-func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
