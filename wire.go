@@ -74,6 +74,8 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.WebhookEventParser), new(*git.WebhookEventParserImpl)),
 		git.NewWebhookHandlerImpl,
 		wire.Bind(new(git.WebhookHandler), new(*git.WebhookHandlerImpl)),
+		sql.NewGitMaterialNodeMappingRepositoryImpl,
+		wire.Bind(new(sql.GitMaterialNodeMappingRepository), new(*sql.GitMaterialNodeMappingRepositoryImpl)),
 	)
 	return &App{}, nil
 }

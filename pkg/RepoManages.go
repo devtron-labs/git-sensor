@@ -20,12 +20,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/caarlos0/env"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/internal/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type RepoManager interface {
@@ -65,6 +69,7 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
+	nodeMappingRepository                         sql.GitMaterialNodeMappingRepository
 }
 
 func NewRepoManagerImpl(
@@ -79,6 +84,7 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository,
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
+	nodeMappingRepository sql.GitMaterialNodeMappingRepository,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                            logger,
@@ -93,6 +99,7 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
+		nodeMappingRepository:                         nodeMappingRepository,
 	}
 }
 
@@ -238,7 +245,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	return provider, err
 }
 
-//handle update
+// handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
@@ -307,10 +314,50 @@ func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
 }
 
 func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	err := impl.materialRepository.Save(material)
+
+	// Get pod ordeal index
+	nodeConfig := &git.NodeConfig{}
+	err := env.Parse(nodeConfig)
+	if err != nil || nodeConfig.Hostname == "" {
+		return nil, err
+	}
+	s := strings.Split(nodeConfig.Hostname, "-")
+	ordinalIndex, err := strconv.Atoi(s[len(s)-1])
+
+	// begin transaction
+	tx, err := impl.materialRepository.GetConnection().Begin()
+	if err != nil {
+		impl.logger.Errorw("error starting transaction",
+			"err", err)
+		return material, err
+	}
+	defer tx.Rollback()
+
+	// save material
+	err = impl.materialRepository.SaveWithTransaction(material, tx)
 	if err != nil {
 		impl.logger.Errorw("error in saving material ", "material", material, "err", err)
 		return material, err
+	}
+
+	// save mapping
+	err = impl.nodeMappingRepository.InsertWithTransaction(&sql.GitMaterialNodeMapping{
+		OrdinalIndex:  ordinalIndex,
+		GitMaterialId: material.Id,
+		CreatedBy:     1,
+		CreatedOn:     time.Now(),
+		UpdatedBy:     1,
+		UpdatedOn:     time.Now(),
+	}, tx)
+	if err != nil {
+		impl.logger.Errorw("error while storing mapping",
+			"err", err)
+		return material, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
 	}
 	return impl.checkoutRepo(material)
 }
