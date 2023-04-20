@@ -26,7 +26,7 @@ type GitMaterialNodeMapping struct {
 	tableName     struct{}  `sql:"git_material_node_mapping" pg:",discard_unknown_columns"`
 	Id            int       `sql:"id,pk"`
 	GitMaterialId int       `sql:"git_material_id"`
-	OrdinalIndex  int       `sql:"ordinal_index"`
+	OrdinalIndex  int       `sql:"ordinal_index" pg:",use_zero"`
 	CreatedBy     int       `sql:"created_by"`
 	CreatedOn     time.Time `sql:"created_on"`
 	UpdatedBy     int       `sql:"updated_by"`
