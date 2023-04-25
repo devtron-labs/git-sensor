@@ -232,7 +232,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	for {
-		if itrCounter > 1000 || len(gitCommits) == count {
+		if itrCounter > 1000 || len(gitCommits) == 100 {
 			break
 		}
 		commit, err := itr.Next()
@@ -243,6 +243,16 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 			break
 		}
+		impl.logger.Infow("commit detail ", "commit", commit.String())
+		impl.logger.Infow("commit detail ", "commit", commit)
+		files, _ := commit.Files()
+		files.ForEach(func(file *object.File) error {
+			impl.logger.Infow("commit detail ..", "file", file.Name)
+			impl.logger.Infow("commit detail ..", "file", file.ID())
+			impl.logger.Infow("commit detail ..", "file", file)
+			return nil
+		})
+
 		if !commitToFind && commit.Hash.String() == to {
 			commitToFind = true
 		}
