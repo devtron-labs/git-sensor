@@ -232,7 +232,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	for {
-		if itrCounter > 1000 || len(gitCommits) == 15 {
+		if itrCounter > 1000 || len(gitCommits) == count {
 			break
 		}
 		commit, err := itr.Next()
@@ -243,12 +243,6 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 			break
 		}
-		stats, err := commit.Stats()
-		if err != nil {
-			impl.logger.Errorw("error in  fetching stats", "err", err)
-		}
-		impl.logger.Infow("commit detail ....", "stats", stats.String())
-
 		if !commitToFind && commit.Hash.String() == to {
 			commitToFind = true
 		}
@@ -265,6 +259,12 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
+		stats, err := commit.Stats()
+		if err != nil {
+			impl.logger.Errorw("error in  fetching stats", "err", err)
+		}
+		impl.logger.Infow("commit detail ....", "stats", stats)
+		gitCommit.FileStats = &stats
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
 		impl.logger.Infow("commit detail ----------------------------------------------------------", "itrCounter", itrCounter)
