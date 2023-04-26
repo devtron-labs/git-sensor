@@ -243,14 +243,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 			break
 		}
-		impl.logger.Infow("commit detail ", "commit", commit)
-		files, _ := commit.Files()
-		files.ForEach(func(file *object.File) error {
-			impl.logger.Infow("commit detail ..", "file", file)
-			return nil
-		})
 		stats, _ := commit.Stats()
-		impl.logger.Infow("commit detail ", "stats", stats.String())
+		impl.logger.Infow("commit detail ....", "stats", stats.String())
 
 		if !commitToFind && commit.Hash.String() == to {
 			commitToFind = true
