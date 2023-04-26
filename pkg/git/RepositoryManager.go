@@ -243,7 +243,10 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 			break
 		}
-		stats, _ := commit.Stats()
+		stats, err := commit.Stats()
+		if err != nil {
+			impl.logger.Errorw("error in  fetching stats", "err", err)
+		}
 		impl.logger.Infow("commit detail ....", "stats", stats.String())
 
 		if !commitToFind && commit.Hash.String() == to {
