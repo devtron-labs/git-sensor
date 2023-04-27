@@ -265,6 +265,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  fetching stats", "err", err)
 		}
 		impl.logger.Infow("commit detail ....", "stats", stats)
+		exclude := impl.pathMatcher(&stats)
+		impl.logger.Infow("exclude", "exclude", exclude)
 		gitCommit.FileStats = &stats
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
@@ -275,19 +277,23 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 
 func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) bool {
 	var paths []string
+	impl.logger.Infow("testing ............", "fileStats", fileStats)
 	fileStatBytes, err := json.Marshal(fileStats)
 	if err != nil {
+		impl.logger.Infow("testing marshal error ............", "err", err)
 		return false
 	}
-	fileChanges2 := make([]map[string]interface{}, 0)
-	var fileChanges map[string][]map[string]interface{}
+	var fileChanges []map[string]interface{}
 	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
+		impl.logger.Infow("testing unmarshal error ............", "err", err)
 		return false
 	}
+	impl.logger.Infow("testing  ............", "fileChanges", fileChanges)
 	for _, fileChange := range fileChanges {
-		paths= append(paths, fileChange["FileStats"])
+		path := fileChange["name"].(string)
+		paths = append(paths, path)
 	}
-
+	impl.logger.Infow("testing. ............", "paths", paths)
 	//TODO read file stat
 	showMaterial := true
 	for _, path := range paths {
