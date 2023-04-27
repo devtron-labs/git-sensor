@@ -18,6 +18,7 @@ package git
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -270,6 +271,56 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		impl.logger.Infow("commit detail ----------------------------------------------------------", "itrCounter", itrCounter)
 	}
 	return gitCommits, err
+}
+
+func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) bool {
+	var paths []string
+	fileStatBytes, err := json.Marshal(fileStats)
+	if err != nil {
+		return false
+	}
+	fileChanges2 := make([]map[string]interface{}, 0)
+	var fileChanges map[string][]map[string]interface{}
+	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
+		return false
+	}
+	for _, fileChange := range fileChanges {
+		paths= append(paths, fileChange["FileStats"])
+	}
+
+	//TODO read file stat
+	showMaterial := true
+	for _, path := range paths {
+		allowed := false
+		includedPaths := []string{"client/argocdServer/application"}
+		for _, includedPath := range includedPaths {
+			if strings.Contains(path, includedPath) {
+				allowed = true
+				continue
+			}
+		}
+		if allowed {
+			return showMaterial
+		}
+	}
+
+	//if changes detected in included path, check if falls under excluded paths
+	for _, path := range paths {
+		excluded := true
+		excludedPaths := []string{""}
+		for _, excludedPath := range excludedPaths {
+			if strings.Contains(path, excludedPath) {
+				excluded = false
+				continue
+			}
+		}
+		if excluded {
+			// if found changes under excluded, return hideMaterials
+			showMaterial = false
+			return showMaterial
+		}
+	}
+	return showMaterial
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
