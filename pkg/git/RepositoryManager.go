@@ -233,7 +233,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	for {
-		if itrCounter > 1000 || len(gitCommits) == count {
+		if itrCounter > 1000 || len(gitCommits) == 3 {
 			break
 		}
 		commit, err := itr.Next()
@@ -288,7 +288,6 @@ func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) bool 
 		impl.logger.Infow("testing unmarshal error ............", "err", err)
 		return false
 	}
-	impl.logger.Infow("testing  ............", "fileChanges", fileChanges)
 	for _, fileChange := range fileChanges {
 		path := fileChange["Name"].(string)
 		paths = append(paths, path)
