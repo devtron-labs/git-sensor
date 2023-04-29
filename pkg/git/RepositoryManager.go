@@ -290,7 +290,7 @@ func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) bool 
 	}
 	impl.logger.Infow("testing  ............", "fileChanges", fileChanges)
 	for _, fileChange := range fileChanges {
-		path := fileChange["name"].(string)
+		path := fileChange["Name"].(string)
 		paths = append(paths, path)
 	}
 	impl.logger.Infow("testing. ............", "paths", paths)
