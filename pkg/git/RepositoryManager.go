@@ -279,7 +279,6 @@ func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) (int,
 	isExcluded := 0
 	isIncluded := 0
 	var paths []string
-	impl.logger.Infow("testing ............", "fileStats", fileStats)
 	fileStatBytes, err := json.Marshal(fileStats)
 	if err != nil {
 		impl.logger.Infow("testing marshal error ............", "err", err)
@@ -299,7 +298,7 @@ func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) (int,
 
 	for _, path := range paths {
 		included := false
-		includedPaths := []string{"client/argocdServer/application"}
+		includedPaths := []string{"api","client/argocdServer/application"}
 		for _, includedPath := range includedPaths {
 			if strings.Contains(path, includedPath) {
 				included = true
@@ -315,7 +314,7 @@ func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) (int,
 	//if changes detected in included path, check if falls under excluded paths
 	for _, path := range paths {
 		excluded := false
-		excludedPaths := []string{""}
+		excludedPaths := []string{"client", "charts/devtron"}
 		for _, excludedPath := range excludedPaths {
 			if strings.Contains(path, excludedPath) {
 				excluded = true
