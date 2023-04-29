@@ -265,8 +265,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			impl.logger.Errorw("error in  fetching stats", "err", err)
 		}
 		impl.logger.Infow("commit detail ....", "stats", stats)
-		exclude := impl.pathMatcher(&stats)
-		impl.logger.Infow("exclude", "exclude", exclude)
+		isExcluded := impl.pathMatcher(&stats)
+		impl.logger.Infow("include exclude result", "isExcluded", isExcluded)
 		gitCommit.FileStats = &stats
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
