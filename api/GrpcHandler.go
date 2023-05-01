@@ -179,7 +179,7 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 func (impl *GrpcHandlerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmChangesRequest) (
 	*pb.MaterialChangeResponse, error) {
 
-	res, err := impl.repositoryManager.FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count))
+	res, err := impl.repositoryManager.FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count), true)
 	if err != nil {
 		impl.logger.Errorw("error while fetching scm changes",
 			"pipelineMaterialId", req.PipelineMaterialId,

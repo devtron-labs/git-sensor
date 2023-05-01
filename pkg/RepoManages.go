@@ -32,7 +32,7 @@ import (
 
 type RepoManager interface {
 	GetHeadForPipelineMaterials(ids []int) ([]*git.CiPipelineMaterialBean, error)
-	FetchChanges(pipelineMaterialId int, from string, to string, count int) (*git.MaterialChangeResp, error) //limit
+	FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) //limit
 	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
 	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error)
 	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
@@ -418,7 +418,7 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 	return materialBean
 }
 
-func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -431,7 +431,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	pipelineMaterialType := pipelineMaterial.Type
 
 	if pipelineMaterialType == sql.SOURCE_TYPE_BRANCH_FIXED {
-		return impl.FetchGitCommitsForBranchFixPipeline(pipelineMaterial, gitMaterial)
+		return impl.FetchGitCommitsForBranchFixPipeline(pipelineMaterial, gitMaterial, showAll)
 	} else if pipelineMaterialType == sql.SOURCE_TYPE_WEBHOOK {
 		return impl.FetchGitCommitsForWebhookTypePipeline(pipelineMaterial, gitMaterial)
 	} else {
@@ -441,7 +441,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	return nil, err
 }
 
-func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial, showAll bool) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 	response.LastFetchTime = gitMaterial.LastFetchTime
 	if pipelineMaterial.Errored {
@@ -461,14 +461,20 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	if err != nil {
 		return nil, err
 	}
-
 	filterCommits := make([]*git.GitCommit, 0)
 	for _, commit := range commits {
 		impl.logger.Infow("commit file stats ....", "stats", commit.FileStats)
-		isIncluded, isExcluded := impl.pathMatcher(commit.FileStats)
+		isIncluded, isExcluded := impl.pathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Infow("include exclude result", "isIncluded", isIncluded, "isExcluded", isExcluded)
 		if isIncluded == 1 {
+			impl.logger.Infow("added as included item")
 			filterCommits = append(filterCommits, commit)
+		} else if showAll && isExcluded == 1 {
+			impl.logger.Infow("added as excluded item")
+			commit.Excluded = 1
+			filterCommits = append(filterCommits, commit)
+		} else {
+			impl.logger.Infow("this item neither included nor excluded, skip this")
 		}
 	}
 
@@ -476,10 +482,20 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	return response, nil
 }
 
-func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats) (int, int) {
+func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) (int, int) {
 	isExcluded := 0
 	isIncluded := 0
 	var paths []string
+	var includedPaths []string
+	var excludedPaths []string
+	for _, path := range gitMaterial.FilterPattern {
+		if strings.Contains(path, "!") {
+			excludedPaths = append(excludedPaths, path)
+		} else {
+			includedPaths = append(includedPaths, path)
+		}
+	}
+	impl.logger.Infow("pathMatcher. ............", "includedPaths", includedPaths, "excludedPaths", excludedPaths)
 	fileStatBytes, err := json.Marshal(fileStats)
 	if err != nil {
 		impl.logger.Infow("testing marshal error ............", "err", err)
@@ -494,12 +510,11 @@ func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats) (int, int) 
 		path := fileChange["Name"].(string)
 		paths = append(paths, path)
 	}
-	impl.logger.Infow("testing. ............", "paths", paths)
+	impl.logger.Infow("testing. ............", "changes in paths", paths)
 	//TODO read file stat
 
 	for _, path := range paths {
 		included := false
-		includedPaths := []string{"api", "client/argocdServer/application"}
 		for _, includedPath := range includedPaths {
 			if strings.Contains(path, includedPath) {
 				included = true
@@ -515,7 +530,6 @@ func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats) (int, int) 
 	//if changes detected in included path, check if falls under excluded paths
 	for _, path := range paths {
 		excluded := false
-		excludedPaths := []string{"client", "charts/devtron"}
 		for _, excludedPath := range excludedPaths {
 			if strings.Contains(path, excludedPath) {
 				excluded = true
