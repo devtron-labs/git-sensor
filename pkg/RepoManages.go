@@ -490,7 +490,7 @@ func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats, gitMaterial
 	var excludedPaths []string
 	for _, path := range gitMaterial.FilterPattern {
 		if strings.Contains(path, "!") {
-			excludedPaths = append(excludedPaths, path)
+			excludedPaths = append(excludedPaths, strings.ReplaceAll(path, "!", ""))
 		} else {
 			includedPaths = append(includedPaths, path)
 		}
