@@ -26,6 +26,8 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"strings"
 )
 
 type RepoManager interface {
@@ -262,7 +264,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	existingMaterial.Deleted = material.Deleted
 	existingMaterial.CheckoutStatus = false
 	existingMaterial.FetchSubmodules = material.FetchSubmodules
-
+	existingMaterial.FilterPattern = material.FilterPattern
 	err = impl.materialRepository.Update(existingMaterial)
 	if err != nil {
 		impl.logger.Errorw("error in updating material ", "material", material, "err", err)
@@ -459,8 +461,74 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	if err != nil {
 		return nil, err
 	}
-	response.Commits = commits
+
+	filterCommits := make([]*git.GitCommit, 0)
+	for _, commit := range commits {
+		impl.logger.Infow("commit file stats ....", "stats", commit.FileStats)
+		isIncluded, isExcluded := impl.pathMatcher(commit.FileStats)
+		impl.logger.Infow("include exclude result", "isIncluded", isIncluded, "isExcluded", isExcluded)
+		if isIncluded == 1 {
+			filterCommits = append(filterCommits, commit)
+		}
+	}
+
+	response.Commits = filterCommits
 	return response, nil
+}
+
+func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats) (int, int) {
+	isExcluded := 0
+	isIncluded := 0
+	var paths []string
+	fileStatBytes, err := json.Marshal(fileStats)
+	if err != nil {
+		impl.logger.Infow("testing marshal error ............", "err", err)
+		return isIncluded, isExcluded
+	}
+	var fileChanges []map[string]interface{}
+	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
+		impl.logger.Infow("testing unmarshal error ............", "err", err)
+		return isIncluded, isExcluded
+	}
+	for _, fileChange := range fileChanges {
+		path := fileChange["Name"].(string)
+		paths = append(paths, path)
+	}
+	impl.logger.Infow("testing. ............", "paths", paths)
+	//TODO read file stat
+
+	for _, path := range paths {
+		included := false
+		includedPaths := []string{"api", "client/argocdServer/application"}
+		for _, includedPath := range includedPaths {
+			if strings.Contains(path, includedPath) {
+				included = true
+				break
+			}
+		}
+		if included {
+			isIncluded = 1
+			return isIncluded, isExcluded
+		}
+	}
+
+	//if changes detected in included path, check if falls under excluded paths
+	for _, path := range paths {
+		excluded := false
+		excludedPaths := []string{"client", "charts/devtron"}
+		for _, excludedPath := range excludedPaths {
+			if strings.Contains(path, excludedPath) {
+				excluded = true
+				break
+			}
+		}
+		if excluded {
+			// if found changes under excluded, return hideMaterials
+			isExcluded = 1
+			return isIncluded, isExcluded
+		}
+	}
+	return isIncluded, isExcluded
 }
 
 func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {

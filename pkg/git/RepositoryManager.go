@@ -18,7 +18,6 @@ package git
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -264,70 +263,11 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		if err != nil {
 			impl.logger.Errorw("error in  fetching stats", "err", err)
 		}
-		impl.logger.Infow("commit detail ....", "stats", stats)
-		isIncluded, isExcluded := impl.pathMatcher(&stats)
-		impl.logger.Infow("include exclude result", "isIncluded", isIncluded, "isExcluded", isExcluded)
 		gitCommit.FileStats = &stats
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
-		impl.logger.Infow("commit detail ----------------------------------------------------------", "itrCounter", itrCounter)
 	}
 	return gitCommits, err
-}
-
-func (impl RepositoryManagerImpl) pathMatcher(fileStats *object.FileStats) (int, int) {
-	isExcluded := 0
-	isIncluded := 0
-	var paths []string
-	fileStatBytes, err := json.Marshal(fileStats)
-	if err != nil {
-		impl.logger.Infow("testing marshal error ............", "err", err)
-		return isIncluded, isExcluded
-	}
-	var fileChanges []map[string]interface{}
-	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
-		impl.logger.Infow("testing unmarshal error ............", "err", err)
-		return isIncluded, isExcluded
-	}
-	for _, fileChange := range fileChanges {
-		path := fileChange["Name"].(string)
-		paths = append(paths, path)
-	}
-	impl.logger.Infow("testing. ............", "paths", paths)
-	//TODO read file stat
-
-	for _, path := range paths {
-		included := false
-		includedPaths := []string{"api","client/argocdServer/application"}
-		for _, includedPath := range includedPaths {
-			if strings.Contains(path, includedPath) {
-				included = true
-				break
-			}
-		}
-		if included {
-			isIncluded = 1
-			return isIncluded, isExcluded
-		}
-	}
-
-	//if changes detected in included path, check if falls under excluded paths
-	for _, path := range paths {
-		excluded := false
-		excludedPaths := []string{"client", "charts/devtron"}
-		for _, excludedPath := range excludedPaths {
-			if strings.Contains(path, excludedPath) {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
-			// if found changes under excluded, return hideMaterials
-			isExcluded = 1
-			return isIncluded, isExcluded
-		}
-	}
-	return isIncluded, isExcluded
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
