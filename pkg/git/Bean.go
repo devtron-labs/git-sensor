@@ -61,7 +61,7 @@ type GitCommit struct {
 	Changes     []string          `json:",omitempty"`
 	FileStats   *object.FileStats `json:",omitempty"`
 	WebhookData *WebhookData      `json:"webhookData"`
-	Excluded    int
+	Excluded    bool
 }
 
 type WebhookAndCiData struct {
