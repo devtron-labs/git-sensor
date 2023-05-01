@@ -48,7 +48,7 @@ type GitMaterial struct {
 	FetchStatus         bool      `json:"fetch_status"`
 	LastFetchErrorCount int       `json:"last_fetch_error_count"` //continues fetch error
 	FetchErrorMessage   string    `json:"fetch_error_message"`
-	FilterPattern       []string  `json:"filter_pattern"`
+	FilterPattern       []string  `sql:"filter_pattern"`
 	GitProvider         *GitProvider
 	CiPipelineMaterials []*CiPipelineMaterial
 }
