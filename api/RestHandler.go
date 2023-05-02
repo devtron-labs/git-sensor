@@ -202,7 +202,7 @@ func (handler RestHandlerImpl) FetchChanges(w http.ResponseWriter, r *http.Reque
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	handler.logger.Infow("update pipelineMaterial request ", "req", material)
+	handler.logger.Infow("fetch git materials ", "req", material)
 	commits, err := handler.repositoryManager.FetchChanges(material.PipelineMaterialId, material.From, material.To, material.Count, material.ShowAll)
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
