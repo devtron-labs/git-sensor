@@ -26,8 +26,6 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"strings"
 )
 
 type RepoManager interface {
@@ -469,7 +467,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	filterCommits := make([]*git.GitCommit, 0)
 	for _, commit := range commits {
 		impl.logger.Info("________________________________________________")
-		excluded := impl.pathMatcher(commit.FileStats, gitMaterial)
+		excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Infow("include exclude result", "excluded", excluded)
 		if showAll {
 			impl.logger.Infow("added as excluded item")
@@ -484,123 +482,6 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	}
 	response.Commits = filterCommits
 	return response, nil
-}
-
-/**
-- if include is present in filters, that means paths outside of the include by default marked by excluded
-- if exclude is present in filters, that means paths outside of the exclude by default marked as included.
-- if include and exclude both present, and path is outside of scope of both, marked as excluded
-- if include and exclude both present, and path is inside include and outside of exclude, marked as included.
-- if include and exclude both present, and path is inside exclude and outside of include, marked as excluded.
-- if include and exclude both present, and path is inside both, marked it as included
-*/
-
-func (impl RepoManagerImpl) pathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
-	excluded := false
-	isExcluded := 0
-	isIncluded := 0
-	var paths []string
-	var includedPaths []string
-	var excludedPaths []string
-	for _, path := range gitMaterial.FilterPattern {
-		if strings.Contains(path, "!") {
-			excludedPaths = append(excludedPaths, strings.ReplaceAll(path, "!", ""))
-		} else {
-			includedPaths = append(includedPaths, path)
-		}
-	}
-	impl.logger.Infow("pathMatcher............", "includedPaths", includedPaths, "excludedPaths", excludedPaths)
-	fileStatBytes, err := json.Marshal(fileStats)
-	if err != nil {
-		impl.logger.Infow("testing marshal error ............", "err", err)
-		return false
-	}
-	var fileChanges []map[string]interface{}
-	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
-		impl.logger.Infow("testing unmarshal error ............", "err", err)
-		return false
-	}
-	for _, fileChange := range fileChanges {
-		path := fileChange["Name"].(string)
-		paths = append(paths, path)
-	}
-	impl.logger.Infow("pathMatcher. ............", "changes in paths", paths)
-	//TODO read file stat
-	outsideOfIncludedScope := 0
-	for _, path := range paths {
-		included := false
-		for _, includedPath := range includedPaths {
-			if strings.Contains(path, includedPath) {
-				included = true
-				break
-			}
-		}
-		if included {
-			isIncluded = 1
-		} else {
-			outsideOfIncludedScope = outsideOfIncludedScope + 1
-		}
-	}
-
-	outsideOfExcludedScope := 0
-	//if changes detected in included path, check if falls under excluded paths
-	for _, path := range paths {
-		excluded := false
-		for _, excludedPath := range excludedPaths {
-			if strings.Contains(path, excludedPath) {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
-			// if found changes under excluded, return hideMaterials
-			isExcluded = 1
-		} else {
-			outsideOfExcludedScope = outsideOfExcludedScope + 1
-		}
-	}
-
-	/**
-	- if include is present in filters, that means paths outside of the include by default marked as excluded
-	- if exclude is present in filters, that means paths outside of the exclude by default marked as included.
-	- if include and exclude both present, and path is outside of scope of both, marked as excluded
-	- if include and exclude both present, and path is inside include and outside of exclude, marked as included.
-	- if include and exclude both present, and path is inside exclude and outside of include, marked as excluded.
-	- if include and exclude both present, and path is inside both, marked it as included
-	*/
-	if len(includedPaths) > 0 && len(excludedPaths) == 0 {
-		if isIncluded == 1 {
-			//SHOW
-			excluded = false
-		} else {
-			//HIDE
-			excluded = true
-		}
-	} else if len(includedPaths) == 0 && len(excludedPaths) > 0 {
-		if isExcluded == 1 && outsideOfExcludedScope == 0 {
-			//HIDE
-			excluded = true
-		} else if outsideOfExcludedScope > 0 {
-			//SHOW
-			excluded = false
-		}
-	} else if len(includedPaths) > 0 && len(excludedPaths) > 0 {
-		if isIncluded == 0 && isExcluded == 0 && (outsideOfIncludedScope > 1 || outsideOfExcludedScope > 1) {
-			//TODO - CHECK ORDER AND LAST ONE WILL OVERRIDE
-			excluded = false
-		} else if isIncluded == 1 && isExcluded == 0 {
-			//SHOW
-			excluded = false
-		} else if isIncluded == 0 && isExcluded == 1 {
-			//HIDE
-			excluded = true
-		} else if isIncluded == 1 && isExcluded == 1 {
-			//TODO - CHECK ORDER AND LAST ONE WILL OVERRIDE
-			excluded = false
-		}
-	}
-
-	return excluded
 }
 
 func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
