@@ -259,7 +259,7 @@ func (handler RestHandlerImpl) GetCommitMetadataForPipelineMaterial(w http.Respo
 	material := &git.CommitMetadataRequest{}
 	err := decoder.Decode(material)
 	if err != nil {
-		handler.logger.Error(err)
+		handler.logger.Errorw("err", "material", material, "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
