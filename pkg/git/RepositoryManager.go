@@ -232,7 +232,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	for {
-		if itrCounter > 1000 || len(gitCommits) == 3 {
+		if itrCounter > 1000 || len(gitCommits) == count {
 			break
 		}
 		commit, err := itr.Next()
