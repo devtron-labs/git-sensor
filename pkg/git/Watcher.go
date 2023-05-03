@@ -456,15 +456,13 @@ func (impl GitWatcherImpl) reverse(s []string) []string {
 func (impl GitWatcherImpl) PathMatcherV2(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
 	excluded := false
 	var changesInPath []string
-	var includedPaths []string
-	var excludedPaths []string
 	var pathsForFilter []string
 	for _, path := range gitMaterial.FilterPattern {
 		regex := impl.getPathRegex(path)
 		pathsForFilter = append(pathsForFilter, regex)
 	}
 	pathsForFilter = impl.reverse(pathsForFilter)
-	impl.logger.Infow("pathMatcher............", "includedPaths", includedPaths, "excludedPaths", excludedPaths)
+	impl.logger.Infow("pathMatcher............", "pathsForFilter", pathsForFilter)
 	fileStatBytes, err := json.Marshal(fileStats)
 	if err != nil {
 		impl.logger.Errorw("marshal error ............", "err", err)
@@ -482,7 +480,8 @@ func (impl GitWatcherImpl) PathMatcherV2(fileStats *object.FileStats, gitMateria
 	impl.logger.Infow("pathMatcher .............", "changes in paths", changesInPath)
 	//TODO read file stat
 
-	for _, filter := range pathsForFilter {
+	len := len(pathsForFilter)
+	for i, filter := range pathsForFilter {
 		isExcludeFilter := false
 		isMatched := false
 		//TODO - handle ! in file name with /!
@@ -509,10 +508,16 @@ func (impl GitWatcherImpl) PathMatcherV2(fileStats *object.FileStats, gitMateria
 				excluded = false
 			}
 			return excluded
+		} else if i == len-1 {
+			//if its a last item
+			if isExcludeFilter {
+				excluded = false
+			} else {
+				excluded = true
+			}
 		} else {
 			//GO TO THE NEXT FILTER
 		}
-
 	}
 
 	return excluded
