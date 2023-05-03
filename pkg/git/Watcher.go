@@ -48,6 +48,7 @@ type GitWatcherImpl struct {
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
 	PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
+	PathMatcherV2(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
 }
 
 type PollConfig struct {
@@ -265,7 +266,7 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 
 	impl.logger.Warnw("material notification", "materials", materials)
 	for _, material := range materials {
-		excluded := impl.PathMatcher(material.GitCommit.FileStats, gitMaterial)
+		excluded := impl.PathMatcherV2(material.GitCommit.FileStats, gitMaterial)
 		if excluded {
 			impl.logger.Infow("skip this auto trigger", "exclude", excluded)
 			continue
@@ -441,6 +442,77 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 			//TODO - CHECK ORDER AND LAST ONE WILL OVERRIDE
 			excluded = false
 		}
+	}
+
+	return excluded
+}
+func (impl GitWatcherImpl) reverse(s []string) []string {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+	return s
+}
+
+func (impl GitWatcherImpl) PathMatcherV2(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
+	excluded := false
+	var changesInPath []string
+	var includedPaths []string
+	var excludedPaths []string
+	var pathsForFilter []string
+	for _, path := range gitMaterial.FilterPattern {
+		regex := impl.getPathRegex(path)
+		pathsForFilter = append(pathsForFilter, regex)
+	}
+	pathsForFilter = impl.reverse(pathsForFilter)
+	impl.logger.Infow("pathMatcher............", "includedPaths", includedPaths, "excludedPaths", excludedPaths)
+	fileStatBytes, err := json.Marshal(fileStats)
+	if err != nil {
+		impl.logger.Errorw("marshal error ............", "err", err)
+		return false
+	}
+	var fileChanges []map[string]interface{}
+	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
+		impl.logger.Errorw("unmarshal error ............", "err", err)
+		return false
+	}
+	for _, fileChange := range fileChanges {
+		path := fileChange["Name"].(string)
+		changesInPath = append(changesInPath, path)
+	}
+	impl.logger.Infow("pathMatcher .............", "changes in paths", changesInPath)
+	//TODO read file stat
+
+	for _, filter := range pathsForFilter {
+		isExcludeFilter := false
+		isMatched := false
+		//TODO - handle ! in file name with /!
+		if strings.Contains(filter, "!") {
+			filter = strings.Replace(filter, "!", "", 1)
+			isExcludeFilter = true
+		}
+		for _, path := range changesInPath {
+			match, err := regexp.MatchString(filter, path)
+			if err != nil {
+				continue
+			}
+			if match {
+				isMatched = true
+				break
+			}
+		}
+		if isMatched {
+			if isExcludeFilter {
+				//if matched for exclude filter
+				excluded = true
+			} else {
+				//if matched for include filter
+				excluded = false
+			}
+			return excluded
+		} else {
+			//GO TO THE NEXT FILTER
+		}
+
 	}
 
 	return excluded
