@@ -232,7 +232,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	for {
-		if itrCounter > 1000 || len(gitCommits) == 5 {
+		if itrCounter > 1000 || len(gitCommits) == count {
 			break
 		}
 		commit, err := itr.Next()
@@ -277,7 +277,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
-		count = 15
+		count = 5
 	}
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
