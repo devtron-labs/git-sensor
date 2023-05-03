@@ -98,6 +98,7 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 				CheckoutStatus:   item.CheckoutStatus,
 				CheckoutMsgAny:   item.CheckoutMsgAny,
 				Deleted:          item.Deleted,
+				FilterPattern:    item.FilterPattern,
 			})
 		}
 	}
@@ -126,6 +127,7 @@ func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial
 		CheckoutStatus:   req.CheckoutStatus,
 		CheckoutMsgAny:   req.CheckoutMsgAny,
 		Deleted:          req.Deleted,
+		FilterPattern:    req.FilterPattern,
 	}
 
 	// Update repo
@@ -179,7 +181,7 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 func (impl *GrpcHandlerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmChangesRequest) (
 	*pb.MaterialChangeResponse, error) {
 
-	res, err := impl.repositoryManager.FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count), true)
+	res, err := impl.repositoryManager.FetchChanges(int(req.PipelineMaterialId), req.From, req.To, int(req.Count), req.ShowAll)
 	if err != nil {
 		impl.logger.Errorw("error while fetching scm changes",
 			"pipelineMaterialId", req.PipelineMaterialId,
@@ -787,6 +789,7 @@ func (impl *GrpcHandlerImpl) mapGitCommit(commit *git.GitCommit) (*pb.GitCommit,
 		Message:   commit.Message,
 		Changes:   commit.Changes,
 		FileStats: mappedFileStats,
+		Excluded:  commit.Excluded,
 	}
 
 	if commit.WebhookData != nil {
