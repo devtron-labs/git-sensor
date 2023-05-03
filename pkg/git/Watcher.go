@@ -28,6 +28,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -208,7 +209,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
 			continue
 		}
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 5)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 15)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
@@ -308,6 +309,16 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 - if include and exclude both present, and path is inside both, marked it as included
 */
 
+func (impl GitWatcherImpl) getPathRegex(path string) string {
+	const MultiDirectoryMatch = "(/[a-z]+)+"
+	const singleDirectoryMatch = "(/[a-z]+)"
+	const fileMatch = "([a-z]+)"
+	path = strings.ReplaceAll(path, "/**", MultiDirectoryMatch)
+	path = strings.ReplaceAll(path, "/*", singleDirectoryMatch)
+	path = strings.ReplaceAll(path, "*", fileMatch)
+	return path
+}
+
 func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
 	excluded := false
 	isExcluded := 0
@@ -317,9 +328,12 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 	var excludedPaths []string
 	for _, path := range gitMaterial.FilterPattern {
 		if strings.Contains(path, "!") {
-			excludedPaths = append(excludedPaths, strings.ReplaceAll(path, "!", ""))
+			regex := strings.ReplaceAll(path, "!", "")
+			regex = impl.getPathRegex(path)
+			excludedPaths = append(excludedPaths, regex)
 		} else {
-			includedPaths = append(includedPaths, path)
+			regex := impl.getPathRegex(path)
+			includedPaths = append(includedPaths, regex)
 		}
 	}
 	impl.logger.Infow("pathMatcher............", "includedPaths", includedPaths, "excludedPaths", excludedPaths)
@@ -343,10 +357,18 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 	for _, path := range paths {
 		included := false
 		for _, includedPath := range includedPaths {
-			if strings.Contains(path, includedPath) {
+			match, err := regexp.MatchString(includedPath, path)
+			if err != nil {
+				continue
+			}
+			if match {
 				included = true
 				break
 			}
+			/*if strings.Contains(path, includedPath) {
+				included = true
+				break
+			}*/
 		}
 		if included {
 			isIncluded = 1
@@ -360,10 +382,18 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 	for _, path := range paths {
 		excluded := false
 		for _, excludedPath := range excludedPaths {
-			if strings.Contains(path, excludedPath) {
+			match, err := regexp.MatchString(excludedPath, path)
+			if err != nil {
+				continue
+			}
+			if match {
 				excluded = true
 				break
 			}
+			/*if strings.Contains(path, excludedPath) {
+				excluded = true
+				break
+			}*/
 		}
 		if excluded {
 			// if found changes under excluded, return hideMaterials
