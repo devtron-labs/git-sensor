@@ -45,9 +45,9 @@ func TriggerGitOperationMetrics(method string, startTime time.Time, err error) {
 }
 
 func GetPathRegex(path string) string {
-	const MultiDirectoryMatch = "(/[a-z]+)+"
-	const singleDirectoryMatch = "(/[a-z]+)"
-	const fileMatch = "([a-z]+)"
+	const MultiDirectoryMatch = "(/[0-9A-Za-z_./-]+)+"
+	const singleDirectoryMatch = "(/[0-9A-Za-z_./-]+)"
+	const fileMatch = "([0-9A-Za-z_./-]+)"
 	path = strings.ReplaceAll(path, "/**", MultiDirectoryMatch)
 	path = strings.ReplaceAll(path, "/*", singleDirectoryMatch)
 	path = strings.ReplaceAll(path, "*", fileMatch)
