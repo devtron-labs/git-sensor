@@ -467,7 +467,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	filterCommits := make([]*git.GitCommit, 0)
 	for _, commit := range commits {
 		impl.logger.Info("________________________________________________")
-		excluded := impl.gitWatcher.PathMatcherV2(commit.FileStats, gitMaterial)
+		excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Infow("include exclude result", "excluded", excluded)
 		if showAll {
 			commit.Excluded = excluded
@@ -693,7 +693,9 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
 		return nil, nil
 	}
-
+	commit := commits[0]
+	excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
+	commit.Excluded = excluded
 	return commits[0], err
 }
 
