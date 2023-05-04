@@ -27,6 +27,7 @@ type FetchScmChangesRequest struct {
 	From               string `json:"from"`
 	To                 string `json:"to"`
 	Count              int    `json:"count"`
+	ShowAll            bool   `json:"showAll"`
 }
 
 type HeadRequest struct {
@@ -60,6 +61,7 @@ type GitCommit struct {
 	Changes     []string          `json:",omitempty"`
 	FileStats   *object.FileStats `json:",omitempty"`
 	WebhookData *WebhookData      `json:"webhookData"`
+	Excluded    bool              `json:",omitempty"`
 }
 
 type WebhookAndCiData struct {
