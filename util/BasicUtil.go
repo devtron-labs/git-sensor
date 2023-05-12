@@ -43,3 +43,20 @@ func TriggerGitOperationMetrics(method string, startTime time.Time, err error) {
 	}
 	middleware.GitOperationDuration.WithLabelValues(method, status).Observe(time.Since(startTime).Seconds())
 }
+
+func GetPathRegex(path string) string {
+	const MultiDirectoryMatch = "(/[0-9A-Za-z_./-]+)+"
+	const singleDirectoryMatch = "(/[0-9A-Za-z_./-]+)"
+	const fileMatch = "([0-9A-Za-z_./-]+)"
+	path = strings.ReplaceAll(path, "/**", MultiDirectoryMatch)
+	path = strings.ReplaceAll(path, "/*", singleDirectoryMatch)
+	path = strings.ReplaceAll(path, "*", fileMatch)
+	return path
+}
+
+func ReverseSlice(s []string) []string {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+	return s
+}

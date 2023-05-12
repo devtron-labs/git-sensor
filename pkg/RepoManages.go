@@ -30,7 +30,7 @@ import (
 
 type RepoManager interface {
 	GetHeadForPipelineMaterials(ids []int) ([]*git.CiPipelineMaterialBean, error)
-	FetchChanges(pipelineMaterialId int, from string, to string, count int) (*git.MaterialChangeResp, error) //limit
+	FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) //limit
 	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
 	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error)
 	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
@@ -238,7 +238,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	return provider, err
 }
 
-//handle update
+// handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
@@ -262,7 +262,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	existingMaterial.Deleted = material.Deleted
 	existingMaterial.CheckoutStatus = false
 	existingMaterial.FetchSubmodules = material.FetchSubmodules
-
+	existingMaterial.FilterPattern = material.FilterPattern
 	err = impl.materialRepository.Update(existingMaterial)
 	if err != nil {
 		impl.logger.Errorw("error in updating material ", "material", material, "err", err)
@@ -416,7 +416,7 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 	return materialBean
 }
 
-func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -429,7 +429,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	pipelineMaterialType := pipelineMaterial.Type
 
 	if pipelineMaterialType == sql.SOURCE_TYPE_BRANCH_FIXED {
-		return impl.FetchGitCommitsForBranchFixPipeline(pipelineMaterial, gitMaterial)
+		return impl.FetchGitCommitsForBranchFixPipeline(pipelineMaterial, gitMaterial, showAll)
 	} else if pipelineMaterialType == sql.SOURCE_TYPE_WEBHOOK {
 		return impl.FetchGitCommitsForWebhookTypePipeline(pipelineMaterial, gitMaterial)
 	} else {
@@ -439,7 +439,7 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	return nil, err
 }
 
-func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial) (*git.MaterialChangeResp, error) {
+func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial *sql.CiPipelineMaterial, gitMaterial *sql.GitMaterial, showAll bool) (*git.MaterialChangeResp, error) {
 	response := &git.MaterialChangeResp{}
 	response.LastFetchTime = gitMaterial.LastFetchTime
 	if pipelineMaterial.Errored {
@@ -459,7 +459,25 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 	if err != nil {
 		return nil, err
 	}
-	response.Commits = commits
+	if len(gitMaterial.FilterPattern) == 0 {
+		response.Commits = commits
+		return response, nil
+	}
+
+	filterCommits := make([]*git.GitCommit, 0)
+	for _, commit := range commits {
+		excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
+		impl.logger.Debugw("include exclude result", "excluded", excluded)
+		if showAll {
+			commit.Excluded = excluded
+			filterCommits = append(filterCommits, commit)
+		} else if excluded == false {
+			filterCommits = append(filterCommits, commit)
+		} else {
+			impl.logger.Debugw("this item neither included nor excluded, skip this")
+		}
+	}
+	response.Commits = filterCommits
 	return response, nil
 }
 
@@ -674,7 +692,9 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
 		return nil, nil
 	}
-
+	commit := commits[0]
+	excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
+	commit.Excluded = excluded
 	return commits[0], err
 }
 

@@ -35,7 +35,7 @@ func NewRepositoryLocker(logger *zap.SugaredLogger) *RepositoryLocker {
 }
 
 func (locker *RepositoryLocker) LeaseLocker(RepositoryId int) *RepositoryLock {
-	locker.logger.Infow("lease req get for ", "repo", RepositoryId)
+	locker.logger.Debugw("lease req get for ", "repo", RepositoryId)
 	locker.Mutex.Lock()
 	defer locker.Mutex.Unlock()
 	repositoryLock := locker.Bank[RepositoryId]
@@ -48,7 +48,7 @@ func (locker *RepositoryLocker) LeaseLocker(RepositoryId int) *RepositoryLock {
 }
 
 func (locker *RepositoryLocker) ReturnLocker(appId int) {
-	locker.logger.Infow("lease req release for ", "repo", appId)
+	locker.logger.Debugw("lease req release for ", "repo", appId)
 	locker.Mutex.Lock()
 	defer locker.Mutex.Unlock()
 	repositoryLock := locker.Bank[appId]

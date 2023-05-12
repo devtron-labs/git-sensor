@@ -202,8 +202,8 @@ func (handler RestHandlerImpl) FetchChanges(w http.ResponseWriter, r *http.Reque
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	handler.logger.Infow("update pipelineMaterial request ", "req", material)
-	commits, err := handler.repositoryManager.FetchChanges(material.PipelineMaterialId, material.From, material.To, material.Count)
+	handler.logger.Infow("fetch git materials ", "req", material)
+	commits, err := handler.repositoryManager.FetchChanges(material.PipelineMaterialId, material.From, material.To, material.Count, material.ShowAll)
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 	} else {
@@ -259,7 +259,7 @@ func (handler RestHandlerImpl) GetCommitMetadataForPipelineMaterial(w http.Respo
 	material := &git.CommitMetadataRequest{}
 	err := decoder.Decode(material)
 	if err != nil {
-		handler.logger.Error(err)
+		handler.logger.Errorw("err", "material", material, "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}

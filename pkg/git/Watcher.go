@@ -24,9 +24,13 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -44,6 +48,7 @@ type GitWatcherImpl struct {
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
+	PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
 }
 
 type PollConfig struct {
@@ -237,7 +242,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		}
 	}
 	if len(updatedMaterialsModel) > 0 {
-		err = impl.NotifyForMaterialUpdate(updatedMaterials)
+		err = impl.NotifyForMaterialUpdate(updatedMaterials, material)
 		if err != nil {
 			impl.logger.Errorw("error in sending notification for materials", "url", material.Url, "update", updatedMaterialsModel)
 		}
@@ -257,13 +262,18 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	return nil
 }
 
-func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMaterialBean) error {
+func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMaterialBean, gitMaterial *sql.GitMaterial) error {
 
 	impl.logger.Warnw("material notification", "materials", materials)
 	for _, material := range materials {
+		excluded := impl.PathMatcher(material.GitCommit.FileStats, gitMaterial)
+		if excluded {
+			impl.logger.Infow("skip this auto trigger", "exclude", excluded)
+			continue
+		}
 		mb, err := json.Marshal(material)
 		if err != nil {
-			impl.logger.Error("err in json marshaling", "err", err)
+			impl.logger.Errorw("err in json marshaling", "err", err)
 			continue
 		}
 		err = impl.pubSubClient.Publish(pubsub.NEW_CI_MATERIAL_TOPIC, string(mb))
@@ -289,6 +299,79 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 	}
 	err := impl.pubSubClient.Subscribe(pubsub.WEBHOOK_EVENT_TOPIC, callback)
 	return err
+}
+
+func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
+	excluded := false
+	var changesInPath []string
+	var pathsForFilter []string
+	if len(gitMaterial.FilterPattern) == 0 {
+		impl.logger.Debugw("no filter configured for this git material", "gitMaterial", gitMaterial)
+		return excluded
+	}
+	for _, path := range gitMaterial.FilterPattern {
+		regex := util.GetPathRegex(path)
+		pathsForFilter = append(pathsForFilter, regex)
+	}
+	pathsForFilter = util.ReverseSlice(pathsForFilter)
+	impl.logger.Debugw("pathMatcher............", "pathsForFilter", pathsForFilter)
+	fileStatBytes, err := json.Marshal(fileStats)
+	if err != nil {
+		impl.logger.Errorw("marshal error ............", "err", err)
+		return false
+	}
+	var fileChanges []map[string]interface{}
+	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
+		impl.logger.Errorw("unmarshal error ............", "err", err)
+		return false
+	}
+	for _, fileChange := range fileChanges {
+		path := fileChange["Name"].(string)
+		changesInPath = append(changesInPath, path)
+	}
+	len := len(pathsForFilter)
+	for i, filter := range pathsForFilter {
+		isExcludeFilter := false
+		isMatched := false
+		//TODO - handle ! in file name with /!
+		const ExcludePathIdentifier = "!"
+		if strings.Contains(filter, ExcludePathIdentifier) {
+			filter = strings.Replace(filter, ExcludePathIdentifier, "", 1)
+			isExcludeFilter = true
+		}
+		for _, path := range changesInPath {
+			match, err := regexp.MatchString(filter, path)
+			if err != nil {
+				continue
+			}
+			if match {
+				isMatched = true
+				break
+			}
+		}
+		if isMatched {
+			if isExcludeFilter {
+				//if matched for exclude filter
+				excluded = true
+			} else {
+				//if matched for include filter
+				excluded = false
+			}
+			return excluded
+		} else if i == len-1 {
+			//if it's a last item
+			if isExcludeFilter {
+				excluded = false
+			} else {
+				excluded = true
+			}
+			return excluded
+		} else {
+			//GO TO THE NEXT FILTER
+		}
+	}
+
+	return excluded
 }
 
 type CronLoggerImpl struct {

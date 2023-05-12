@@ -48,6 +48,7 @@ type GitMaterial struct {
 	FetchStatus         bool      `json:"fetch_status"`
 	LastFetchErrorCount int       `json:"last_fetch_error_count"` //continues fetch error
 	FetchErrorMessage   string    `json:"fetch_error_message"`
+	FilterPattern       []string  `sql:"filter_pattern"`
 	GitProvider         *GitProvider
 	CiPipelineMaterials []*CiPipelineMaterial
 }
@@ -81,7 +82,7 @@ func (repo MaterialRepositoryImpl) Update(material *GitMaterial) error {
 func (repo MaterialRepositoryImpl) FindActive() ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
-		Column("git_material.*", "GitProvider", ).
+		Column("git_material.*", "GitProvider").
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {
 			return q.Where("active IS TRUE"), nil
 		}).
@@ -111,7 +112,7 @@ func (repo MaterialRepositoryImpl) FindById(id int) (*GitMaterial, error) {
 	return &material, err
 }
 
-func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls[] string) ([]*GitMaterial, error) {
+func (repo MaterialRepositoryImpl) FindAllActiveByUrls(urls []string) ([]*GitMaterial, error) {
 	var materials []*GitMaterial
 	err := repo.dbConnection.Model(&materials).
 		Relation("CiPipelineMaterials", func(q *orm.Query) (*orm.Query, error) {

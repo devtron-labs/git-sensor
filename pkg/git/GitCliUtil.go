@@ -51,7 +51,7 @@ func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err err
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
-		impl.logger.Error("error in git cli operation", "msg", string(outBytes), "err", err)
+		impl.logger.Errorw("error in git cli operation", "msg", string(outBytes), "err", err)
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
 			return "", string(outBytes), err
