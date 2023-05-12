@@ -314,7 +314,7 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 		pathsForFilter = append(pathsForFilter, regex)
 	}
 	pathsForFilter = util.ReverseSlice(pathsForFilter)
-	impl.logger.Infow("pathMatcher............", "pathsForFilter", pathsForFilter)
+	impl.logger.Debugw("pathMatcher............", "pathsForFilter", pathsForFilter)
 	fileStatBytes, err := json.Marshal(fileStats)
 	if err != nil {
 		impl.logger.Errorw("marshal error ............", "err", err)
@@ -329,14 +329,14 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 		path := fileChange["Name"].(string)
 		changesInPath = append(changesInPath, path)
 	}
-	impl.logger.Infow("pathMatcher .............", "changes in paths", changesInPath)
 	len := len(pathsForFilter)
 	for i, filter := range pathsForFilter {
 		isExcludeFilter := false
 		isMatched := false
 		//TODO - handle ! in file name with /!
-		if strings.Contains(filter, "!") {
-			filter = strings.Replace(filter, "!", "", 1)
+		const ExcludePathIdentifier = "!"
+		if strings.Contains(filter, ExcludePathIdentifier) {
+			filter = strings.Replace(filter, ExcludePathIdentifier, "", 1)
 			isExcludeFilter = true
 		}
 		for _, path := range changesInPath {
@@ -359,7 +359,7 @@ func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial 
 			}
 			return excluded
 		} else if i == len-1 {
-			//if its a last item
+			//if it's a last item
 			if isExcludeFilter {
 				excluded = false
 			} else {

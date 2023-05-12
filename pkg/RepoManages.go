@@ -238,7 +238,7 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 	return provider, err
 }
 
-//handle update
+// handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
@@ -466,16 +466,15 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 
 	filterCommits := make([]*git.GitCommit, 0)
 	for _, commit := range commits {
-		impl.logger.Info("________________________________________________")
 		excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
-		impl.logger.Infow("include exclude result", "excluded", excluded)
+		impl.logger.Debugw("include exclude result", "excluded", excluded)
 		if showAll {
 			commit.Excluded = excluded
 			filterCommits = append(filterCommits, commit)
 		} else if excluded == false {
 			filterCommits = append(filterCommits, commit)
 		} else {
-			impl.logger.Infow("this item neither included nor excluded, skip this")
+			impl.logger.Debugw("this item neither included nor excluded, skip this")
 		}
 	}
 	response.Commits = filterCommits
