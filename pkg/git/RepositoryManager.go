@@ -259,6 +259,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
+		impl.logger.Info("commit dto for repo ", "repo", repository, commit)
 		if !commitToFind {
 			stats, err := commit.Stats()
 			if err != nil {
