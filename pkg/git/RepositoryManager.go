@@ -259,7 +259,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
-		if !strings.Contains(commit.Hash.String(), to) {
+		if !commitToFind {
 			stats, err := commit.Stats()
 			if err != nil {
 				impl.logger.Errorw("error in  fetching stats", "err", err)
