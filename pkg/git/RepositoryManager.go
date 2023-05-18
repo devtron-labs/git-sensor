@@ -259,11 +259,13 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			Date:    commit.Author.When,
 			Message: commit.Message,
 		}
-		stats, err := commit.Stats()
-		if err != nil {
-			impl.logger.Errorw("error in  fetching stats", "err", err)
+		if !strings.Contains(commit.Hash.String(), to) {
+			stats, err := commit.Stats()
+			if err != nil {
+				impl.logger.Errorw("error in  fetching stats", "err", err)
+			}
+			gitCommit.FileStats = &stats
 		}
-		gitCommit.FileStats = &stats
 		gitCommits = append(gitCommits, gitCommit)
 		itrCounter = itrCounter + 1
 	}
