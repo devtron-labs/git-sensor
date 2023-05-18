@@ -210,8 +210,8 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
 			continue
 		}
-		impl.logger.Info("Running changesBySinceRepository for material - ", material)
-		impl.logger.Info("---------------------------------------------------------- ")
+		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
+		impl.logger.Debugw("---------------------------------------------------------- ")
 		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 15)
 		if err != nil {
 			material.Errored = true
