@@ -266,17 +266,19 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				Message: commit.Message,
 			}
 			impl.logger.Info("commit dto for repo ", "repo", repository, commit)
-			defer func() {
-				if err := recover(); err != nil {
-					impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+			if impl.configuration.EnableFileStats {
+				defer func() {
+					if err := recover(); err != nil {
+						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+					}
+				}()
+				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
+				stats, err := commit.Stats()
+				if err != nil {
+					impl.logger.Errorw("error in  fetching stats", "err", err)
 				}
-			}()
-			//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
-			stats, err := commit.Stats()
-			if err != nil {
-				impl.logger.Errorw("error in  fetching stats", "err", err)
+				gitCommit.FileStats = &stats
 			}
-			gitCommit.FileStats = &stats
 			gitCommits = append(gitCommits, gitCommit)
 			itrCounter = itrCounter + 1
 		}()
