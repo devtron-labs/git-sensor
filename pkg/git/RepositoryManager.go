@@ -231,41 +231,57 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	var gitCommits []*GitCommit
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
+	breakLoop := false
 	for {
-		if itrCounter > 1000 || len(gitCommits) == count {
+		if breakLoop {
 			break
 		}
-		commit, err := itr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
-			break
-		}
-		if !commitToFind && strings.Contains(commit.Hash.String(), to) {
-			commitToFind = true
-		}
-		if !commitToFind {
-			continue
-		}
-		if commit.Hash.String() == from && len(from) > 0 {
-			//found end
-			break
-		}
-		gitCommit := &GitCommit{
-			Author:  commit.Author.String(),
-			Commit:  commit.Hash.String(),
-			Date:    commit.Author.When,
-			Message: commit.Message,
-		}
-		stats, err := commit.Stats()
-		if err != nil {
-			impl.logger.Errorw("error in  fetching stats", "err", err)
-		}
-		gitCommit.FileStats = &stats
-		gitCommits = append(gitCommits, gitCommit)
-		itrCounter = itrCounter + 1
+		//TODO: move code out of this dummy function after removing defer inside loop
+		func() {
+			if itrCounter > 1000 || len(gitCommits) == count {
+				breakLoop = true
+			}
+			commit, err := itr.Next()
+			if err == io.EOF {
+				breakLoop = true
+			}
+			if err != nil {
+				impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
+				breakLoop = true
+			}
+			if !commitToFind && strings.Contains(commit.Hash.String(), to) {
+				commitToFind = true
+			}
+			if !commitToFind {
+				return
+			}
+			if commit.Hash.String() == from && len(from) > 0 {
+				//found end
+				breakLoop = true
+			}
+			gitCommit := &GitCommit{
+				Author:  commit.Author.String(),
+				Commit:  commit.Hash.String(),
+				Date:    commit.Author.When,
+				Message: commit.Message,
+			}
+			impl.logger.Info("commit dto for repo ", "repo", repository, commit)
+			if impl.configuration.EnableFileStats {
+				defer func() {
+					if err := recover(); err != nil {
+						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+					}
+				}()
+				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
+				stats, err := commit.Stats()
+				if err != nil {
+					impl.logger.Errorw("error in  fetching stats", "err", err)
+				}
+				gitCommit.FileStats = &stats
+			}
+			gitCommits = append(gitCommits, gitCommit)
+			itrCounter = itrCounter + 1
+		}()
 	}
 	return gitCommits, err
 }
