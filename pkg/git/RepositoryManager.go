@@ -240,14 +240,17 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		func() {
 			if itrCounter > 1000 || len(gitCommits) == count {
 				breakLoop = true
+				return
 			}
 			commit, err := itr.Next()
 			if err == io.EOF {
 				breakLoop = true
+				return
 			}
 			if err != nil {
 				impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 				breakLoop = true
+				return
 			}
 			if !commitToFind && strings.Contains(commit.Hash.String(), to) {
 				commitToFind = true
@@ -258,6 +261,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			if commit.Hash.String() == from && len(from) > 0 {
 				//found end
 				breakLoop = true
+				return
 			}
 			gitCommit := &GitCommit{
 				Author:  commit.Author.String(),
