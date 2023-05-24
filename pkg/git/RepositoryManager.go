@@ -274,6 +274,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				defer func() {
 					if err := recover(); err != nil {
 						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+						gitCommits = append(gitCommits, gitCommit)
+						itrCounter = itrCounter + 1
 					}
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
