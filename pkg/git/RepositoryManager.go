@@ -269,7 +269,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				Date:    commit.Author.When,
 				Message: commit.Message,
 			}
-			impl.logger.Info("commit dto for repo ", "repo", repository, commit)
+			impl.logger.Debugw("commit dto for repo ", "repo", repository, commit)
+			gitCommits = append(gitCommits, gitCommit)
+			itrCounter = itrCounter + 1
 			if impl.configuration.EnableFileStats {
 				defer func() {
 					if err := recover(); err != nil {
@@ -283,8 +285,6 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				}
 				gitCommit.FileStats = &stats
 			}
-			gitCommits = append(gitCommits, gitCommit)
-			itrCounter = itrCounter + 1
 		}()
 	}
 	return gitCommits, err
