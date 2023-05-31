@@ -514,8 +514,9 @@ func (impl *GrpcHandlerImpl) GetAllWebhookEventConfigForHost(ctx context.Context
 
 		return nil, err
 	}
+	webhookConfig := &pb.WebhookEventConfigResponse{}
 	if res == nil {
-		return nil, nil
+		return webhookConfig, nil
 	}
 
 	// Mapping response
