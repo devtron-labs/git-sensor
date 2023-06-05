@@ -7,7 +7,7 @@ WORKDIR /go/src/github.com/devtron-labs/git-sensor
 ADD . /go/src/github.com/devtron-labs/git-sensor/
 RUN GOOS=linux make
 
-FROM alpine:3.9
+FROM alpine:3.18
 COPY ./git-ask-pass.sh /git-ask-pass.sh
 RUN chmod +x /git-ask-pass.sh
 RUN apk add --no-cache ca-certificates
