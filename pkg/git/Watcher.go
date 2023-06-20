@@ -212,7 +212,8 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		}
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 15)
+		//parse env variables here, then search for the count fioeld and pass here.
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 7)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
