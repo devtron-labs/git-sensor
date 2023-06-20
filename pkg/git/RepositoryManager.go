@@ -238,7 +238,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		}
 		//TODO: move code out of this dummy function after removing defer inside loop
 		func() {
-			if itrCounter > 1000 || len(gitCommits) == count {
+			if itrCounter > 1000 || len(gitCommits) == 4 {
 				breakLoop = true
 				return
 			}
