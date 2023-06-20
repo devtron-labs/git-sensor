@@ -44,16 +44,22 @@ type GitWatcherImpl struct {
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
+	gitCommitConfig              *GitCommitConfig
 }
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
 	PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
+	GetGitCommitConfig() *GitCommitConfig
 }
 
 type PollConfig struct {
 	PollDuration int `env:"POLL_DURATION" envDefault:"2"`
 	PollWorker   int `env:"POLL_WORKER" envDefault:"5"`
+}
+
+type GitCommitConfig struct {
+	HistoryCount int `env:"HISTORY_COUNT" envDefault:"5"`
 }
 
 func NewGitWatcherImpl(repositoryManager RepositoryManager,
@@ -69,6 +75,11 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		return nil, err
 	}
 
+	gitCommitConfig := &GitCommitConfig{}
+	err = env.Parse(gitCommitConfig)
+	if err != nil {
+		return nil, err
+	}
 	cronLogger := &CronLoggerImpl{logger: logger}
 	cron := cron.New(
 		cron.WithChain(
@@ -85,6 +96,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
+		gitCommitConfig:              gitCommitConfig,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -98,9 +110,13 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	return watcher, err
 }
 
+func (impl GitWatcherImpl) GetGitCommitConfig() *GitCommitConfig {
+	return impl.gitCommitConfig
+}
 func (impl GitWatcherImpl) StopCron() {
 	impl.cron.Stop()
 }
+
 func (impl GitWatcherImpl) Watch() {
 	impl.logger.Infow("starting git watch thread")
 	materials, err := impl.materialRepo.FindActive()
@@ -213,7 +229,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		//parse env variables here, then search for the count fioeld and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", 7)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.gitCommitConfig.HistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
