@@ -75,8 +75,8 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		return nil, err
 	}
 
-	gitCommitConfig := &GitCommitConfig{}
-	err = env.Parse(gitCommitConfig)
+	gitCommitConfigValue := &GitCommitConfig{}
+	err = env.Parse(gitCommitConfigValue)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
-		gitCommitConfig:              gitCommitConfig,
+		gitCommitConfig:              gitCommitConfigValue,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
