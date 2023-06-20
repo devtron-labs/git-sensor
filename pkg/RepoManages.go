@@ -189,7 +189,8 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			impl.logger.Errorw("error in fetching material", "err", err)
 			continue
 		}
-		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", int(impl.gitCommitConfig.HistoryCount))
+
+		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", impl.gitCommitConfig.HistoryCount)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
