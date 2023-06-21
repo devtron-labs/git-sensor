@@ -228,7 +228,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		}
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
-		//parse env variables here, then search for the count fioeld and pass here.
+		//parse env variables here, then search for the count field and pass here.
 		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.gitCommitConfig.HistoryCount)
 		if err != nil {
 			material.Errored = true
@@ -236,7 +236,15 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			erroredMaterialsModels = append(erroredMaterialsModels, material)
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
-			if latestCommit.Commit != material.LastSeenHash {
+			commitHistory := make([]*GitCommit, 0)
+			err := json.Unmarshal([]byte(material.CommitHistory), &commitHistory)
+			if err != nil {
+				impl.logger.Errorw("Error while unmarshalling commit history")
+				return err
+			}
+
+			//from string convert it to array of commit hashes and a
+			if latestCommit.Commit != material.LastSeenHash || len(commits) != len(commitHistory) {
 				//new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
