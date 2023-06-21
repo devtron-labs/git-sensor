@@ -244,7 +244,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			}
 
 			//from string convert it to array of commit hashes and a
-			if len(commits) != len(commitHistory) || latestCommit.Commit != material.LastSeenHash {
+			if impl.gitCommitConfig.HistoryCount != len(commitHistory) || latestCommit.Commit != material.LastSeenHash {
 				//new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
