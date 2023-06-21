@@ -632,7 +632,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, branchName, "", "", 1)
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, branchName, "", "", impl.gitCommitConfig.HistoryCount)
 
 	if commits == nil {
 		return nil, err
