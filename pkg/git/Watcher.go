@@ -244,30 +244,30 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			}
 
 			//from string convert it to array of commit hashes and a
-			if impl.gitCommitConfig.HistoryCount != len(commitHistory) || latestCommit.Commit != material.LastSeenHash {
-				//new commit found
-				mb := &CiPipelineMaterialBean{
-					Id:            material.Id,
-					Value:         material.Value,
-					GitMaterialId: material.GitMaterialId,
-					Type:          material.Type,
-					Active:        material.Active,
-					GitCommit:     latestCommit,
-				}
-				updatedMaterials = append(updatedMaterials, mb)
-
-				material.LastSeenHash = latestCommit.Commit
-				material.CommitAuthor = latestCommit.Author
-				material.CommitDate = latestCommit.Date
-				commitJson, _ := json.Marshal(commits)
-				material.CommitHistory = string(commitJson)
-				material.Errored = false
-				material.ErrorMsg = ""
-				updatedMaterialsModel = append(updatedMaterialsModel, material)
+			//if impl.gitCommitConfig.HistoryCount != len(commitHistory) || latestCommit.Commit != material.LastSeenHash {
+			//new commit found
+			mb := &CiPipelineMaterialBean{
+				Id:            material.Id,
+				Value:         material.Value,
+				GitMaterialId: material.GitMaterialId,
+				Type:          material.Type,
+				Active:        material.Active,
+				GitCommit:     latestCommit,
 			}
-			middleware.GitMaterialUpdateCounter.WithLabelValues().Inc()
+			updatedMaterials = append(updatedMaterials, mb)
+
+			material.LastSeenHash = latestCommit.Commit
+			material.CommitAuthor = latestCommit.Author
+			material.CommitDate = latestCommit.Date
+			commitJson, _ := json.Marshal(commits)
+			material.CommitHistory = string(commitJson)
+			material.Errored = false
+			material.ErrorMsg = ""
+			updatedMaterialsModel = append(updatedMaterialsModel, material)
 		}
+		middleware.GitMaterialUpdateCounter.WithLabelValues().Inc()
 	}
+	//}
 	if len(updatedMaterialsModel) > 0 {
 		err = impl.NotifyForMaterialUpdate(updatedMaterials, material)
 		if err != nil {
