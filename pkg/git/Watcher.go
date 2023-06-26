@@ -190,7 +190,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-	_, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
@@ -201,7 +201,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				return err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				_, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location)
+				updated, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
@@ -211,9 +211,9 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			return err
 		}
 	}
-	//if !updated {
-	//	return nil
-	//}
+	if !updated {
+		return nil
+	}
 	materials, err := impl.ciPipelineMaterialRepository.FindByGitMaterialId(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in calculating head", "err", err, "url", material.Url)
@@ -236,15 +236,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			erroredMaterialsModels = append(erroredMaterialsModels, material)
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
-			commitHistory := make([]*GitCommit, 0)
-			err := json.Unmarshal([]byte(material.CommitHistory), &commitHistory)
-			if err != nil {
-				impl.logger.Errorw("Error while unmarshalling commit history")
-				return err
-			}
-
-			//from string convert it to array of commit hashes and a
-			if impl.gitCommitConfig.HistoryCount != len(commitHistory) || latestCommit.Commit != material.LastSeenHash {
+			if latestCommit.Commit != material.LastSeenHash {
 				//new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
