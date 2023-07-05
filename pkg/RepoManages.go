@@ -518,7 +518,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 		return response, nil
 	}
 
-	webhookEventDataArr, err := impl.webhookEventParsedDataRepository.GetWebhookEventParsedDataByIds(webhookDataIds, impl.gitCommitConfig.HistoryCount)
+	webhookEventDataArr, err := impl.webhookEventParsedDataRepository.GetWebhookEventParsedDataByIds(webhookDataIds, 15)
 	if err != nil {
 		impl.logger.Errorw("error in getting webhook data for ids ", "ids", webhookDataIds, "errMsg", err)
 		return nil, err
