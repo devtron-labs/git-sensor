@@ -19,6 +19,7 @@ package git
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/avdkp/go-git/plumbing/object"
 	"github.com/caarlos0/env"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -28,7 +29,6 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"regexp"
 	"strings"
 	"time"
