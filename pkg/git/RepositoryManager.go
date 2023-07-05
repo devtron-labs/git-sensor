@@ -27,13 +27,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devtron-labs/git-sensor/go-git"
+	"github.com/devtron-labs/git-sensor/go-git/plumbing"
+	"github.com/devtron-labs/git-sensor/go-git/plumbing/object"
+	"github.com/devtron-labs/git-sensor/go-git/plumbing/transport"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport"
 )
 
 type RepositoryManager interface {
