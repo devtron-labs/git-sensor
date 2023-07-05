@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 
-	"gopkg.in/src-d/go-billy.v4"
-	"gopkg.in/src-d/go-git.v4/config"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/index"
+	"github.com/avdkp/go-git/config"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/format/index"
+	"github.com/avdkp/go-git/plumbing/transport"
+	"github.com/go-git/go-billy/v5"
 )
 
 var (
@@ -35,7 +37,7 @@ func (s *Submodule) Config() *config.Submodule {
 // Init initialize the submodule reading the recorded Entry in the index for
 // the given submodule
 func (s *Submodule) Init() error {
-	cfg, err := s.w.r.Storer.Config()
+	cfg, err := s.w.r.Config()
 	if err != nil {
 		return err
 	}
@@ -131,9 +133,29 @@ func (s *Submodule) Repository() (*Repository, error) {
 		return nil, err
 	}
 
+	moduleEndpoint, err := transport.NewEndpoint(s.c.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	if !path.IsAbs(moduleEndpoint.Path) && moduleEndpoint.Protocol == "file" {
+		remotes, err := s.w.r.Remotes()
+		if err != nil {
+			return nil, err
+		}
+
+		rootEndpoint, err := transport.NewEndpoint(remotes[0].c.URLs[0])
+		if err != nil {
+			return nil, err
+		}
+
+		rootEndpoint.Path = path.Join(rootEndpoint.Path, moduleEndpoint.Path)
+		*moduleEndpoint = *rootEndpoint
+	}
+
 	_, err = r.CreateRemote(&config.RemoteConfig{
 		Name: DefaultRemoteName,
-		URLs: []string{s.c.URL},
+		URLs: []string{moduleEndpoint.String()},
 	})
 
 	return r, err
@@ -151,7 +173,7 @@ func (s *Submodule) Update(o *SubmoduleUpdateOptions) error {
 // setting in the options SubmoduleUpdateOptions.Init equals true.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 func (s *Submodule) UpdateContext(ctx context.Context, o *SubmoduleUpdateOptions) error {
 	return s.update(ctx, o, plumbing.ZeroHash)
@@ -221,7 +243,7 @@ func (s *Submodule) fetchAndCheckout(
 	ctx context.Context, r *Repository, o *SubmoduleUpdateOptions, hash plumbing.Hash,
 ) error {
 	if !o.NoFetch {
-		err := r.FetchContext(ctx, &FetchOptions{Auth: o.Auth})
+		err := r.FetchContext(ctx, &FetchOptions{Auth: o.Auth, Depth: o.Depth})
 		if err != nil && err != NoErrAlreadyUpToDate {
 			return err
 		}
@@ -230,6 +252,25 @@ func (s *Submodule) fetchAndCheckout(
 	w, err := r.Worktree()
 	if err != nil {
 		return err
+	}
+
+	// Handle a case when submodule refers to an orphaned commit that's still reachable
+	// through Git server using a special protocol capability[1].
+	//
+	// [1]: https://git-scm.com/docs/protocol-capabilities#_allow_reachable_sha1_in_want
+	if !o.NoFetch {
+		if _, err := w.r.Object(plumbing.AnyObject, hash); err != nil {
+			refSpec := config.RefSpec("+" + hash.String() + ":" + hash.String())
+
+			err := r.FetchContext(ctx, &FetchOptions{
+				Auth:     o.Auth,
+				RefSpecs: []config.RefSpec{refSpec},
+				Depth:    o.Depth,
+			})
+			if err != nil && err != NoErrAlreadyUpToDate && err != ErrExactSHA1NotSupported {
+				return err
+			}
+		}
 	}
 
 	if err := w.Checkout(&CheckoutOptions{Hash: hash}); err != nil {
@@ -262,7 +303,7 @@ func (s Submodules) Update(o *SubmoduleUpdateOptions) error {
 // UpdateContext updates all the submodules in this list.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 func (s Submodules) UpdateContext(ctx context.Context, o *SubmoduleUpdateOptions) error {
 	for _, sub := range s {

@@ -7,18 +7,19 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
-	"gopkg.in/src-d/go-billy.v4/util"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/filemode"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/gitignore"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/index"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/utils/ioutil"
-	"gopkg.in/src-d/go-git.v4/utils/merkletrie"
-	"gopkg.in/src-d/go-git.v4/utils/merkletrie/filesystem"
-	mindex "gopkg.in/src-d/go-git.v4/utils/merkletrie/index"
-	"gopkg.in/src-d/go-git.v4/utils/merkletrie/noder"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/filemode"
+	"github.com/avdkp/go-git/plumbing/format/gitignore"
+	"github.com/avdkp/go-git/plumbing/format/index"
+	"github.com/avdkp/go-git/plumbing/object"
+	"github.com/avdkp/go-git/utils/ioutil"
+	"github.com/avdkp/go-git/utils/merkletrie"
+	"github.com/avdkp/go-git/utils/merkletrie/filesystem"
+	mindex "github.com/avdkp/go-git/utils/merkletrie/index"
+	"github.com/avdkp/go-git/utils/merkletrie/noder"
+	"github.com/go-git/go-billy/v5/util"
 )
 
 var (
@@ -168,7 +169,9 @@ func (w *Worktree) excludeIgnoredChanges(changes merkletrie.Changes) merkletrie.
 		if len(path) != 0 {
 			isDir := (len(ch.To) > 0 && ch.To.IsDir()) || (len(ch.From) > 0 && ch.From.IsDir())
 			if m.Match(path, isDir) {
-				continue
+				if len(ch.From) == 0 {
+					continue
+				}
 			}
 		}
 		res = append(res, ch)
@@ -264,7 +267,70 @@ func diffTreeIsEquals(a, b noder.Hasher) bool {
 // the worktree to the index. If any of the files is already staged in the index
 // no error is returned. When path is a file, the blob.Hash is returned.
 func (w *Worktree) Add(path string) (plumbing.Hash, error) {
-	// TODO(mcuadros): remove plumbing.Hash from signature at v5.
+	// TODO(mcuadros): deprecate in favor of AddWithOption in v6.
+	return w.doAdd(path, make([]gitignore.Pattern, 0))
+}
+
+func (w *Worktree) doAddDirectory(idx *index.Index, s Status, directory string, ignorePattern []gitignore.Pattern) (added bool, err error) {
+	if len(ignorePattern) > 0 {
+		m := gitignore.NewMatcher(ignorePattern)
+		matchPath := strings.Split(directory, string(os.PathSeparator))
+		if m.Match(matchPath, true) {
+			// ignore
+			return false, nil
+		}
+	}
+
+	directory = filepath.ToSlash(filepath.Clean(directory))
+
+	for name := range s {
+		if !isPathInDirectory(name, directory) {
+			continue
+		}
+
+		var a bool
+		a, _, err = w.doAddFile(idx, s, name, ignorePattern)
+		if err != nil {
+			return
+		}
+
+		added = added || a
+	}
+
+	return
+}
+
+func isPathInDirectory(path, directory string) bool {
+	return directory == "." || strings.HasPrefix(path, directory+"/")
+}
+
+// AddWithOptions file contents to the index,  updates the index using the
+// current content found in the working tree, to prepare the content staged for
+// the next commit.
+//
+// It typically adds the current content of existing paths as a whole, but with
+// some options it can also be used to add content with only part of the changes
+// made to the working tree files applied, or remove paths that do not exist in
+// the working tree anymore.
+func (w *Worktree) AddWithOptions(opts *AddOptions) error {
+	if err := opts.Validate(w.r); err != nil {
+		return err
+	}
+
+	if opts.All {
+		_, err := w.doAdd(".", w.Excludes)
+		return err
+	}
+
+	if opts.Glob != "" {
+		return w.AddGlob(opts.Glob)
+	}
+
+	_, err := w.Add(opts.Path)
+	return err
+}
+
+func (w *Worktree) doAdd(path string, ignorePattern []gitignore.Pattern) (plumbing.Hash, error) {
 	s, err := w.Status()
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -280,9 +346,9 @@ func (w *Worktree) Add(path string) (plumbing.Hash, error) {
 
 	fi, err := w.Filesystem.Lstat(path)
 	if err != nil || !fi.IsDir() {
-		added, h, err = w.doAddFile(idx, s, path)
+		added, h, err = w.doAddFile(idx, s, path, ignorePattern)
 	} else {
-		added, err = w.doAddDirectory(idx, s, path)
+		added, err = w.doAddDirectory(idx, s, path, ignorePattern)
 	}
 
 	if err != nil {
@@ -296,42 +362,11 @@ func (w *Worktree) Add(path string) (plumbing.Hash, error) {
 	return h, w.r.Storer.SetIndex(idx)
 }
 
-func (w *Worktree) doAddDirectory(idx *index.Index, s Status, directory string) (added bool, err error) {
-	files, err := w.Filesystem.ReadDir(directory)
-	if err != nil {
-		return false, err
-	}
-
-	for _, file := range files {
-		name := path.Join(directory, file.Name())
-
-		var a bool
-		if file.IsDir() {
-			if file.Name() == GitDirName {
-				// ignore special git directory
-				continue
-			}
-			a, err = w.doAddDirectory(idx, s, name)
-		} else {
-			a, _, err = w.doAddFile(idx, s, name)
-		}
-
-		if err != nil {
-			return
-		}
-
-		if !added && a {
-			added = true
-		}
-	}
-
-	return
-}
-
 // AddGlob adds all paths, matching pattern, to the index. If pattern matches a
 // directory path, all directory contents are added to the index recursively. No
 // error is returned if all matching paths are already staged in index.
 func (w *Worktree) AddGlob(pattern string) error {
+	// TODO(mcuadros): deprecate in favor of AddWithOption in v6.
 	files, err := util.Glob(w.Filesystem, pattern)
 	if err != nil {
 		return err
@@ -360,9 +395,9 @@ func (w *Worktree) AddGlob(pattern string) error {
 
 		var added bool
 		if fi.IsDir() {
-			added, err = w.doAddDirectory(idx, s, file)
+			added, err = w.doAddDirectory(idx, s, file, make([]gitignore.Pattern, 0))
 		} else {
-			added, _, err = w.doAddFile(idx, s, file)
+			added, _, err = w.doAddFile(idx, s, file, make([]gitignore.Pattern, 0))
 		}
 
 		if err != nil {
@@ -383,9 +418,17 @@ func (w *Worktree) AddGlob(pattern string) error {
 
 // doAddFile create a new blob from path and update the index, added is true if
 // the file added is different from the index.
-func (w *Worktree) doAddFile(idx *index.Index, s Status, path string) (added bool, h plumbing.Hash, err error) {
+func (w *Worktree) doAddFile(idx *index.Index, s Status, path string, ignorePattern []gitignore.Pattern) (added bool, h plumbing.Hash, err error) {
 	if s.File(path).Worktree == Unmodified {
 		return false, h, nil
+	}
+	if len(ignorePattern) > 0 {
+		m := gitignore.NewMatcher(ignorePattern)
+		matchPath := strings.Split(path, string(os.PathSeparator))
+		if m.Match(matchPath, true) {
+			// ignore
+			return false, h, nil
+		}
 	}
 
 	h, err = w.copyFileToStorage(path)

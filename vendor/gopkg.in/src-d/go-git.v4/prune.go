@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/storer"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/storer"
 )
 
 type PruneHandler func(unreferencedObjectHash plumbing.Hash) error
@@ -17,7 +17,7 @@ type PruneOptions struct {
 	Handler PruneHandler
 }
 
-var ErrLooseObjectsNotSupported = errors.New("Loose objects not supported")
+var ErrLooseObjectsNotSupported = errors.New("loose objects not supported")
 
 // DeleteObject deletes an object from a repository.
 // The type conveniently matches PruneHandler.

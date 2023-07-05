@@ -2,18 +2,25 @@ package git
 
 import (
 	"bytes"
+	"errors"
 	"path"
 	"sort"
 	"strings"
 
-	"golang.org/x/crypto/openpgp"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/filemode"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/index"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/storage"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/filemode"
+	"github.com/avdkp/go-git/plumbing/format/index"
+	"github.com/avdkp/go-git/plumbing/object"
+	"github.com/avdkp/go-git/storage"
 
-	"gopkg.in/src-d/go-billy.v4"
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/go-git/go-billy/v5"
+)
+
+var (
+	// ErrEmptyCommit occurs when a commit is attempted using a clean
+	// working tree, with no changes to be committed.
+	ErrEmptyCommit = errors.New("cannot create empty commit: clean working tree")
 )
 
 // Commit stores the current contents of the index in a new commit along with
@@ -39,7 +46,7 @@ func (w *Worktree) Commit(msg string, opts *CommitOptions) (plumbing.Hash, error
 		s:  w.r.Storer,
 	}
 
-	tree, err := h.BuildTree(idx)
+	tree, err := h.BuildTree(idx, opts)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -58,17 +65,23 @@ func (w *Worktree) autoAddModifiedAndDeleted() error {
 		return err
 	}
 
+	idx, err := w.r.Storer.Index()
+	if err != nil {
+		return err
+	}
+
 	for path, fs := range s {
 		if fs.Worktree != Modified && fs.Worktree != Deleted {
 			continue
 		}
 
-		if _, err := w.Add(path); err != nil {
+		if _, _, err := w.doAddFile(idx, s, path, nil); err != nil {
 			return err
 		}
+
 	}
 
-	return nil
+	return w.r.Storer.SetIndex(idx)
 }
 
 func (w *Worktree) updateHEAD(commit plumbing.Hash) error {
@@ -139,7 +152,11 @@ type buildTreeHelper struct {
 
 // BuildTree builds the tree objects and push its to the storer, the hash
 // of the root tree is returned.
-func (h *buildTreeHelper) BuildTree(idx *index.Index) (plumbing.Hash, error) {
+func (h *buildTreeHelper) BuildTree(idx *index.Index, opts *CommitOptions) (plumbing.Hash, error) {
+	if len(idx.Entries) == 0 && (opts == nil || !opts.AllowEmptyCommits) {
+		return plumbing.ZeroHash, ErrEmptyCommit
+	}
+
 	const rootNode = ""
 	h.trees = map[string]*object.Tree{rootNode: {}}
 	h.entries = map[string]*object.TreeEntry{}
@@ -224,5 +241,9 @@ func (h *buildTreeHelper) copyTreeToStorageRecursive(parent string, t *object.Tr
 		return plumbing.ZeroHash, err
 	}
 
+	hash := o.Hash()
+	if h.s.HasEncodedObject(hash) == nil {
+		return hash, nil
+	}
 	return h.s.SetEncodedObject(o)
 }

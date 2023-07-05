@@ -3,30 +3,35 @@ package git
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	stdioutil "io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/openpgp"
-	"gopkg.in/src-d/go-git.v4/config"
-	"gopkg.in/src-d/go-git.v4/internal/revision"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/cache"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/packfile"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing/storer"
-	"gopkg.in/src-d/go-git.v4/storage"
-	"gopkg.in/src-d/go-git.v4/storage/filesystem"
-	"gopkg.in/src-d/go-git.v4/utils/ioutil"
-
-	"gopkg.in/src-d/go-billy.v4"
-	"gopkg.in/src-d/go-billy.v4/osfs"
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/avdkp/go-git/config"
+	"github.com/avdkp/go-git/internal/revision"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/cache"
+	formatcfg "github.com/avdkp/go-git/plumbing/format/config"
+	"github.com/avdkp/go-git/plumbing/format/packfile"
+	"github.com/avdkp/go-git/plumbing/hash"
+	"github.com/avdkp/go-git/plumbing/object"
+	"github.com/avdkp/go-git/plumbing/storer"
+	"github.com/avdkp/go-git/storage"
+	"github.com/avdkp/go-git/storage/filesystem"
+	"github.com/avdkp/go-git/storage/filesystem/dotgit"
+	"github.com/avdkp/go-git/utils/ioutil"
+	"github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-billy/v5/util"
+	"github.com/imdario/mergo"
 )
 
 // GitDirName this is a special folder where all the git stuff is.
@@ -46,6 +51,7 @@ var (
 
 	ErrInvalidReference          = errors.New("invalid reference, should be a tag or a branch")
 	ErrRepositoryNotExists       = errors.New("repository does not exist")
+	ErrRepositoryIncomplete      = errors.New("repository's commondir path does not exist")
 	ErrRepositoryAlreadyExists   = errors.New("repository already exists")
 	ErrRemoteNotFound            = errors.New("remote not found")
 	ErrRemoteExists              = errors.New("remote already exists")
@@ -53,7 +59,8 @@ var (
 	ErrWorktreeNotProvided       = errors.New("worktree should be provided")
 	ErrIsBareRepository          = errors.New("worktree not available in a bare repository")
 	ErrUnableToResolveCommit     = errors.New("unable to resolve commit")
-	ErrPackedObjectsNotSupported = errors.New("Packed objects not supported")
+	ErrPackedObjectsNotSupported = errors.New("packed objects not supported")
+	ErrSHA256NotSupported        = errors.New("go-git was not compiled with SHA256 support")
 )
 
 // Repository represents a git repository
@@ -64,12 +71,28 @@ type Repository struct {
 	wt billy.Filesystem
 }
 
+type InitOptions struct {
+	// The default branch (e.g. "refs/heads/master")
+	DefaultBranch plumbing.ReferenceName
+}
+
 // Init creates an empty git repository, based on the given Storer and worktree.
 // The worktree Filesystem is optional, if nil a bare repository is created. If
 // the given storer is not empty ErrRepositoryAlreadyExists is returned
 func Init(s storage.Storer, worktree billy.Filesystem) (*Repository, error) {
+	options := InitOptions{
+		DefaultBranch: plumbing.Master,
+	}
+	return InitWithOptions(s, worktree, options)
+}
+
+func InitWithOptions(s storage.Storer, worktree billy.Filesystem, options InitOptions) (*Repository, error) {
 	if err := initStorer(s); err != nil {
 		return nil, err
+	}
+
+	if options.DefaultBranch == "" {
+		options.DefaultBranch = plumbing.Master
 	}
 
 	r := newRepository(s, worktree)
@@ -82,13 +105,13 @@ func Init(s storage.Storer, worktree billy.Filesystem) (*Repository, error) {
 		return nil, err
 	}
 
-	h := plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.Master)
+	h := plumbing.NewSymbolicReference(plumbing.HEAD, options.DefaultBranch)
 	if err := s.SetReference(h); err != nil {
 		return nil, err
 	}
 
 	if worktree == nil {
-		r.setIsBare(true)
+		_ = r.setIsBare(true)
 		return r, nil
 	}
 
@@ -155,7 +178,7 @@ func setConfigWorktree(r *Repository, worktree, storage billy.Filesystem) error 
 		return nil
 	}
 
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -185,10 +208,6 @@ func Open(s storage.Storer, worktree billy.Filesystem) (*Repository, error) {
 // Clone a repository into the given Storer and worktree Filesystem with the
 // given options, if worktree is nil a bare repository is created. If the given
 // storer is not empty ErrRepositoryAlreadyExists is returned.
-//
-// The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
-// transport operations.
 func Clone(s storage.Storer, worktree billy.Filesystem, o *CloneOptions) (*Repository, error) {
 	return CloneContext(context.Background(), s, worktree, o)
 }
@@ -198,7 +217,7 @@ func Clone(s storage.Storer, worktree billy.Filesystem, o *CloneOptions) (*Repos
 // given storer is not empty ErrRepositoryAlreadyExists is returned.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 func CloneContext(
 	ctx context.Context, s storage.Storer, worktree billy.Filesystem, o *CloneOptions,
@@ -229,6 +248,39 @@ func PlainInit(path string, isBare bool) (*Repository, error) {
 	return Init(s, wt)
 }
 
+func PlainInitWithOptions(path string, opts *PlainInitOptions) (*Repository, error) {
+	wt := osfs.New(path)
+	dot, _ := wt.Chroot(GitDirName)
+
+	s := filesystem.NewStorage(dot, cache.NewObjectLRUDefault())
+
+	r, err := Init(s, wt)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := r.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	if opts != nil {
+		if opts.ObjectFormat == formatcfg.SHA256 && hash.CryptoType != crypto.SHA256 {
+			return nil, ErrSHA256NotSupported
+		}
+
+		cfg.Core.RepositoryFormatVersion = formatcfg.Version_1
+		cfg.Extensions.ObjectFormat = opts.ObjectFormat
+	}
+
+	err = r.Storer.SetConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return r, err
+}
+
 // PlainOpen opens a git repository from the given path. It detects if the
 // repository is bare or a normal one. If the path doesn't contain a valid
 // repository ErrRepositoryNotExists is returned
@@ -252,7 +304,19 @@ func PlainOpenWithOptions(path string, o *PlainOpenOptions) (*Repository, error)
 		return nil, err
 	}
 
-	s := filesystem.NewStorage(dot, cache.NewObjectLRUDefault())
+	var repositoryFs billy.Filesystem
+
+	if o.EnableDotGitCommonDir {
+		dotGitCommon, err := dotGitCommonDirectory(dot)
+		if err != nil {
+			return nil, err
+		}
+		repositoryFs = dotgit.NewRepositoryFilesystem(dot, dotGitCommon)
+	} else {
+		repositoryFs = dot
+	}
+
+	s := filesystem.NewStorage(repositoryFs, cache.NewObjectLRUDefault())
 
 	return Open(s, wt)
 }
@@ -261,10 +325,22 @@ func dotGitToOSFilesystems(path string, detect bool) (dot, wt billy.Filesystem, 
 	if path, err = filepath.Abs(path); err != nil {
 		return nil, nil, err
 	}
+
 	var fs billy.Filesystem
 	var fi os.FileInfo
 	for {
 		fs = osfs.New(path)
+
+		pathinfo, err := fs.Stat("/")
+		if !os.IsNotExist(err) {
+			if pathinfo == nil {
+				return nil, nil, err
+			}
+			if !pathinfo.IsDir() && detect {
+				fs = osfs.New(filepath.Dir(path))
+			}
+		}
+
 		fi, err = fs.Stat(GitDirName)
 		if err == nil {
 			// no error; stop
@@ -307,7 +383,7 @@ func dotGitFileToOSFilesystem(path string, fs billy.Filesystem) (bfs billy.Files
 	}
 	defer ioutil.CheckClose(f, &err)
 
-	b, err := stdioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +403,38 @@ func dotGitFileToOSFilesystem(path string, fs billy.Filesystem) (bfs billy.Files
 	return osfs.New(fs.Join(path, gitdir)), nil
 }
 
+func dotGitCommonDirectory(fs billy.Filesystem) (commonDir billy.Filesystem, err error) {
+	f, err := fs.Open("commondir")
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > 0 {
+		path := strings.TrimSpace(string(b))
+		if filepath.IsAbs(path) {
+			commonDir = osfs.New(path)
+		} else {
+			commonDir = osfs.New(filepath.Join(fs.Root(), path))
+		}
+		if _, err := commonDir.Stat(""); err != nil {
+			if os.IsNotExist(err) {
+				return nil, ErrRepositoryIncomplete
+			}
+
+			return nil, err
+		}
+	}
+
+	return commonDir, nil
+}
+
 // PlainClone a repository into the path with the given options, isBare defines
 // if the new repository will be bare or normal. If the path is not empty
 // ErrRepositoryAlreadyExists is returned.
@@ -341,7 +449,7 @@ func PlainClone(path string, isBare bool, o *CloneOptions) (*Repository, error) 
 // ErrRepositoryAlreadyExists is returned.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 //
 // TODO(mcuadros): move isBare to CloneOptions in v5
@@ -352,6 +460,9 @@ func PlainCloneContext(ctx context.Context, path string, isBare bool, o *CloneOp
 		return nil, err
 	}
 
+	if o.Mirror {
+		isBare = true
+	}
 	r, err := PlainInit(path, isBare)
 	if err != nil {
 		return nil, err
@@ -360,7 +471,7 @@ func PlainCloneContext(ctx context.Context, path string, isBare bool, o *CloneOp
 	err = r.clone(ctx, o)
 	if err != nil && err != ErrRepositoryAlreadyExists {
 		if cleanup {
-			cleanUpDir(path, cleanupParent)
+			_ = cleanUpDir(path, cleanupParent)
 		}
 	}
 
@@ -376,7 +487,7 @@ func newRepository(s storage.Storer, worktree billy.Filesystem) *Repository {
 }
 
 func checkIfCleanupIsNeeded(path string) (cleanup bool, cleanParent bool, err error) {
-	fi, err := os.Stat(path)
+	fi, err := osfs.Default.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return true, true, nil
@@ -389,20 +500,13 @@ func checkIfCleanupIsNeeded(path string) (cleanup bool, cleanParent bool, err er
 		return false, false, fmt.Errorf("path is not a directory: %s", path)
 	}
 
-	f, err := os.Open(path)
+	files, err := osfs.Default.ReadDir(path)
 	if err != nil {
 		return false, false, err
 	}
 
-	defer ioutil.CheckClose(f, &err)
-
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
+	if len(files) == 0 {
 		return true, false, nil
-	}
-
-	if err != nil {
-		return false, false, err
 	}
 
 	return false, false, nil
@@ -410,23 +514,16 @@ func checkIfCleanupIsNeeded(path string) (cleanup bool, cleanParent bool, err er
 
 func cleanUpDir(path string, all bool) error {
 	if all {
-		return os.RemoveAll(path)
+		return util.RemoveAll(osfs.Default, path)
 	}
 
-	f, err := os.Open(path)
+	files, err := osfs.Default.ReadDir(path)
 	if err != nil {
 		return err
 	}
 
-	defer ioutil.CheckClose(f, &err)
-
-	names, err := f.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-
-	for _, name := range names {
-		if err := os.RemoveAll(filepath.Join(path, name)); err != nil {
+	for _, fi := range files {
+		if err := util.RemoveAll(osfs.Default, osfs.Default.Join(path, fi.Name())); err != nil {
 			return err
 		}
 	}
@@ -434,14 +531,56 @@ func cleanUpDir(path string, all bool) error {
 	return err
 }
 
-// Config return the repository config
+// Config return the repository config. In a filesystem backed repository this
+// means read the `.git/config`.
 func (r *Repository) Config() (*config.Config, error) {
 	return r.Storer.Config()
 }
 
+// SetConfig marshall and writes the repository config. In a filesystem backed
+// repository this means write the `.git/config`. This function should be called
+// with the result of `Repository.Config` and never with the output of
+// `Repository.ConfigScoped`.
+func (r *Repository) SetConfig(cfg *config.Config) error {
+	return r.Storer.SetConfig(cfg)
+}
+
+// ConfigScoped returns the repository config, merged with requested scope and
+// lower. For example if, config.GlobalScope is given the local and global config
+// are returned merged in one config value.
+func (r *Repository) ConfigScoped(scope config.Scope) (*config.Config, error) {
+	// TODO(mcuadros): v6, add this as ConfigOptions.Scoped
+
+	var err error
+	system := config.NewConfig()
+	if scope >= config.SystemScope {
+		system, err = config.LoadConfig(config.SystemScope)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	global := config.NewConfig()
+	if scope >= config.GlobalScope {
+		global, err = config.LoadConfig(config.GlobalScope)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	local, err := r.Storer.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	_ = mergo.Merge(global, system)
+	_ = mergo.Merge(local, global)
+	return local, nil
+}
+
 // Remote return a remote if exists
 func (r *Repository) Remote(name string) (*Remote, error) {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +595,7 @@ func (r *Repository) Remote(name string) (*Remote, error) {
 
 // Remotes returns a list with all the remotes
 func (r *Repository) Remotes() ([]*Remote, error) {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +619,7 @@ func (r *Repository) CreateRemote(c *config.RemoteConfig) (*Remote, error) {
 
 	remote := NewRemote(r.Storer, c)
 
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +650,7 @@ func (r *Repository) CreateRemoteAnonymous(c *config.RemoteConfig) (*Remote, err
 
 // DeleteRemote delete a remote from the repository and delete the config
 func (r *Repository) DeleteRemote(name string) error {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -526,7 +665,7 @@ func (r *Repository) DeleteRemote(name string) error {
 
 // Branch return a Branch if exists
 func (r *Repository) Branch(name string) (*config.Branch, error) {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +684,7 @@ func (r *Repository) CreateBranch(c *config.Branch) error {
 		return err
 	}
 
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -560,7 +699,7 @@ func (r *Repository) CreateBranch(c *config.Branch) error {
 
 // DeleteBranch delete a Branch from the repository and delete the config
 func (r *Repository) DeleteBranch(name string) error {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -667,21 +806,20 @@ func (r *Repository) buildTagSignature(tag *object.Tag, signKey *openpgp.Entity)
 // If you want to check to see if the tag is an annotated tag, you can call
 // TagObject on the hash of the reference in ForEach:
 //
-//   ref, err := r.Tag("v0.1.0")
-//   if err != nil {
-//     // Handle error
-//   }
+//	ref, err := r.Tag("v0.1.0")
+//	if err != nil {
+//	  // Handle error
+//	}
 //
-//   obj, err := r.TagObject(ref.Hash())
-//   switch err {
-//   case nil:
-//     // Tag object present
-//   case plumbing.ErrObjectNotFound:
-//     // Not a tag object
-//   default:
-//     // Some other error
-//   }
-//
+//	obj, err := r.TagObject(ref.Hash())
+//	switch err {
+//	case nil:
+//	  // Tag object present
+//	case plumbing.ErrObjectNotFound:
+//	  // Not a tag object
+//	default:
+//	  // Some other error
+//	}
 func (r *Repository) Tag(name string) (*plumbing.Reference, error) {
 	ref, err := r.Reference(plumbing.ReferenceName(path.Join("refs", "tags", name)), false)
 	if err != nil {
@@ -732,9 +870,10 @@ func (r *Repository) clone(ctx context.Context, o *CloneOptions) error {
 	}
 
 	c := &config.RemoteConfig{
-		Name:  o.RemoteName,
-		URLs:  []string{o.URL},
-		Fetch: r.cloneRefSpec(o),
+		Name:   o.RemoteName,
+		URLs:   []string{o.URL},
+		Fetch:  r.cloneRefSpec(o),
+		Mirror: o.Mirror,
 	}
 
 	if _, err := r.CreateRemote(c); err != nil {
@@ -742,12 +881,15 @@ func (r *Repository) clone(ctx context.Context, o *CloneOptions) error {
 	}
 
 	ref, err := r.fetchAndUpdateReferences(ctx, &FetchOptions{
-		RefSpecs:   c.Fetch,
-		Depth:      o.Depth,
-		Auth:       o.Auth,
-		Progress:   o.Progress,
-		Tags:       o.Tags,
-		RemoteName: o.RemoteName,
+		RefSpecs:        c.Fetch,
+		Depth:           o.Depth,
+		Auth:            o.Auth,
+		Progress:        o.Progress,
+		Tags:            o.Tags,
+		RemoteName:      o.RemoteName,
+		InsecureSkipTLS: o.InsecureSkipTLS,
+		CABundle:        o.CABundle,
+		ProxyOptions:    o.ProxyOptions,
 	}, o.ReferenceName)
 	if err != nil {
 		return err
@@ -774,7 +916,13 @@ func (r *Repository) clone(ctx context.Context, o *CloneOptions) error {
 		if o.RecurseSubmodules != NoRecurseSubmodules {
 			if err := w.updateSubmodules(&SubmoduleUpdateOptions{
 				RecurseSubmodules: o.RecurseSubmodules,
-				Auth:              o.Auth,
+				Depth: func() int {
+					if o.ShallowSubmodules {
+						return 1
+					}
+					return 0
+				}(),
+				Auth: o.Auth,
 			}); err != nil {
 				return err
 			}
@@ -785,7 +933,7 @@ func (r *Repository) clone(ctx context.Context, o *CloneOptions) error {
 		return err
 	}
 
-	if ref.Name().IsBranch() {
+	if !o.Mirror && ref.Name().IsBranch() {
 		branchRef := ref.Name()
 		branchName := strings.Split(string(branchRef), "refs/heads/")[1]
 
@@ -793,11 +941,13 @@ func (r *Repository) clone(ctx context.Context, o *CloneOptions) error {
 			Name:  branchName,
 			Merge: branchRef,
 		}
+
 		if o.RemoteName == "" {
 			b.Remote = "origin"
 		} else {
 			b.Remote = o.RemoteName
 		}
+
 		if err := r.CreateBranch(b); err != nil {
 			return err
 		}
@@ -814,6 +964,8 @@ const (
 
 func (r *Repository) cloneRefSpec(o *CloneOptions) []config.RefSpec {
 	switch {
+	case o.Mirror:
+		return []config.RefSpec{"+refs/*:refs/*"}
 	case o.ReferenceName.IsTag():
 		return []config.RefSpec{
 			config.RefSpec(fmt.Sprintf(refspecTag, o.ReferenceName.Short())),
@@ -821,7 +973,6 @@ func (r *Repository) cloneRefSpec(o *CloneOptions) []config.RefSpec {
 	case o.SingleBranch && o.ReferenceName == plumbing.HEAD:
 		return []config.RefSpec{
 			config.RefSpec(fmt.Sprintf(refspecSingleBranchHEAD, o.RemoteName)),
-			config.RefSpec(fmt.Sprintf(refspecSingleBranch, plumbing.Master.Short(), o.RemoteName)),
 		}
 	case o.SingleBranch:
 		return []config.RefSpec{
@@ -835,7 +986,7 @@ func (r *Repository) cloneRefSpec(o *CloneOptions) []config.RefSpec {
 }
 
 func (r *Repository) setIsBare(isBare bool) error {
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -851,7 +1002,7 @@ func (r *Repository) updateRemoteConfigIfNeeded(o *CloneOptions, c *config.Remot
 
 	c.Fetch = r.cloneRefSpec(o)
 
-	cfg, err := r.Storer.Config()
+	cfg, err := r.Config()
 	if err != nil {
 		return err
 	}
@@ -883,7 +1034,7 @@ func (r *Repository) fetchAndUpdateReferences(
 		return nil, err
 	}
 
-	resolvedRef, err := storer.ResolveReference(remoteRefs, ref)
+	resolvedRef, err := expand_ref(remoteRefs, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -1000,7 +1151,7 @@ func (r *Repository) Fetch(o *FetchOptions) error {
 // no changes to be fetched, or an error.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 func (r *Repository) FetchContext(ctx context.Context, o *FetchOptions) error {
 	if err := o.Validate(); err != nil {
@@ -1027,7 +1178,7 @@ func (r *Repository) Push(o *PushOptions) error {
 // FetchOptions.RemoteName.
 //
 // The provided Context must be non-nil. If the context expires before the
-// operation is complete, an error is returned. The context only affects to the
+// operation is complete, an error is returned. The context only affects the
 // transport operations.
 func (r *Repository) PushContext(ctx context.Context, o *PushOptions) error {
 	if err := o.Validate(); err != nil {
@@ -1067,6 +1218,14 @@ func (r *Repository) Log(o *LogOptions) (object.CommitIter, error) {
 		// for `git log --all` also check parent (if the next commit comes from the real parent)
 		it = r.logWithFile(*o.FileName, it, o.All)
 	}
+	if o.PathFilter != nil {
+		it = r.logWithPathFilter(o.PathFilter, it, o.All)
+	}
+
+	if o.Since != nil || o.Until != nil {
+		limitOptions := object.LogLimitOptions{Since: o.Since, Until: o.Until}
+		it = r.logWithLimit(it, limitOptions)
+	}
 
 	return it, nil
 }
@@ -1094,7 +1253,25 @@ func (r *Repository) logAll(commitIterFunc func(*object.Commit) object.CommitIte
 }
 
 func (*Repository) logWithFile(fileName string, commitIter object.CommitIter, checkParent bool) object.CommitIter {
-	return object.NewCommitFileIterFromIter(fileName, commitIter, checkParent)
+	return object.NewCommitPathIterFromIter(
+		func(path string) bool {
+			return path == fileName
+		},
+		commitIter,
+		checkParent,
+	)
+}
+
+func (*Repository) logWithPathFilter(pathFilter func(string) bool, commitIter object.CommitIter, checkParent bool) object.CommitIter {
+	return object.NewCommitPathIterFromIter(
+		pathFilter,
+		commitIter,
+		checkParent,
+	)
+}
+
+func (*Repository) logWithLimit(commitIter object.CommitIter, limitOptions object.LogLimitOptions) object.CommitIter {
+	return object.NewCommitLimitIterFromIter(commitIter, limitOptions)
 }
 
 func commitIterFunc(order LogOrder) func(c *object.Commit) object.CommitIter {
@@ -1128,26 +1305,25 @@ func commitIterFunc(order LogOrder) func(c *object.Commit) object.CommitIter {
 // If you want to check to see if the tag is an annotated tag, you can call
 // TagObject on the hash Reference passed in through ForEach:
 //
-//   iter, err := r.Tags()
-//   if err != nil {
-//     // Handle error
-//   }
+//	iter, err := r.Tags()
+//	if err != nil {
+//	  // Handle error
+//	}
 //
-//   if err := iter.ForEach(func (ref *plumbing.Reference) error {
-//     obj, err := r.TagObject(ref.Hash())
-//     switch err {
-//     case nil:
-//       // Tag object present
-//     case plumbing.ErrObjectNotFound:
-//       // Not a tag object
-//     default:
-//       // Some other error
-//       return err
-//     }
-//   }); err != nil {
-//     // Handle outer iterator error
-//   }
-//
+//	if err := iter.ForEach(func (ref *plumbing.Reference) error {
+//	  obj, err := r.TagObject(ref.Hash())
+//	  switch err {
+//	  case nil:
+//	    // Tag object present
+//	  case plumbing.ErrObjectNotFound:
+//	    // Not a tag object
+//	  default:
+//	    // Some other error
+//	    return err
+//	  }
+//	}); err != nil {
+//	  // Handle outer iterator error
+//	}
 func (r *Repository) Tags() (storer.ReferenceIter, error) {
 	refIter, err := r.Storer.IterReferences()
 	if err != nil {
@@ -1306,14 +1482,35 @@ func (r *Repository) Worktree() (*Worktree, error) {
 	return &Worktree{r: r, Filesystem: r.wt}, nil
 }
 
+func expand_ref(s storer.ReferenceStorer, ref plumbing.ReferenceName) (*plumbing.Reference, error) {
+	// For improving troubleshooting, this preserves the error for the provided `ref`,
+	// and returns the error for that specific ref in case all parse rules fails.
+	var ret error
+	for _, rule := range plumbing.RefRevParseRules {
+		resolvedRef, err := storer.ResolveReference(s, plumbing.ReferenceName(fmt.Sprintf(rule, ref)))
+
+		if err == nil {
+			return resolvedRef, nil
+		} else if ret == nil {
+			ret = err
+		}
+	}
+
+	return nil, ret
+}
+
 // ResolveRevision resolves revision to corresponding hash. It will always
 // resolve to a commit hash, not a tree or annotated tag.
 //
 // Implemented resolvers : HEAD, branch, tag, heads/branch, refs/heads/branch,
-// refs/tags/tag, refs/remotes/origin/branch, refs/remotes/origin/HEAD, tilde and caret (HEAD~1, master~^, tag~2, ref/heads/master~1, ...), selection by text (HEAD^{/fix nasty bug})
-func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, error) {
-	p := revision.NewParserFromString(string(rev))
+// refs/tags/tag, refs/remotes/origin/branch, refs/remotes/origin/HEAD, tilde and caret (HEAD~1, master~^, tag~2, ref/heads/master~1, ...), selection by text (HEAD^{/fix nasty bug}), hash (prefix and full)
+func (r *Repository) ResolveRevision(in plumbing.Revision) (*plumbing.Hash, error) {
+	rev := in.String()
+	if rev == "" {
+		return &plumbing.ZeroHash, plumbing.ErrReferenceNotFound
+	}
 
+	p := revision.NewParserFromString(rev)
 	items, err := p.Parse()
 
 	if err != nil {
@@ -1323,25 +1520,17 @@ func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, err
 	var commit *object.Commit
 
 	for _, item := range items {
-		switch item.(type) {
+		switch item := item.(type) {
 		case revision.Ref:
-			revisionRef := item.(revision.Ref)
+			revisionRef := item
 
 			var tryHashes []plumbing.Hash
 
-			maybeHash := plumbing.NewHash(string(revisionRef))
+			tryHashes = append(tryHashes, r.resolveHashPrefix(string(revisionRef))...)
 
-			if !maybeHash.IsZero() {
-				tryHashes = append(tryHashes, maybeHash)
-			}
-
-			for _, rule := range append([]string{"%s"}, plumbing.RefRevParseRules...) {
-				ref, err := storer.ResolveReference(r.Storer, plumbing.ReferenceName(fmt.Sprintf(rule, revisionRef)))
-
-				if err == nil {
-					tryHashes = append(tryHashes, ref.Hash())
-					break
-				}
+			ref, err := expand_ref(r.Storer, plumbing.ReferenceName(revisionRef))
+			if err == nil {
+				tryHashes = append(tryHashes, ref.Hash())
 			}
 
 			// in ambiguous cases, `git rev-parse` will emit a warning, but
@@ -1378,7 +1567,7 @@ func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, err
 			}
 
 		case revision.CaretPath:
-			depth := item.(revision.CaretPath).Depth
+			depth := item.Depth
 
 			if depth == 0 {
 				break
@@ -1406,7 +1595,7 @@ func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, err
 
 			commit = c
 		case revision.TildePath:
-			for i := 0; i < item.(revision.TildePath).Depth; i++ {
+			for i := 0; i < item.Depth; i++ {
 				c, err := commit.Parents().Next()
 
 				if err != nil {
@@ -1418,8 +1607,8 @@ func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, err
 		case revision.CaretReg:
 			history := object.NewCommitPreorderIter(commit, nil, nil)
 
-			re := item.(revision.CaretReg).Regexp
-			negate := item.(revision.CaretReg).Negate
+			re := item.Regexp
+			negate := item.Negate
 
 			var c *object.Commit
 
@@ -1441,14 +1630,61 @@ func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, err
 			}
 
 			if c == nil {
-				return &plumbing.ZeroHash, fmt.Errorf(`No commit message match regexp : "%s"`, re.String())
+				return &plumbing.ZeroHash, fmt.Errorf("no commit message match regexp: %q", re.String())
 			}
 
 			commit = c
 		}
 	}
 
+	if commit == nil {
+		return &plumbing.ZeroHash, plumbing.ErrReferenceNotFound
+	}
+
 	return &commit.Hash, nil
+}
+
+// resolveHashPrefix returns a list of potential hashes that the given string
+// is a prefix of. It quietly swallows errors, returning nil.
+func (r *Repository) resolveHashPrefix(hashStr string) []plumbing.Hash {
+	// Handle complete and partial hashes.
+	// plumbing.NewHash forces args into a full 20 byte hash, which isn't suitable
+	// for partial hashes since they will become zero-filled.
+
+	if hashStr == "" {
+		return nil
+	}
+	if len(hashStr) == len(plumbing.ZeroHash)*2 {
+		// Only a full hash is possible.
+		hexb, err := hex.DecodeString(hashStr)
+		if err != nil {
+			return nil
+		}
+		var h plumbing.Hash
+		copy(h[:], hexb)
+		return []plumbing.Hash{h}
+	}
+
+	// Partial hash.
+	// hex.DecodeString only decodes to complete bytes, so only works with pairs of hex digits.
+	evenHex := hashStr[:len(hashStr)&^1]
+	hexb, err := hex.DecodeString(evenHex)
+	if err != nil {
+		return nil
+	}
+	candidates := expandPartialHash(r.Storer, hexb)
+	if len(evenHex) == len(hashStr) {
+		// The prefix was an exact number of bytes.
+		return candidates
+	}
+	// Do another prefix check to ensure the dangling nybble is correct.
+	var hashes []plumbing.Hash
+	for _, h := range candidates {
+		if strings.HasPrefix(h.String(), hashStr) {
+			hashes = append(hashes, h)
+		}
+	}
+	return hashes
 }
 
 type RepackConfig struct {
@@ -1515,7 +1751,7 @@ func (r *Repository) createNewObjectPack(cfg *RepackConfig) (h plumbing.Hash, er
 		return h, err
 	}
 	defer ioutil.CheckClose(wc, &err)
-	scfg, err := r.Storer.Config()
+	scfg, err := r.Config()
 	if err != nil {
 		return h, err
 	}
@@ -1542,4 +1778,32 @@ func (r *Repository) createNewObjectPack(cfg *RepackConfig) (h plumbing.Hash, er
 	}
 
 	return h, err
+}
+
+func expandPartialHash(st storer.EncodedObjectStorer, prefix []byte) (hashes []plumbing.Hash) {
+	// The fast version is implemented by storage/filesystem.ObjectStorage.
+	type fastIter interface {
+		HashesWithPrefix(prefix []byte) ([]plumbing.Hash, error)
+	}
+	if fi, ok := st.(fastIter); ok {
+		h, err := fi.HashesWithPrefix(prefix)
+		if err != nil {
+			return nil
+		}
+		return h
+	}
+
+	// Slow path.
+	iter, err := st.IterEncodedObjects(plumbing.AnyObject)
+	if err != nil {
+		return nil
+	}
+	iter.ForEach(func(obj plumbing.EncodedObject) error {
+		h := obj.Hash()
+		if bytes.HasPrefix(h[:], prefix) {
+			hashes = append(hashes, h)
+		}
+		return nil
+	})
+	return
 }

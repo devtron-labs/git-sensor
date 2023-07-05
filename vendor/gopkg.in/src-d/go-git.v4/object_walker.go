@@ -3,10 +3,10 @@ package git
 import (
 	"fmt"
 
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/filemode"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/storage"
+	"github.com/avdkp/go-git/plumbing"
+	"github.com/avdkp/go-git/plumbing/filemode"
+	"github.com/avdkp/go-git/plumbing/object"
+	"github.com/avdkp/go-git/storage"
 )
 
 type objectWalker struct {
@@ -21,7 +21,7 @@ func newObjectWalker(s storage.Storer) *objectWalker {
 	return &objectWalker{s, map[plumbing.Hash]struct{}{}}
 }
 
-// walkAllRefs walks all (hash) refererences from the repo.
+// walkAllRefs walks all (hash) references from the repo.
 func (p *objectWalker) walkAllRefs() error {
 	// Walk over all the references in the repo.
 	it, err := p.Storer.IterReferences()
@@ -60,7 +60,7 @@ func (p *objectWalker) walkObjectTree(hash plumbing.Hash) error {
 	// Fetch the object.
 	obj, err := object.GetObject(p.Storer, hash)
 	if err != nil {
-		return fmt.Errorf("Getting object %s failed: %v", hash, err)
+		return fmt.Errorf("getting object %s failed: %v", hash, err)
 	}
 	// Walk all children depending on object type.
 	switch obj := obj.(type) {
@@ -98,7 +98,7 @@ func (p *objectWalker) walkObjectTree(hash plumbing.Hash) error {
 		return p.walkObjectTree(obj.Target)
 	default:
 		// Error out on unhandled object types.
-		return fmt.Errorf("Unknown object %X %s %T\n", obj.ID(), obj.Type(), obj)
+		return fmt.Errorf("unknown object %X %s %T", obj.ID(), obj.Type(), obj)
 	}
 	return nil
 }

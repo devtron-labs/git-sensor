@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package git
@@ -7,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/src-d/go-git.v4/plumbing/format/index"
+	"github.com/avdkp/go-git/plumbing/format/index"
 )
 
 func init() {

@@ -1,11 +1,19 @@
 ![go-git logo](https://cdn.rawgit.com/src-d/artwork/02036484/go-git/files/go-git-github-readme-header.png)
-[![GoDoc](https://godoc.org/gopkg.in/src-d/go-git.v4?status.svg)](https://godoc.org/github.com/src-d/go-git) [![Build Status](https://travis-ci.org/src-d/go-git.svg)](https://travis-ci.org/src-d/go-git) [![Build status](https://ci.appveyor.com/api/projects/status/nyidskwifo4py6ub?svg=true)](https://ci.appveyor.com/project/mcuadros/go-git) [![codecov.io](https://codecov.io/github/src-d/go-git/coverage.svg)](https://codecov.io/github/src-d/go-git) [![Go Report Card](https://goreportcard.com/badge/github.com/src-d/go-git)](https://goreportcard.com/report/github.com/src-d/go-git)
+[![GoDoc](https://godoc.org/github.com/avdkp/go-git?status.svg)](https://pkg.go.dev/github.com/avdkp/go-git) [![Build Status](https://github.com/go-git/go-git/workflows/Test/badge.svg)](https://github.com/go-git/go-git/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/go-git/go-git)](https://goreportcard.com/report/github.com/go-git/go-git)
 
 *go-git* is a highly extensible git implementation library written in **pure Go**.
 
-It can be used to manipulate git repositories at low level *(plumbing)* or high level *(porcelain)*, through an idiomatic Go API. It also supports several types of storage, such as in-memory filesystems, or custom implementations thanks to the [`Storer`](https://godoc.org/gopkg.in/src-d/go-git.v4/plumbing/storer) interface.
+It can be used to manipulate git repositories at low level *(plumbing)* or high level *(porcelain)*, through an idiomatic Go API. It also supports several types of storage, such as in-memory filesystems, or custom implementations, thanks to the [`Storer`](https://pkg.go.dev/github.com/avdkp/go-git/plumbing/storer) interface.
 
-It's being actively developed since 2015 and is being used extensively by [source{d}](https://sourced.tech/) and [Keybase](https://keybase.io/blog/encrypted-git-for-everyone), and by many other libraries and tools.
+It's being actively developed since 2015 and is being used extensively by [Keybase](https://keybase.io/blog/encrypted-git-for-everyone), [Gitea](https://gitea.io/en-us/) or [Pulumi](https://github.com/search?q=org%3Apulumi+go-git&type=Code), and by many other libraries and tools.
+
+Project Status
+--------------
+
+After the legal issues with the [`src-d`](https://github.com/src-d) organization, the lack of update for four months and the requirement to make a hard fork, the project is **now back to normality**.
+
+The project is currently actively maintained by individual contributors, including several of the original authors, but also backed by a new company, [gitsight](https://github.com/gitsight), where `go-git` is a critical component used at scale.
+
 
 Comparison with git
 -------------------
@@ -20,16 +28,16 @@ Installation
 
 The recommended way to install *go-git* is:
 
-```
-go get -u gopkg.in/src-d/go-git.v4/...
+```go
+import "github.com/avdkp/go-git" // with go modules enabled (GO111MODULE=on or outside GOPATH)
+import "github.com/go-git/go-git" // with go modules disabled
 ```
 
-> We use [gopkg.in](http://labix.org/gopkg.in) to version the API, this means that when `go get` clones the package, it's the latest tag matching `v4.*` that is cloned and not the master branch.
 
 Examples
 --------
 
-> Please note that the `CheckIfError` and `Info` functions  used in the examples are from the [examples package](https://github.com/src-d/go-git/blob/master/_examples/common.go#L17) just to be used in the examples.
+> Please note that the `CheckIfError` and `Info` functions  used in the examples are from the [examples package](https://github.com/go-git/go-git/blob/master/_examples/common.go#L19) just to be used in the examples.
 
 
 ### Basic example
@@ -38,10 +46,10 @@ A basic example that mimics the standard `git clone` command
 
 ```go
 // Clone the given repository to the given directory
-Info("git clone https://github.com/src-d/go-git")
+Info("git clone https://github.com/go-git/go-git")
 
 _, err := git.PlainClone("/tmp/foo", false, &git.CloneOptions{
-    URL:      "https://github.com/src-d/go-git",
+    URL:      "https://github.com/go-git/go-git",
     Progress: os.Stdout,
 })
 
@@ -63,10 +71,10 @@ Cloning a repository into memory and printing the history of HEAD, just like `gi
 ```go
 // Clones the given repository in memory, creating the remote, the local
 // branches and fetching the objects, exactly as:
-Info("git clone https://github.com/src-d/go-siva")
+Info("git clone https://github.com/go-git/go-billy")
 
 r, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
-    URL: "https://github.com/src-d/go-siva",
+    URL: "https://github.com/go-git/go-billy",
 })
 
 CheckIfError(err)
@@ -115,7 +123,7 @@ You can find this [example](_examples/log/main.go) and many others in the [examp
 Contribute
 ----------
 
-[Contributions](https://github.com/src-d/go-git/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) are more than welcome, if you are interested please take a look to
+[Contributions](https://github.com/go-git/go-git/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) are more than welcome, if you are interested please take a look to
 our [Contributing Guidelines](CONTRIBUTING.md).
 
 License

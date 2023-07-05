@@ -3,7 +3,7 @@ WORKDIR = $(PWD)
 
 # Go parameters
 GOCMD = go
-GOTEST = $(GOCMD) test -v
+GOTEST = $(GOCMD) test 
 
 # Git config
 GIT_VERSION ?=
@@ -11,13 +11,8 @@ GIT_DIST_PATH ?= $(PWD)/.git-dist
 GIT_REPOSITORY = http://github.com/git/git.git
 
 # Coverage
-COVERAGE_REPORT = coverage.txt
-COVERAGE_PROFILE = profile.out
-COVERAGE_MODE = atomic
-
-ifneq ($(origin CI), undefined)
-	WORKDIR := $(GOPATH)/src/gopkg.in/src-d/go-git.v4
-endif
+COVERAGE_REPORT = coverage.out
+COVERAGE_MODE = count
 
 build-git:
 	@if [ -f $(GIT_DIST_PATH)/git ]; then \
@@ -31,22 +26,19 @@ build-git:
 	fi
 
 test:
-	@cd $(WORKDIR); \
-	$(GOTEST) ./...
+	@echo "running against `git version`"; \
+	$(GOTEST) -race ./...
+
+TEMP_REPO := $(shell mktemp)
+test-sha256:
+	$(GOCMD) run -tags sha256 _examples/sha256/main.go $(TEMP_REPO)
+	cd $(TEMP_REPO) && git fsck
+	rm -rf $(TEMP_REPO)
 
 test-coverage:
-	@cd $(WORKDIR); \
+	@echo "running against `git version`"; \
 	echo "" > $(COVERAGE_REPORT); \
-	for dir in `find . -name "*.go" | grep -o '.*/' | sort | uniq`; do \
-		$(GOTEST) $$dir -coverprofile=$(COVERAGE_PROFILE) -covermode=$(COVERAGE_MODE); \
-		if [ $$? != 0 ]; then \
-			exit 2; \
-		fi; \
-		if [ -f $(COVERAGE_PROFILE) ]; then \
-			cat $(COVERAGE_PROFILE) >> $(COVERAGE_REPORT); \
-			rm $(COVERAGE_PROFILE); \
-		fi; \
-	done; \
+	$(GOTEST) -coverprofile=$(COVERAGE_REPORT) -coverpkg=./... -covermode=$(COVERAGE_MODE) ./...
 
 clean:
 	rm -rf $(GIT_DIST_PATH)
