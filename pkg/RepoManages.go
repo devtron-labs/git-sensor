@@ -95,6 +95,7 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
+		configuration:                                 configuration,
 	}
 }
 

@@ -85,6 +85,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
+		configuration:                configuration,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
