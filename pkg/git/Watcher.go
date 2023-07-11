@@ -44,13 +44,12 @@ type GitWatcherImpl struct {
 	locker                       *internal.RepositoryLocker
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
-	gitCommitConfig              *GitCommitConfig
+	configuration                *internal.Configuration
 }
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
 	PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
-	GetGitCommitConfig() *GitCommitConfig
 }
 
 type PollConfig struct {
@@ -58,25 +57,15 @@ type PollConfig struct {
 	PollWorker   int `env:"POLL_WORKER" envDefault:"5"`
 }
 
-type GitCommitConfig struct {
-	HistoryCount int `env:"GIT_HISTORY_COUNT" envDefault:"15"`
-}
-
 func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	materialRepo sql.MaterialRepository,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler) (*GitWatcherImpl, error) {
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	gitCommitConfigValue := &GitCommitConfig{}
-	err = env.Parse(gitCommitConfigValue)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +85,6 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pubSubClient:                 pubSubClient,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
-		gitCommitConfig:              gitCommitConfigValue,
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -108,10 +96,6 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	//err = watcher.SubscribePull()
 	watcher.SubscribeWebhookEvent()
 	return watcher, err
-}
-
-func (impl GitWatcherImpl) GetGitCommitConfig() *GitCommitConfig {
-	return impl.gitCommitConfig
 }
 func (impl GitWatcherImpl) StopCron() {
 	impl.cron.Stop()
@@ -229,7 +213,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		//parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.gitCommitConfig.HistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
