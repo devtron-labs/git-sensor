@@ -49,9 +49,10 @@ type RepositoryManager interface {
 }
 
 type RepositoryManagerImpl struct {
-	logger        *zap.SugaredLogger
-	gitUtil       *GitUtil
-	configuration *internal.Configuration
+	logger          *zap.SugaredLogger
+	gitUtil         *GitUtil
+	configuration   *internal.Configuration
+	gitCommitConfig *GitCommitConfig
 }
 
 func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, configuration *internal.Configuration) *RepositoryManagerImpl {
@@ -297,7 +298,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
-		count = 15
+		count = impl.gitCommitConfig.HistoryCount
 	}
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {

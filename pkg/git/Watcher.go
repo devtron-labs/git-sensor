@@ -55,11 +55,11 @@ type GitWatcher interface {
 
 type PollConfig struct {
 	PollDuration int `env:"POLL_DURATION" envDefault:"2"`
-	PollWorker   int `env:"POLL_WORKER" envDefault:"15"`
+	PollWorker   int `env:"POLL_WORKER" envDefault:"5"`
 }
 
 type GitCommitConfig struct {
-	HistoryCount int `env:"HISTORY_COUNT" envDefault:"5"`
+	HistoryCount int `env:"GIT_HISTORY_COUNT" envDefault:"15"`
 }
 
 func NewGitWatcherImpl(repositoryManager RepositoryManager,
