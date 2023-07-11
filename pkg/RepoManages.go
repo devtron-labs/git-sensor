@@ -65,6 +65,7 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
+	configuration                                 *internal.Configuration
 }
 
 func NewRepoManagerImpl(
@@ -79,6 +80,7 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository,
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
+	configuration *internal.Configuration,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                            logger,
@@ -93,6 +95,7 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingRepository: webhookEventDataMappingRepository,
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
+		configuration:                                 configuration,
 	}
 }
 
@@ -186,7 +189,8 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			impl.logger.Errorw("error in fetching material", "err", err)
 			continue
 		}
-		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", 0)
+
+		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", impl.configuration.GitHistoryCount)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)

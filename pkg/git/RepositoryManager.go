@@ -297,7 +297,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
-		count = 15
+		count = impl.configuration.GitHistoryCount
 	}
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
