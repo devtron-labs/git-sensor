@@ -24,6 +24,17 @@ var username = "prakash100198"
 var password = ""
 var sshPrivateKey = ``
 
+func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
+	logger, err := utils.NewSugardLogger()
+	assert.Nil(t, err)
+	gitCliImpl := NewGitUtil(logger)
+	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, &internal.Configuration{
+		CommitStatsTimeoutInSec: 0,
+		EnableFileStats:         false,
+		GitHistoryCount:         2,
+	})
+	return repositoryManagerImpl
+}
 func setupSuite(t *testing.T) func(t *testing.T) {
 	//Add(1, "/tmp/git-base/31/github.com/prakash100198/SampleGoLangProject.git", "https://github.com/prakash100198/SampleGoLangProject.git", "", "", "ANONYMOUS", "")
 	//Fetch("", "", "https://github.com/prakash100198/SampleGoLangProject.git", "/tmp/git-base/31/github.com/prakash100198/SampleGoLangProject.git")
@@ -98,10 +109,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 			}, wantErr: false,
 		},
 	}
-	logger, err := utils.NewSugardLogger()
-	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, nil)
+	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		if tt.payload.authMode == "SSH" {
 			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
@@ -163,10 +171,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			}, wantErr: true,
 		},
 	}
-	logger, err := utils.NewSugardLogger()
-	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, nil)
+	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, err := repositoryManagerImpl.Fetch(tt.payload.username, tt.payload.password, tt.payload.url, tt.payload.location)
@@ -220,10 +225,7 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 			}, wantErr: true,
 		},
 	}
-	logger, err := utils.NewSugardLogger()
-	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, nil)
+	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := repositoryManagerImpl.GetCommitMetadata(tt.payload.checkoutPath, tt.payload.commitHash)
@@ -340,14 +342,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	logger, err := utils.NewSugardLogger()
-	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, &internal.Configuration{
-		CommitStatsTimeoutInSec: 0,
-		EnableFileStats:         false,
-		GitHistoryCount:         2,
-	})
+	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := repositoryManagerImpl.ChangesSince(tt.payload.checkoutPath, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
@@ -413,10 +408,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 			}, wantErr: true,
 		},
 	}
-	logger, err := utils.NewSugardLogger()
-	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, nil)
+	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := repositoryManagerImpl.GetCommitForTag(tt.payload.checkoutPath, tt.payload.tag)
