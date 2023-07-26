@@ -197,7 +197,7 @@ func (impl *GrpcHandlerImpl) FetchChanges(ctx context.Context, req *pb.FetchScmC
 	if res.Commits != nil {
 		pbGitCommits = make([]*pb.GitCommit, 0, len(res.Commits))
 		for _, item := range res.Commits {
-
+			item.TruncateMessageIfExceedsMaxLength()
 			mappedCommit, err := impl.mapGitCommit(item)
 			if err != nil {
 				impl.logger.Debugw("failed to map git commit from bean to proto specified type",
