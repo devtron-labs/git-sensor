@@ -64,6 +64,13 @@ type GitCommit struct {
 	Excluded    bool              `json:",omitempty"`
 }
 
+func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
+	maxLength := 1024
+	if len(gitCommit.Message) > maxLength {
+		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
+	}
+}
+
 type WebhookAndCiData struct {
 	ExtraEnvironmentVariables map[string]string `json:"extraEnvironmentVariables"` // extra env variables which will be used for CI
 	WebhookData               *WebhookData      `json:"webhookData"`
