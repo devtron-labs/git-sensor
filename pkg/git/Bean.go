@@ -66,7 +66,6 @@ type GitCommit struct {
 }
 
 func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
-	log.Println("truncating git message called")
 	maxLength := 1024
 	if len(gitCommit.Message) > maxLength {
 		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
