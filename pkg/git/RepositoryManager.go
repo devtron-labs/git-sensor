@@ -300,6 +300,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				breakLoop = true
 				return
 			}
+
 			gitCommit := &GitCommit{
 				Author:  commit.Author.String(),
 				Commit:  commit.Hash.String(),
