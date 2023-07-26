@@ -271,6 +271,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				Message: commit.Message,
 			}
 			gitCommit.TruncateMessageIfExceedsMaxLength()
+			log.Println("after truncation", gitCommit.Message)
 			impl.logger.Debugw("commit dto for repo ", "repo", repository, commit)
 			gitCommits = append(gitCommits, gitCommit)
 			itrCounter = itrCounter + 1

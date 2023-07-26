@@ -19,6 +19,7 @@ package git
 import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/go-git/plumbing/object"
+	"log"
 	"time"
 )
 
@@ -65,10 +66,12 @@ type GitCommit struct {
 }
 
 func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
+	log.Println("truncating git message called")
 	maxLength := 1024
 	if len(gitCommit.Message) > maxLength {
 		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
 	}
+	log.Println(gitCommit.Message)
 }
 
 type WebhookAndCiData struct {
