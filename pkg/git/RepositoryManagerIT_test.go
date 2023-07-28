@@ -4,6 +4,8 @@ import (
 	"github.com/devtron-labs/common-lib/utils"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/go-git"
+	"github.com/devtron-labs/go-git/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
@@ -30,17 +32,13 @@ func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	gitCliImpl := NewGitUtil(logger)
 	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, &internal.Configuration{
 		CommitStatsTimeoutInSec: 0,
-		EnableFileStats:         false,
+		EnableFileStats:         true,
 		GitHistoryCount:         2,
 	})
 	return repositoryManagerImpl
 }
 func setupSuite(t *testing.T) func(t *testing.T) {
-	//Add(1, "/tmp/git-base/31/github.com/prakash100198/SampleGoLangProject.git", "https://github.com/prakash100198/SampleGoLangProject.git", "", "", "ANONYMOUS", "")
-	//Fetch("", "", "https://github.com/prakash100198/SampleGoLangProject.git", "/tmp/git-base/31/github.com/prakash100198/SampleGoLangProject.git")
 
-	//err := os.MkdirAll(location, 0700)
-	//assert.Nil(t, err)
 	err := os.MkdirAll(privateGitRepoLocation, 0700)
 	assert.Nil(t, err)
 	// Return a function to teardown the test
@@ -269,22 +267,30 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:      "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:      "nishant kumar <4nishantkumar@gmail.com>",
-					Message:     "Update README.md",
-					Date:        time.Time{},
-					Changes:     nil,
-					FileStats:   nil,
+					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 0,
+					}},
 					WebhookData: nil,
 					Excluded:    false,
 				},
 				{
-					Commit:      "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:      "nishant kumar <4nishantkumar@gmail.com>",
-					Message:     "Update README.md",
-					Date:        time.Time{},
-					Changes:     nil,
-					FileStats:   nil,
+					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 1,
+					}},
 					WebhookData: nil,
 					Excluded:    false,
 				},
@@ -319,22 +325,30 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:      "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:      "nishant kumar <4nishantkumar@gmail.com>",
-					Message:     "Update README.md",
-					Date:        time.Time{},
-					Changes:     nil,
-					FileStats:   nil,
+					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 0,
+					}},
 					WebhookData: nil,
 					Excluded:    false,
 				},
 				{
-					Commit:      "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:      "nishant kumar <4nishantkumar@gmail.com>",
-					Message:     "Update README.md",
-					Date:        time.Time{},
-					Changes:     nil,
-					FileStats:   nil,
+					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 1,
+					}},
 					WebhookData: nil,
 					Excluded:    false,
 				},
@@ -356,8 +370,96 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			for index, want := range tt.want {
 				if want != nil && got != nil {
 					got[index].Date = time.Time{}
+
+					if !reflect.DeepEqual(*got[index].FileStats, *want.FileStats) {
+						t.Errorf("ChangesSince() got = %v, want %v", got, tt.want)
+					}
+					got[index].FileStats = nil
+					want.FileStats = nil
 					if !reflect.DeepEqual(*got[index], *want) {
 						t.Errorf("ChangesSince() got = %v, want %v", got, tt.want)
+					}
+				}
+			}
+
+		})
+	}
+}
+
+func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
+
+	type args struct {
+		checkoutPath string
+		branch       string
+		from         string
+		to           string
+		count        int
+	}
+	tests := []struct {
+		name    string
+		payload args
+		want    []*GitCommit
+		wantErr bool
+	}{
+		{
+			name: "Test1_ChangesSinceByRepository_InvokingWithCorrectPayloadAndBranchPrefix", payload: args{
+				checkoutPath: location2,
+				branch:       "refs/heads/" + branchName,
+				from:         "",
+				to:           "",
+				count:        2,
+			},
+			want: []*GitCommit{
+				{
+					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 0,
+					}},
+					WebhookData: nil,
+					Excluded:    false,
+				},
+				{
+					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
+					Author:  "nishant kumar <4nishantkumar@gmail.com>",
+					Message: "Update README.md",
+					Date:    time.Time{},
+					Changes: nil,
+					FileStats: &object.FileStats{object.FileStat{
+						Name:     "README.md",
+						Addition: 1,
+						Deletion: 1,
+					}},
+					WebhookData: nil,
+					Excluded:    false,
+				},
+			},
+			wantErr: false,
+		},
+	}
+	repositoryManagerImpl := getRepoManagerImpl(t)
+	for _, tt := range tests {
+		r, err := git.PlainOpen(tt.payload.checkoutPath)
+		assert.Nil(t, err)
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
+				return
+			}
+			if len(tt.want) != len(got) {
+				t.Errorf("ChangesSinceByRepository() got = %v, want %v", got, tt.want)
+			}
+			for index, want := range tt.want {
+				if want != nil && got != nil {
+					got[index].Date = time.Time{}
+					if !reflect.DeepEqual(*got[index], *want) {
+						t.Errorf("ChangesSinceByRepository() got = %v, want %v", got, tt.want)
 					}
 				}
 			}
@@ -421,6 +523,208 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 				if !reflect.DeepEqual(*got, *tt.want) {
 					t.Errorf("GetCommitMetadata() got = %v, want %v", got, tt.want)
 				}
+			}
+
+		})
+	}
+}
+
+func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
+
+	type args struct {
+		checkoutPath string
+		oldHash      string
+		newHash      string
+	}
+	tests := []struct {
+		name    string
+		payload args
+		want    *GitChanges
+		wantErr bool
+	}{
+		{
+			name: "Test1_ChangesSinceByRepositoryForAnalytics_InvokingWithCorrectCheckoutPathAndCorrectOldAndNewHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+				newHash:      "4da167b5242b79c609e1e92e9e05f00ba325c284",
+			},
+			want: &GitChanges{
+				Commits: []*Commit{
+					{
+						Hash: &Hash{
+							Long:  "4da167b5242b79c609e1e92e9e05f00ba325c284",
+							Short: "4da167b5",
+						},
+						Tree: &Tree{
+							Long:  "691f8324102aa3c2d6ca20ec71e9cd1395b419cd",
+							Short: "691f8324",
+						},
+						Author: &Author{
+							Name:  "pawan-mehta-dt",
+							Email: "117346502+pawan-mehta-dt@users.noreply.github.com",
+							Date:  time.Time{},
+						},
+						Committer: &Committer{
+							Name:  "GitHub",
+							Email: "noreply@github.com",
+							Date:  time.Time{},
+						},
+						Tag:     nil,
+						Subject: "Updated dockerfile for multi-arch support",
+						Body:    "",
+					},
+					{
+						Hash: &Hash{
+							Long:  "17489a358dedf304c267b502be37c21f81cbe5d2",
+							Short: "17489a35",
+						},
+						Tree: &Tree{
+							Long:  "a87efbc3ee22e0eb3678401a3d3f6e95da05305a",
+							Short: "a87efbc3",
+						},
+						Author: &Author{
+							Name:  "Prashant Ghildiyal",
+							Email: "60953820+pghildiyal@users.noreply.github.com",
+							Date:  time.Time{},
+						},
+						Committer: &Committer{
+							Name:  "GitHub",
+							Email: "noreply@github.com",
+							Date:  time.Time{},
+						},
+						Tag:     nil,
+						Subject: "Update app.js",
+						Body:    "",
+					},
+				},
+				FileStats: object.FileStats{
+					object.FileStat{
+						Name:     "Dockerfile",
+						Addition: 1,
+						Deletion: 1,
+					},
+					object.FileStat{
+						Name:     "app.js",
+						Addition: 1,
+						Deletion: 3,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test2_ChangesSinceByRepositoryForAnalytics_InvokingWithCorrectCheckoutPathAndInCorrectOldAndNewHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "87234877rfvervrvve34hufda3ba3254712965b5944a6271e71f20",
+				newHash:      "4289u34r8924ufhiuwefnoweijfhwe9udwsvda167b5242b325c284",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Test3_ChangesSinceByRepositoryForAnalytics_InvokingWithIncorrectCheckoutPathAndCorrectOldAndNewHash", payload: args{
+				checkoutPath: location2 + "/dsjnvfuiv",
+				oldHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+				newHash:      "4da167b5242b79c609e1e92e9e05f00ba325c284",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Test4_ChangesSinceByRepositoryForAnalytics_InvokingWithIncorrectCheckoutPathAndIncorrectCorrectNewHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+				newHash:      "4289u34r8924ufhiuwefnoweijfhwe9udwsvda167b5242b325c284",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	repositoryManagerImpl := getRepoManagerImpl(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotGitChanges, err := repositoryManagerImpl.ChangesSinceByRepositoryForAnalytics(tt.payload.checkoutPath, "", tt.payload.oldHash, tt.payload.newHash)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ChangesSinceByRepositoryForAnalytics() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
+				return
+			}
+			if tt.want != nil && gotGitChanges != nil {
+
+				if len(tt.want.Commits) != len(gotGitChanges.Commits) {
+					t.Errorf("unequal length of commits got = %v, want %v", gotGitChanges.Commits, tt.want.Commits)
+				}
+				if !areEqualStruct(*tt.want, *gotGitChanges) {
+					t.Errorf("ChangesSinceByRepositoryForAnalytics() got = %v, want %v", gotGitChanges, tt.want)
+				}
+			}
+
+		})
+	}
+}
+
+func areEqualStruct(want GitChanges, gotGitChanges GitChanges) bool {
+	//comparing commits
+	for i, got := range gotGitChanges.Commits {
+		got.Author.Date = time.Time{}
+		got.Committer.Date = time.Time{}
+		if !reflect.DeepEqual(*got.Hash, *want.Commits[i].Hash) {
+			return false
+		}
+		if !reflect.DeepEqual(*got.Tree, *want.Commits[i].Tree) {
+			return false
+		}
+		if !reflect.DeepEqual(*got.Author, *want.Commits[i].Author) {
+			return false
+		}
+		if !reflect.DeepEqual(*got.Committer, *want.Commits[i].Committer) {
+			return false
+		}
+		if got.Subject != want.Commits[i].Subject || got.Tag != want.Commits[i].Tag || got.Body != want.Commits[i].Body {
+			return false
+		}
+	}
+	if !reflect.DeepEqual(gotGitChanges.FileStats, want.FileStats) {
+		return false
+	}
+
+	return true
+}
+
+func TestRepositoryManager_Clean(t *testing.T) {
+
+	type args struct {
+		dir string
+	}
+	tests := []struct {
+		name    string
+		payload args
+		wantErr bool
+	}{
+		{
+			name: "Test1_Clean_InvokingWithCorrectDir", payload: args{
+				dir: location2,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test2_Clean_InvokingWithInCorrectDir", payload: args{
+				dir: "/bh/ij/" + location2 + "/wei/uhfe",
+			},
+			wantErr: false,
+		},
+	}
+	repositoryManagerImpl := getRepoManagerImpl(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := repositoryManagerImpl.Clean(tt.payload.dir)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Clean() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
+				return
+			}
+			err = os.Chdir(tt.payload.dir)
+			if err == nil {
+				t.Errorf("error in Test1_Clean_InvokingWithCorrectDir")
+				return
 			}
 
 		})
