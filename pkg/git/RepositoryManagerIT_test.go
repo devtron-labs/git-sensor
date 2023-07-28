@@ -37,6 +37,7 @@ func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	})
 	return repositoryManagerImpl
 }
+
 func setupSuite(t *testing.T) func(t *testing.T) {
 
 	err := os.MkdirAll(privateGitRepoLocation, 0700)
@@ -173,6 +174,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, err := repositoryManagerImpl.Fetch(tt.payload.username, tt.payload.password, tt.payload.url, tt.payload.location)
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -227,10 +229,12 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := repositoryManagerImpl.GetCommitMetadata(tt.payload.checkoutPath, tt.payload.commitHash)
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCommitMetadata() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
 			}
+
 			if tt.want != nil && got != nil {
 				got.Date = time.Time{}
 				if !reflect.DeepEqual(*got, *tt.want) {
@@ -374,8 +378,10 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 					if !reflect.DeepEqual(*got[index].FileStats, *want.FileStats) {
 						t.Errorf("ChangesSince() got = %v, want %v", got, tt.want)
 					}
+
 					got[index].FileStats = nil
 					want.FileStats = nil
+
 					if !reflect.DeepEqual(*got[index], *want) {
 						t.Errorf("ChangesSince() got = %v, want %v", got, tt.want)
 					}
@@ -587,6 +593,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		r, err := git.PlainOpen(tt.payload.checkoutPath)
@@ -597,9 +604,11 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
 			}
+
 			if len(tt.want) != len(got) {
 				t.Errorf("ChangesSinceByRepository() got = %v, want %v", got, tt.want)
 			}
+
 			for index, want := range tt.want {
 				if want != nil && got != nil {
 					got[index].Date = time.Time{}
@@ -663,6 +672,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 				t.Errorf("GetCommitMetadata() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
 			}
+
 			if tt.want != nil && got != nil {
 				got.Date = time.Time{}
 				if !reflect.DeepEqual(*got, *tt.want) {
@@ -784,6 +794,107 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "Test5_ChangesSinceByRepositoryForAnalytics_InvokingWithSameOldAndNewHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+				newHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+			},
+			want: &GitChanges{
+				Commits: []*Commit{
+					{
+						Hash: &Hash{
+							Long:  "da3ba3254712965b5944a6271e71bff91fe51f20",
+							Short: "da3ba325",
+						},
+						Tree: &Tree{
+							Long:  "d367e0fe1b9f15ccdbf0bb10a53b1e2e554e4c00",
+							Short: "d367e0fe",
+						},
+						Author: &Author{
+							Name:  "Prakarsh",
+							Email: "71125043+prakarsh-dt@users.noreply.github.com",
+							Date:  time.Time{},
+						},
+						Committer: &Committer{
+							Name:  "GitHub",
+							Email: "noreply@github.com",
+							Date:  time.Time{},
+						},
+						Tag:     nil,
+						Subject: "Update README.md",
+						Body:    "",
+					},
+				},
+				FileStats: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test6_ChangesSinceByRepositoryForAnalytics_InvokingWithOldAndNewHashReversed", payload: args{
+				checkoutPath: location2,
+				oldHash:      "4da167b5242b79c609e1e92e9e05f00ba325c284",
+				newHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+			},
+			want: &GitChanges{
+				Commits: []*Commit{
+					{
+						Hash: &Hash{
+							Long:  "da3ba3254712965b5944a6271e71bff91fe51f20",
+							Short: "da3ba325",
+						},
+						Tree: &Tree{
+							Long:  "d367e0fe1b9f15ccdbf0bb10a53b1e2e554e4c00",
+							Short: "d367e0fe",
+						},
+						Author: &Author{
+							Name:  "Prakarsh",
+							Email: "71125043+prakarsh-dt@users.noreply.github.com",
+							Date:  time.Time{},
+						},
+						Committer: &Committer{
+							Name:  "GitHub",
+							Email: "noreply@github.com",
+							Date:  time.Time{},
+						},
+						Tag:     nil,
+						Subject: "Update README.md",
+						Body:    "",
+					},
+				},
+				FileStats: object.FileStats{
+					object.FileStat{
+						Name:     "Dockerfile",
+						Addition: 1,
+						Deletion: 1,
+					},
+					object.FileStat{
+						Name:     "app.js",
+						Addition: 2,
+						Deletion: 1,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test7_ChangesSinceByRepositoryForAnalytics_InvokingWithEmptyNewHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "da3ba3254712965b5944a6271e71bff91fe51f20",
+				newHash:      "",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Test8_ChangesSinceByRepositoryForAnalytics_InvokingWithEmptyOldHash", payload: args{
+				checkoutPath: location2,
+				oldHash:      "",
+				newHash:      "4da167b5242b79c609e1e92e9e05f00ba325c284",
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
@@ -812,6 +923,7 @@ func areEqualStruct(want GitChanges, gotGitChanges GitChanges) bool {
 	for i, got := range gotGitChanges.Commits {
 		got.Author.Date = time.Time{}
 		got.Committer.Date = time.Time{}
+
 		if !reflect.DeepEqual(*got.Hash, *want.Commits[i].Hash) {
 			return false
 		}
