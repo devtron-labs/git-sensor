@@ -1,11 +1,11 @@
 module github.com/devtron-labs/git-sensor
 
-go 1.17
+go 1.20
 
 require (
-	github.com/devtron-labs/go-git v1.2.0
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/devtron-labs/common-lib v0.0.0-20230109070754-ff4dca200a2c
+	github.com/devtron-labs/go-git v1.2.0
 	github.com/devtron-labs/protos v0.0.0-20230503113602-282404f70fd2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
