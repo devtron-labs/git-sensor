@@ -18,7 +18,7 @@ package git
 
 import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/go-git/plumbing/object"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"time"
 )
 

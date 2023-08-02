@@ -17,8 +17,9 @@ import (
 	"github.com/emirpasic/gods/utils"
 )
 
-// Assert List implementation
-var _ lists.List = (*List)(nil)
+func assertListImplementation() {
+	var _ lists.List = (*List)(nil)
+}
 
 // List holds the elements in a slice
 type List struct {
@@ -82,8 +83,8 @@ func (list *List) Contains(values ...interface{}) bool {
 
 	for _, searchValue := range values {
 		found := false
-		for index := 0; index < list.size; index++ {
-			if list.elements[index] == searchValue {
+		for _, element := range list.elements {
+			if element == searchValue {
 				found = true
 				break
 			}

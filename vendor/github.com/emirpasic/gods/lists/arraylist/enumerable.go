@@ -6,8 +6,9 @@ package arraylist
 
 import "github.com/emirpasic/gods/containers"
 
-// Assert Enumerable implementation
-var _ containers.EnumerableWithIndex = (*List)(nil)
+func assertEnumerableImplementation() {
+	var _ containers.EnumerableWithIndex = (*List)(nil)
+}
 
 // Each calls the given function once for each element, passing that element's index and value.
 func (list *List) Each(f func(index int, value interface{})) {

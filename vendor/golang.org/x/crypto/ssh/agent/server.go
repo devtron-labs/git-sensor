@@ -20,7 +20,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// server wraps an Agent and uses it to implement the agent side of
+// Server wraps an Agent and uses it to implement the agent side of
 // the SSH-agent, wire protocol.
 type server struct {
 	agent Agent
