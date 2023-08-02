@@ -19,8 +19,9 @@ import (
 	"strings"
 )
 
-// Assert Tree implementation
-var _ trees.Tree = (*Heap)(nil)
+func assertTreeImplementation() {
+	var _ trees.Tree = (*Heap)(nil)
+}
 
 // Heap holds elements in an array-list
 type Heap struct {
@@ -97,19 +98,15 @@ func (heap *Heap) Clear() {
 
 // Values returns all elements in the heap.
 func (heap *Heap) Values() []interface{} {
-	values := make([]interface{}, heap.list.Size(), heap.list.Size())
-	for it := heap.Iterator(); it.Next(); {
-		values[it.Index()] = it.Value()
-	}
-	return values
+	return heap.list.Values()
 }
 
 // String returns a string representation of container
 func (heap *Heap) String() string {
 	str := "BinaryHeap\n"
 	values := []string{}
-	for it := heap.Iterator(); it.Next(); {
-		values = append(values, fmt.Sprintf("%v", it.Value()))
+	for _, value := range heap.list.Values() {
+		values = append(values, fmt.Sprintf("%v", value))
 	}
 	str += strings.Join(values, ", ")
 	return str
