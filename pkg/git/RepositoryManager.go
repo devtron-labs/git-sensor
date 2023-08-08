@@ -29,6 +29,7 @@ import (
 
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/go-git"
 	"github.com/devtron-labs/go-git/plumbing"
 	"github.com/devtron-labs/go-git/plumbing/object"
 	"github.com/devtron-labs/go-git/plumbing/transport"

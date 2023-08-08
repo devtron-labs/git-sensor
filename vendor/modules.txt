@@ -16,26 +16,45 @@ github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
 # github.com/devtron-labs/go-git v1.5.0
 ## explicit; go 1.20
+github.com/devtron-labs/go-git
 github.com/devtron-labs/go-git/config
+github.com/devtron-labs/go-git/internal/revision
 github.com/devtron-labs/go-git/internal/url
 github.com/devtron-labs/go-git/plumbing
+github.com/devtron-labs/go-git/plumbing/cache
 github.com/devtron-labs/go-git/plumbing/filemode
 github.com/devtron-labs/go-git/plumbing/format/config
 github.com/devtron-labs/go-git/plumbing/format/diff
+github.com/devtron-labs/go-git/plumbing/format/gitignore
+github.com/devtron-labs/go-git/plumbing/format/idxfile
 github.com/devtron-labs/go-git/plumbing/format/index
+github.com/devtron-labs/go-git/plumbing/format/objfile
+github.com/devtron-labs/go-git/plumbing/format/packfile
 github.com/devtron-labs/go-git/plumbing/format/pktline
 github.com/devtron-labs/go-git/plumbing/object
 github.com/devtron-labs/go-git/plumbing/protocol/packp
 github.com/devtron-labs/go-git/plumbing/protocol/packp/capability
 github.com/devtron-labs/go-git/plumbing/protocol/packp/sideband
+github.com/devtron-labs/go-git/plumbing/revlist
 github.com/devtron-labs/go-git/plumbing/storer
 github.com/devtron-labs/go-git/plumbing/transport
+github.com/devtron-labs/go-git/plumbing/transport/client
+github.com/devtron-labs/go-git/plumbing/transport/file
+github.com/devtron-labs/go-git/plumbing/transport/git
+github.com/devtron-labs/go-git/plumbing/transport/http
+github.com/devtron-labs/go-git/plumbing/transport/internal/common
+github.com/devtron-labs/go-git/plumbing/transport/server
+github.com/devtron-labs/go-git/plumbing/transport/ssh
 github.com/devtron-labs/go-git/storage
+github.com/devtron-labs/go-git/storage/filesystem
+github.com/devtron-labs/go-git/storage/filesystem/dotgit
 github.com/devtron-labs/go-git/storage/memory
 github.com/devtron-labs/go-git/utils/binary
 github.com/devtron-labs/go-git/utils/diff
 github.com/devtron-labs/go-git/utils/ioutil
 github.com/devtron-labs/go-git/utils/merkletrie
+github.com/devtron-labs/go-git/utils/merkletrie/filesystem
+github.com/devtron-labs/go-git/utils/merkletrie/index
 github.com/devtron-labs/go-git/utils/merkletrie/internal/frame
 github.com/devtron-labs/go-git/utils/merkletrie/noder
 # github.com/devtron-labs/protos v0.0.0-20230503113602-282404f70fd2
@@ -91,6 +110,7 @@ github.com/jbenet/go-context/io
 github.com/jinzhu/inflection
 # github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd
 ## explicit
+github.com/kevinburke/ssh_config
 # github.com/klauspost/compress v1.15.12
 ## explicit; go 1.17
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -100,6 +120,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 ## explicit; go 1.15
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
+github.com/mitchellh/go-homedir
 # github.com/nats-io/jwt/v2 v2.3.0
 ## explicit; go 1.16
 # github.com/nats-io/nats.go v1.19.0
@@ -171,6 +192,7 @@ github.com/tidwall/match
 github.com/tidwall/pretty
 # github.com/xanzy/ssh-agent v0.2.1
 ## explicit
+github.com/xanzy/ssh-agent
 # go.uber.org/atomic v1.7.0
 ## explicit; go 1.13
 go.uber.org/atomic
@@ -187,8 +209,14 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 # golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 ## explicit; go 1.17
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/cast5
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
+golang.org/x/crypto/internal/poly1305
+golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/openpgp
 golang.org/x/crypto/openpgp/armor
 golang.org/x/crypto/openpgp/elgamal
@@ -196,6 +224,10 @@ golang.org/x/crypto/openpgp/errors
 golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/ssh
+golang.org/x/crypto/ssh/agent
+golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 ## explicit; go 1.17
 golang.org/x/net/context
@@ -203,10 +235,13 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
+golang.org/x/net/proxy
 golang.org/x/net/trace
 # golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 ## explicit; go 1.17
+golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -310,6 +345,11 @@ google.golang.org/protobuf/types/known/timestamppb
 ## explicit
 # gopkg.in/src-d/go-billy.v4 v4.3.2
 ## explicit
+gopkg.in/src-d/go-billy.v4
+gopkg.in/src-d/go-billy.v4/helper/chroot
+gopkg.in/src-d/go-billy.v4/helper/polyfill
+gopkg.in/src-d/go-billy.v4/osfs
+gopkg.in/src-d/go-billy.v4/util
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0

@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/devtron-labs/go-git"
 	"github.com/devtron-labs/go-git/config"
 	"go.uber.org/zap"
 	"os"
