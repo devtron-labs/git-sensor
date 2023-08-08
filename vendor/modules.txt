@@ -14,6 +14,49 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.18
 github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
+# github.com/devtron-labs/go-git v1.5.0
+## explicit; go 1.20
+github.com/devtron-labs/go-git
+github.com/devtron-labs/go-git/config
+github.com/devtron-labs/go-git/internal/revision
+github.com/devtron-labs/go-git/internal/url
+github.com/devtron-labs/go-git/plumbing
+github.com/devtron-labs/go-git/plumbing/cache
+github.com/devtron-labs/go-git/plumbing/filemode
+github.com/devtron-labs/go-git/plumbing/format/config
+github.com/devtron-labs/go-git/plumbing/format/diff
+github.com/devtron-labs/go-git/plumbing/format/gitignore
+github.com/devtron-labs/go-git/plumbing/format/idxfile
+github.com/devtron-labs/go-git/plumbing/format/index
+github.com/devtron-labs/go-git/plumbing/format/objfile
+github.com/devtron-labs/go-git/plumbing/format/packfile
+github.com/devtron-labs/go-git/plumbing/format/pktline
+github.com/devtron-labs/go-git/plumbing/object
+github.com/devtron-labs/go-git/plumbing/protocol/packp
+github.com/devtron-labs/go-git/plumbing/protocol/packp/capability
+github.com/devtron-labs/go-git/plumbing/protocol/packp/sideband
+github.com/devtron-labs/go-git/plumbing/revlist
+github.com/devtron-labs/go-git/plumbing/storer
+github.com/devtron-labs/go-git/plumbing/transport
+github.com/devtron-labs/go-git/plumbing/transport/client
+github.com/devtron-labs/go-git/plumbing/transport/file
+github.com/devtron-labs/go-git/plumbing/transport/git
+github.com/devtron-labs/go-git/plumbing/transport/http
+github.com/devtron-labs/go-git/plumbing/transport/internal/common
+github.com/devtron-labs/go-git/plumbing/transport/server
+github.com/devtron-labs/go-git/plumbing/transport/ssh
+github.com/devtron-labs/go-git/storage
+github.com/devtron-labs/go-git/storage/filesystem
+github.com/devtron-labs/go-git/storage/filesystem/dotgit
+github.com/devtron-labs/go-git/storage/memory
+github.com/devtron-labs/go-git/utils/binary
+github.com/devtron-labs/go-git/utils/diff
+github.com/devtron-labs/go-git/utils/ioutil
+github.com/devtron-labs/go-git/utils/merkletrie
+github.com/devtron-labs/go-git/utils/merkletrie/filesystem
+github.com/devtron-labs/go-git/utils/merkletrie/index
+github.com/devtron-labs/go-git/utils/merkletrie/internal/frame
+github.com/devtron-labs/go-git/utils/merkletrie/noder
 # github.com/devtron-labs/protos v0.0.0-20230503113602-282404f70fd2
 ## explicit; go 1.17
 github.com/devtron-labs/protos/gitSensor
@@ -122,7 +165,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/robfig/cron/v3 v3.0.0
 ## explicit; go 1.12
 github.com/robfig/cron/v3
-# github.com/sergi/go-diff v1.1.0
+# github.com/sergi/go-diff v1.3.0
 ## explicit; go 1.12
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/src-d/gcfg v1.4.0
@@ -307,49 +350,6 @@ gopkg.in/src-d/go-billy.v4/helper/chroot
 gopkg.in/src-d/go-billy.v4/helper/polyfill
 gopkg.in/src-d/go-billy.v4/osfs
 gopkg.in/src-d/go-billy.v4/util
-# gopkg.in/src-d/go-git.v4 v4.13.1
-## explicit
-gopkg.in/src-d/go-git.v4
-gopkg.in/src-d/go-git.v4/config
-gopkg.in/src-d/go-git.v4/internal/revision
-gopkg.in/src-d/go-git.v4/internal/url
-gopkg.in/src-d/go-git.v4/plumbing
-gopkg.in/src-d/go-git.v4/plumbing/cache
-gopkg.in/src-d/go-git.v4/plumbing/filemode
-gopkg.in/src-d/go-git.v4/plumbing/format/config
-gopkg.in/src-d/go-git.v4/plumbing/format/diff
-gopkg.in/src-d/go-git.v4/plumbing/format/gitignore
-gopkg.in/src-d/go-git.v4/plumbing/format/idxfile
-gopkg.in/src-d/go-git.v4/plumbing/format/index
-gopkg.in/src-d/go-git.v4/plumbing/format/objfile
-gopkg.in/src-d/go-git.v4/plumbing/format/packfile
-gopkg.in/src-d/go-git.v4/plumbing/format/pktline
-gopkg.in/src-d/go-git.v4/plumbing/object
-gopkg.in/src-d/go-git.v4/plumbing/protocol/packp
-gopkg.in/src-d/go-git.v4/plumbing/protocol/packp/capability
-gopkg.in/src-d/go-git.v4/plumbing/protocol/packp/sideband
-gopkg.in/src-d/go-git.v4/plumbing/revlist
-gopkg.in/src-d/go-git.v4/plumbing/storer
-gopkg.in/src-d/go-git.v4/plumbing/transport
-gopkg.in/src-d/go-git.v4/plumbing/transport/client
-gopkg.in/src-d/go-git.v4/plumbing/transport/file
-gopkg.in/src-d/go-git.v4/plumbing/transport/git
-gopkg.in/src-d/go-git.v4/plumbing/transport/http
-gopkg.in/src-d/go-git.v4/plumbing/transport/internal/common
-gopkg.in/src-d/go-git.v4/plumbing/transport/server
-gopkg.in/src-d/go-git.v4/plumbing/transport/ssh
-gopkg.in/src-d/go-git.v4/storage
-gopkg.in/src-d/go-git.v4/storage/filesystem
-gopkg.in/src-d/go-git.v4/storage/filesystem/dotgit
-gopkg.in/src-d/go-git.v4/storage/memory
-gopkg.in/src-d/go-git.v4/utils/binary
-gopkg.in/src-d/go-git.v4/utils/diff
-gopkg.in/src-d/go-git.v4/utils/ioutil
-gopkg.in/src-d/go-git.v4/utils/merkletrie
-gopkg.in/src-d/go-git.v4/utils/merkletrie/filesystem
-gopkg.in/src-d/go-git.v4/utils/merkletrie/index
-gopkg.in/src-d/go-git.v4/utils/merkletrie/internal/frame
-gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0

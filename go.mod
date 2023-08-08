@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/devtron-labs/common-lib v0.0.0-20230109070754-ff4dca200a2c
+	github.com/devtron-labs/go-git v1.5.0
 	github.com/devtron-labs/protos v0.0.0-20230503113602-282404f70fd2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
@@ -19,7 +20,6 @@ require (
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/src-d/go-git.v4 v4.13.1
 )
 
 require (
@@ -47,7 +47,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.13.0 // indirect
 	github.com/prometheus/procfs v0.1.3 // indirect
-	github.com/sergi/go-diff v1.1.0 // indirect
+	github.com/sergi/go-diff v1.3.0 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tidwall/match v1.0.3 // indirect
