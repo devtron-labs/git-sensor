@@ -18,7 +18,7 @@ package git
 
 import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/go-git/plumbing/object"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"time"
 )
 
@@ -62,6 +62,13 @@ type GitCommit struct {
 	FileStats   *object.FileStats `json:",omitempty"`
 	WebhookData *WebhookData      `json:"webhookData"`
 	Excluded    bool              `json:",omitempty"`
+}
+
+func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
+	maxLength := 1024
+	if len(gitCommit.Message) > maxLength {
+		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
+	}
 }
 
 type WebhookAndCiData struct {

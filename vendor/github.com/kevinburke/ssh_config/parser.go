@@ -3,7 +3,6 @@ package ssh_config
 import (
 	"fmt"
 	"strings"
-	"unicode"
 )
 
 type sshParser struct {
@@ -123,16 +122,11 @@ func (p *sshParser) parseKV() sshParserStateFn {
 			}
 			patterns = append(patterns, pat)
 		}
-		// val.val at this point could be e.g. "example.com       "
-		hostval := strings.TrimRightFunc(val.val, unicode.IsSpace)
-		spaceBeforeComment := val.val[len(hostval):]
-		val.val = hostval
 		p.config.Hosts = append(p.config.Hosts, &Host{
-			Patterns:           patterns,
-			Nodes:              make([]Node, 0),
-			EOLComment:         comment,
-			spaceBeforeComment: spaceBeforeComment,
-			hasEquals:          hasEquals,
+			Patterns:   patterns,
+			Nodes:      make([]Node, 0),
+			EOLComment: comment,
+			hasEquals:  hasEquals,
 		})
 		return p.parseStart
 	}
@@ -150,16 +144,13 @@ func (p *sshParser) parseKV() sshParserStateFn {
 		lastHost.Nodes = append(lastHost.Nodes, inc)
 		return p.parseStart
 	}
-	shortval := strings.TrimRightFunc(val.val, unicode.IsSpace)
-	spaceAfterValue := val.val[len(shortval):]
 	kv := &KV{
-		Key:             key.val,
-		Value:           shortval,
-		spaceAfterValue: spaceAfterValue,
-		Comment:         comment,
-		hasEquals:       hasEquals,
-		leadingSpace:    key.Position.Col - 1,
-		position:        key.Position,
+		Key:          key.val,
+		Value:        val.val,
+		Comment:      comment,
+		hasEquals:    hasEquals,
+		leadingSpace: key.Position.Col - 1,
+		position:     key.Position,
 	}
 	lastHost.Nodes = append(lastHost.Nodes, kv)
 	return p.parseStart
