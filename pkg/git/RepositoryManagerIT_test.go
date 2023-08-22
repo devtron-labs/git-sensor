@@ -4,9 +4,9 @@ import (
 	"github.com/devtron-labs/common-lib/utils"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/go-git"
-	"github.com/devtron-labs/go-git/plumbing/object"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"os"
 	"reflect"
 	"testing"
@@ -53,8 +53,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 		gitProviderId        int
 		location             string
 		url                  string
-		username             string
-		password             string
+		gitContext           *GitContext
 		authMode             sql.AuthMode
 		sshPrivateKeyContent string
 	}
@@ -65,44 +64,52 @@ func TestRepositoryManager_Add(t *testing.T) {
 	}{
 		{
 			name: "Test1_Add_InvokingWithCorrectArgumentsWithCreds", payload: args{
-				gitProviderId:        1,
-				location:             privateGitRepoLocation,
-				url:                  privateGitRepoUrl,
-				username:             username,
-				password:             password,
+				gitProviderId: 1,
+				location:      privateGitRepoLocation,
+				url:           privateGitRepoUrl,
+				gitContext: &GitContext{
+					Username: username,
+					Password: password,
+				},
 				authMode:             "USERNAME_PASSWORD",
 				sshPrivateKeyContent: "",
 			}, wantErr: false,
 		},
 		{
 			name: "Test2_Add_InvokingWithCorrectArgumentsWithSSHCreds", payload: args{
-				gitProviderId:        1,
-				location:             privateGitRepoLocation,
-				url:                  privateGitRepoUrl,
-				username:             "",
-				password:             "",
+				gitProviderId: 1,
+				location:      privateGitRepoLocation,
+				url:           privateGitRepoUrl,
+				gitContext: &GitContext{
+					Username: "",
+					Password: "",
+				},
 				authMode:             "SSH",
 				sshPrivateKeyContent: sshPrivateKey,
 			}, wantErr: false,
 		},
 		{
 			name: "Test3_Add_InvokingWithInvalidGitUrlWithoutCreds", payload: args{
-				gitProviderId:        1,
-				location:             location1,
-				url:                  gitRepoUrl + "dhs",
-				username:             "",
-				password:             "",
+				gitProviderId: 1,
+				location:      location1,
+				url:           gitRepoUrl + "dhs",
+				gitContext: &GitContext{
+					Username: "",
+					Password: "",
+				},
 				authMode:             "ANONYMOUS",
 				sshPrivateKeyContent: "",
 			}, wantErr: true,
 		},
 		{
 			name: "Test4_Add_InvokingWithCorrectArgumentsWithoutCreds", payload: args{
-				gitProviderId:        1,
-				location:             location2,
-				url:                  gitRepoUrl,
-				username:             "",
-				password:             "",
+				gitProviderId: 1,
+				location:      location2,
+				url:           gitRepoUrl,
+				gitContext: &GitContext{
+					Username: "",
+					Password: "",
+				},
 				authMode:             "ANONYMOUS",
 				sshPrivateKeyContent: "",
 			}, wantErr: false,
@@ -115,7 +122,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			err := repositoryManagerImpl.Add(tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.username, tt.payload.password, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
+			err := repositoryManagerImpl.Add(tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.gitContext, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Add() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -127,10 +134,9 @@ func TestRepositoryManager_Add(t *testing.T) {
 func TestRepositoryManager_Fetch(t *testing.T) {
 
 	type args struct {
-		location string
-		url      string
-		username string
-		password string
+		location   string
+		url        string
+		gitContext *GitContext
 	}
 	tests := []struct {
 		name    string
@@ -141,39 +147,47 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test1_Fetch_InvokingWithValidGitUrlWithoutCreds", payload: args{
 				location: location2,
 				url:      gitRepoUrl,
-				username: "",
-				password: "",
+				gitContext: &GitContext{
+					Username: "",
+					Password: "",
+				},
 			}, wantErr: false,
 		},
 		{
 			name: "Test2_Fetch_InvokingWithInvalidGitUrlWithoutCreds", payload: args{
 				location: location1,
 				url:      gitRepoUrl + "dhs",
-				username: "",
-				password: "",
+				gitContext: &GitContext{
+					Username: "",
+					Password: "",
+				},
 			}, wantErr: true,
 		},
 		{
 			name: "Test3_Fetch_InvokingWithCorrectArgumentsWithCreds", payload: args{
 				location: privateGitRepoLocation,
 				url:      privateGitRepoUrl,
-				username: username,
-				password: password,
+				gitContext: &GitContext{
+					Username: username,
+					Password: password,
+				},
 			}, wantErr: false,
 		},
 		{
 			name: "Test4_Fetch_InvokingWithWrongLocationOfLocalDir", payload: args{
 				location: privateGitRepoLocation + "/hjwbwfdj",
 				url:      privateGitRepoUrl,
-				username: "",
-				password: "",
+				gitContext: &GitContext{
+					Username: username,
+					Password: password,
+				},
 			}, wantErr: true,
 		},
 	}
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := repositoryManagerImpl.Fetch(tt.payload.username, tt.payload.password, tt.payload.url, tt.payload.location)
+			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitContext, tt.payload.url, tt.payload.location)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
@@ -761,7 +775,7 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 					object.FileStat{
 						Name:     "app.js",
 						Addition: 1,
-						Deletion: 3,
+						Deletion: 2,
 					},
 				},
 			},

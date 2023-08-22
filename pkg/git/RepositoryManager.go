@@ -37,8 +37,8 @@ import (
 )
 
 type RepositoryManager interface {
-	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
-	Add(gitProviderId int, location, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *git.Repository, err error)
+	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
 	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -58,7 +58,7 @@ func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, confi
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
-func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -83,7 +83,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		}
 	}
 
-	opt, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	opt, errorMsg, err := impl.gitUtil.Fetch(location, gitContext)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err
@@ -117,7 +117,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -127,7 +127,7 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 	if err != nil {
 		return false, nil, err
 	}
-	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	res, errorMsg, err := impl.gitUtil.Fetch(location, gitContext)
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
