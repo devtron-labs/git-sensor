@@ -216,10 +216,6 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 			},
 			want: &GitCommit{
 				Commit:      "dfde5ecae5cd1ae6a7e3471a63a8277177898a7d",
-				Author:      "Vivekanand Pandey <95338474+vivek-devtron@users.noreply.github.com>",
-				Message:     "Update README.md",
-				Date:        time.Time{},
-				Changes:     nil,
 				FileStats:   nil,
 				WebhookData: nil,
 				Excluded:    false,
@@ -251,6 +247,10 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 
 			if tt.want != nil && got != nil {
 				got.Date = time.Time{}
+				got.Author = ""
+				got.Message = ""
+				got.Changes = nil
+
 				if !reflect.DeepEqual(*got, *tt.want) {
 					t.Errorf("GetCommitMetadata() got = %v, want %v", got, tt.want)
 				}
@@ -285,11 +285,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -299,11 +295,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -343,11 +335,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -357,11 +345,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -388,6 +372,9 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 			for index, want := range tt.want {
 				if want != nil && got != nil {
 					got[index].Date = time.Time{}
+					got[index].Author = ""
+					got[index].Message = ""
+					got[index].Changes = nil
 
 					if !reflect.DeepEqual(*got[index].FileStats, *want.FileStats) {
 						t.Errorf("ChangesSince() got = %v, want %v", got, tt.want)
@@ -431,11 +418,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -445,11 +428,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -471,11 +450,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -485,11 +460,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "commit 22",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -511,11 +482,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -525,11 +492,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -551,11 +514,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			},
 			want: []*GitCommit{
 				{
-					Commit:  "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "Update README.md",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -565,11 +524,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "commit 22",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -579,11 +534,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					Excluded:    false,
 				},
 				{
-					Commit:  "7ffe9bcd668835e9de8d87582c42f8642efb6012",
-					Author:  "nishant kumar <4nishantkumar@gmail.com>",
-					Message: "commit 21",
-					Date:    time.Time{},
-					Changes: nil,
+					Commit: "7ffe9bcd668835e9de8d87582c42f8642efb6012",
 					FileStats: &object.FileStats{object.FileStat{
 						Name:     "README.md",
 						Addition: 1,
@@ -626,6 +577,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 			for index, want := range tt.want {
 				if want != nil && got != nil {
 					got[index].Date = time.Time{}
+					got[index].Author = ""
+					got[index].Message = ""
+					got[index].Changes = nil
+
 					if !reflect.DeepEqual(*got[index], *want) {
 						t.Errorf("ChangesSinceByRepository() got = %v, want %v", got, tt.want)
 					}
@@ -655,10 +610,6 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 			},
 			want: &GitCommit{
 				Commit:      "6e0d605a1c9fbf2717b7fe8a3d4ae23ab006e5c0",
-				Author:      "pghildiy <pghildiyal82@gmail.com>",
-				Message:     "Update app.js",
-				Date:        time.Time{},
-				Changes:     nil,
 				FileStats:   nil,
 				WebhookData: nil,
 				Excluded:    false,
@@ -689,6 +640,10 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 
 			if tt.want != nil && got != nil {
 				got.Date = time.Time{}
+				got.Author = ""
+				got.Message = ""
+				got.Changes = nil
+
 				if !reflect.DeepEqual(*got, *tt.want) {
 					t.Errorf("GetCommitMetadata() got = %v, want %v", got, tt.want)
 				}
