@@ -146,6 +146,7 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 		//return false, nil, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	impl.logger.Errorw("********* reached here ------------- ============= ", "err", err)
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
