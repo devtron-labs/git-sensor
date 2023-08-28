@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
+	"golang.org/x/sys/unix"
 	"io"
 	"log"
 	"os"
@@ -151,11 +152,20 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 
-	disk := DiskUsage("/git-base")
-	freeSpace := float64(disk.Free) / float64(GB)
+	var statfs unix.Statfs_t
+	err = unix.Statfs(GIT_BASE_DIR, &statfs)
+	if err != nil {
+		fmt.Printf("Error getting file system info: %s\n", err)
+		return
+	}
 
-	if freeSpace == 0.0 {
-		return false, nil, errors.New("no space left on disk")
+	availableSpace := int64(statfs.Bavail) * int64(statfs.Bsize)
+
+	fmt.Printf("Available space in bytes: %d\n", availableSpace)
+
+	if availableSpace < 5*MB {
+		impl.logger.Infow("no space left, please increase disk size", "available disk size", availableSpace)
+		return false, nil, errors.New("no space left on disk, please increase the disk size")
 	}
 
 	r, err := git.PlainOpen(location)
