@@ -143,6 +143,11 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 			return false, nil, err
 		}
 		impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
+
+		r, err = git.PlainOpen(location)
+		if err != nil {
+			return false, nil, err
+		}
 		//return false, nil, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
