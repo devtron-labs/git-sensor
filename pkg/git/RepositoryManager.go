@@ -18,6 +18,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -25,6 +26,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/devtron-labs/git-sensor/internal/middleware"
@@ -117,12 +119,45 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
+type DiskStatus struct {
+	All  uint64 `json:"all"`
+	Used uint64 `json:"used"`
+	Free uint64 `json:"free"`
+}
+
+func DiskUsage(path string) (disk DiskStatus) {
+	fs := syscall.Statfs_t{}
+	err := syscall.Statfs(path, &fs)
+	if err != nil {
+		return
+	}
+	disk.All = fs.Blocks * uint64(fs.Bsize)
+	disk.Free = fs.Bfree * uint64(fs.Bsize)
+	disk.Used = disk.All - disk.Free
+	return
+}
+
+const (
+	B  = 1
+	KB = 1024 * B
+	MB = 1024 * KB
+	GB = 1024 * MB
+)
+
 func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
+
+	disk := DiskUsage("/git-base")
+	freeSpace := float64(disk.Free) / float64(GB)
+
+	if freeSpace == 0.0 {
+		return false, nil, errors.New("no space left on disk")
+	}
+
 	r, err := git.PlainOpen(location)
 	if err != nil {
 		return false, nil, err
