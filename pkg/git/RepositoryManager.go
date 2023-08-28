@@ -132,8 +132,18 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 
 	r, err := git.PlainOpen(location)
 	if err != nil {
-		impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
-		return false, nil, err
+		err = os.RemoveAll(location)
+		if err != nil {
+			impl.logger.Errorw("error in cleaning checkout path", "err", err)
+			return false, nil, err
+		}
+		err = impl.gitUtil.Init(location, url, true)
+		if err != nil {
+			impl.logger.Errorw("err in git init", "err", err)
+			return false, nil, err
+		}
+		//impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
+		//return false, nil, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
 	if err == nil && len(res) > 0 {
