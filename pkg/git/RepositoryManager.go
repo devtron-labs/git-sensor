@@ -83,7 +83,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		}
 	}
 
-	opt, errorMsg, err := impl.gitUtil.Fetch(location, gitContext)
+	opt, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err
@@ -127,7 +127,7 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 	if err != nil {
 		return false, nil, err
 	}
-	res, errorMsg, err := impl.gitUtil.Fetch(location, gitContext)
+	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated

@@ -30,7 +30,7 @@ func NewGitUtil(logger *zap.SugaredLogger) *GitUtil {
 
 const GIT_ASK_PASS = "/git-ask-pass.sh"
 
-func (impl *GitUtil) Fetch(rootDir string, gitContext *GitContext) (response, errMsg string, err error) {
+func (impl *GitUtil) Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
 	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
