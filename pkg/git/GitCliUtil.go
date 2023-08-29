@@ -78,7 +78,7 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 
 	err := os.MkdirAll(rootDir, 0755)
 	if !IsSpaceAvailableOnDisk() {
-		err = errors.New("this is an error, mkdir, disk full")
+		err = errors.New("git-sensor PVC - disk full, please increase space")
 	}
 	if err != nil {
 		return err
