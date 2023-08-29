@@ -637,7 +637,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		gitMaterial.CheckoutMsgAny = err.Error()
 		gitMaterial.FetchErrorMessage = err.Error()
 
-		impl.logger.Errorw("error in fetching the repository ", "err", err)
+		impl.logger.Errorw("error in fetching the repository ", "gitMaterial", gitMaterial, "err", err)
 		return nil, err
 	}
 
