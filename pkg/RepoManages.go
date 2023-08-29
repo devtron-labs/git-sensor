@@ -343,13 +343,11 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
-	//isSpaceFull := true
-	////if !IsSpaceAvailableOnDisk() {
-	//if isSpaceFull {
-	//	impl.logger.Infow("no space left, please increase disk size", "available disk size")
-	//	return material, errors.New("no space left on device, please increase disk size")
-	//}
-	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, userName, password, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	gitContext := &git.GitContext{
+		Username: userName,
+		Password: password,
+	}
+	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, gitContext, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true
@@ -632,8 +630,11 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}()
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation, gitMaterial)
-
+	gitContext := &git.GitContext{
+		Username: userName,
+		Password: password,
+	}
+	updated, repo, err := impl.repositoryManager.Fetch(gitContext, gitMaterial.Url, gitMaterial.CheckoutLocation, gitMaterial)
 	if err == nil {
 		gitMaterial.CheckoutStatus = true
 	} else {
