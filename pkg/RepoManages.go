@@ -620,6 +620,29 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
 	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation)
 
+	if err == nil {
+		gitMaterial.CheckoutStatus = true
+	} else {
+		gitMaterial.CheckoutStatus = false
+		gitMaterial.CheckoutMsgAny = err.Error()
+		gitMaterial.FetchErrorMessage = err.Error()
+	}
+
+	err = impl.materialRepository.Update(gitMaterial)
+	if err != nil {
+		impl.logger.Errorw("error in updating material repo", "err", err, "material", gitMaterial)
+		return nil, err
+	}
+	ciPipelineMaterial, err := impl.ciPipelineMaterialRepository.FindByGitMaterialId(gitMaterial.Id)
+	if err != nil {
+		impl.logger.Errorw("unable to load material", "err", err)
+		return nil, err
+	}
+	err = impl.updatePipelineMaterialCommit(ciPipelineMaterial)
+	if err != nil {
+		impl.logger.Errorw("error in updating pipeline material", "err", err)
+	}
+
 	if err != nil {
 		impl.logger.Errorw("error in fetching the repository ", "err", err)
 		return nil, err
