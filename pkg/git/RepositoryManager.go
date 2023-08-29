@@ -18,6 +18,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -123,6 +124,10 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
+	if !IsSpaceAvailableOnDisk() {
+		err = errors.New("git-sensor PVC - disk full, please increase space")
+		return false, nil, err
+	}
 	r, err := git.PlainOpen(location)
 	if err != nil {
 		err = os.RemoveAll(location)
