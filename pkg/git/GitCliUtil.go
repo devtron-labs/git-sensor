@@ -80,6 +80,7 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 		Name: git.DefaultRemoteName,
 		URLs: []string{remoteUrl},
 	})
+	impl.logger.Errorw("git init successful", "remote Url", remoteUrl, "err", err)
 	return err
 }
 
