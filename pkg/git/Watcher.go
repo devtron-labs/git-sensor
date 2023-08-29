@@ -199,6 +199,14 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	if !updated {
 		return nil
 	}
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	} else {
+		material.CheckoutStatus = false
+		material.CheckoutMsgAny = err.Error()
+		material.FetchErrorMessage = err.Error()
+	}
 	materials, err := impl.ciPipelineMaterialRepository.FindByGitMaterialId(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in calculating head", "err", err, "url", material.Url)
