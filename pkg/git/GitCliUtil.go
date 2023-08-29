@@ -69,6 +69,7 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 
 	err := os.MkdirAll(rootDir, 0755)
 	if err != nil {
+		impl.logger.Errorw("error in creating directory", "msg", rootDir, "err", err)
 		return err
 	}
 	repo, err := git.PlainInit(rootDir, isBare)
