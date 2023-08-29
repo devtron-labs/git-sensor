@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
@@ -68,6 +69,10 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
+	//isSpaceFull := false
+	if !IsSpaceAvailableOnDisk() {
+		err = errors.New("this is an error, mkdir, disk full")
+	}
 	if err != nil {
 		impl.logger.Errorw("error in creating directory", "rootDir", rootDir, "err", err)
 		return err

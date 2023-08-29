@@ -18,7 +18,6 @@ package git
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -38,7 +37,7 @@ import (
 )
 
 type RepositoryManager interface {
-	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
+	Fetch(userName, password string, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error)
 	Add(gitProviderId int, location, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -118,17 +117,18 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
-
-	if !IsSpaceAvailableOnDisk() {
-		impl.logger.Infow("no space left, please increase disk size", "available disk size")
-		return false, nil, errors.New("no space left on device, please increase disk size")
-	}
+	//isSpaceFull := true
+	////if !IsSpaceAvailableOnDisk() {
+	//if isSpaceFull {
+	//	impl.logger.Infow("no space left, please increase disk size", "available disk size")
+	//	return false, nil, errors.New("no space left on device, please increase disk size")
+	//}
 
 	r, err := git.PlainOpen(location)
 	if err != nil {
@@ -148,9 +148,13 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 		if err != nil {
 			return false, nil, err
 		}
-		return false, nil, err
+		//return false, nil, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	}
 	impl.logger.Errorw("********* reached here ------------- ============= ", "err", err)
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)

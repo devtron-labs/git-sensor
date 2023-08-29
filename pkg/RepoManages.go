@@ -343,6 +343,12 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
+	//isSpaceFull := true
+	////if !IsSpaceAvailableOnDisk() {
+	//if isSpaceFull {
+	//	impl.logger.Infow("no space left, please increase disk size", "available disk size")
+	//	return material, errors.New("no space left on device, please increase disk size")
+	//}
 	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, userName, password, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
@@ -352,6 +358,7 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 		material.CheckoutMsgAny = err.Error()
 		material.FetchErrorMessage = err.Error()
 	}
+	fmt.Println(material)
 	err = impl.materialRepository.Update(material)
 	if err != nil {
 		impl.logger.Errorw("error in updating material repo", "err", err, "material", material)
@@ -421,6 +428,13 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 }
 
 func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) {
+	//isSpaceFull := true
+	////if !IsSpaceAvailableOnDisk() {
+	//if isSpaceFull {
+	//	impl.logger.Infow("no space left, please increase disk size", "available disk size")
+	//	return nil, errors.New("no space left on device, please increase disk size")
+	//}
+
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -618,7 +632,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}()
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, gitMaterial.Url, gitMaterial.CheckoutLocation, gitMaterial)
 
 	if err == nil {
 		gitMaterial.CheckoutStatus = true

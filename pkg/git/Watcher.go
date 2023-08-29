@@ -175,7 +175,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location)
+	updated, repo, err := impl.repositoryManager.Fetch(userName, password, material.Url, location, material)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
@@ -186,7 +186,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				return err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				updated, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location)
+				updated, repo, err = impl.repositoryManager.Fetch(userName, password, material.Url, location, material)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
