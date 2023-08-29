@@ -244,6 +244,10 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 
 // handle update
 func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
+	if !git.IsSpaceAvailableOnDisk() {
+		impl.logger.Errorw("space full in git sensor PVC, please increase disk space ")
+		return nil, errors.New("no space left on disk")
+	}
 	for _, material := range materials {
 		_, err := impl.addRepo(material)
 		if err != nil {
