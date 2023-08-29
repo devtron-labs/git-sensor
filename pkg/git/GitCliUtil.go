@@ -76,11 +76,11 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 	if err != nil {
 		return err
 	}
-	_, err = repo.CreateRemote(&config.RemoteConfig{
+	remote, err := repo.CreateRemote(&config.RemoteConfig{
 		Name: git.DefaultRemoteName,
 		URLs: []string{remoteUrl},
 	})
-	impl.logger.Errorw("git init successful", "remote Url", remoteUrl, "err", err)
+	impl.logger.Errorw("git init successful", "remote Url", remoteUrl, "remote", remote, "err", err)
 	return err
 }
 
