@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
+	"golang.org/x/sys/unix"
 	"io"
 	"log"
 	"os"
@@ -59,6 +60,16 @@ func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, confi
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
+func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
+	var statFs unix.Statfs_t
+	err := unix.Statfs(GIT_BASE_DIR, &statFs)
+	if err != nil {
+		return false
+	}
+	availableSpace := int64(statFs.Bavail) * int64(statFs.Bsize)
+	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
+}
+
 func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	var err error
 	start := time.Now()
@@ -68,6 +79,10 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 	err = os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
+		return err
+	}
+	if !impl.IsSpaceAvailableOnDisk() {
+		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return err
 	}
 	err = impl.gitUtil.Init(location, url, true)
@@ -124,7 +139,7 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
-	if !IsSpaceAvailableOnDisk() {
+	if !impl.IsSpaceAvailableOnDisk() {
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}

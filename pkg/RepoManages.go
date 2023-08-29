@@ -627,13 +627,18 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		Password: password,
 	}
 	updated, repo, err := impl.repositoryManager.Fetch(gitContext, gitMaterial.Url, gitMaterial.CheckoutLocation, gitMaterial)
-
+	if !updated {
+		impl.logger.Warn("repository is up to date")
+	}
 	if err == nil {
 		gitMaterial.CheckoutStatus = true
 	} else {
 		gitMaterial.CheckoutStatus = false
 		gitMaterial.CheckoutMsgAny = err.Error()
 		gitMaterial.FetchErrorMessage = err.Error()
+
+		impl.logger.Errorw("error in fetching the repository ", "err", err)
+		return nil, err
 	}
 
 	err = impl.materialRepository.Update(gitMaterial)
@@ -643,23 +648,12 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}
 	ciPipelineMaterial, err := impl.ciPipelineMaterialRepository.FindByGitMaterialId(gitMaterial.Id)
 	if err != nil {
-		impl.logger.Errorw("unable to load material", "err", err)
+		impl.logger.Errorw("unable to load material", "err", err, "ciPipelineMaterial", ciPipelineMaterial)
 		return nil, err
 	}
 	err = impl.updatePipelineMaterialCommit(ciPipelineMaterial)
 	if err != nil {
 		impl.logger.Errorw("error in updating pipeline material", "err", err)
-	}
-
-	if err != nil {
-		impl.logger.Errorw("error in fetching the repository ", "err", err)
-		return nil, err
-	}
-	if !updated {
-		impl.logger.Warn("repository is up to date")
-	}
-	if err != nil {
-		impl.logger.Errorw("error in fetching the repository ", "err", err)
 		return nil, err
 	}
 

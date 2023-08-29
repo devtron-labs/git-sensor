@@ -19,7 +19,6 @@ package git
 import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"path"
@@ -124,14 +123,4 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 	}
 
 	return nil
-}
-
-func IsSpaceAvailableOnDisk() bool {
-	var statFs unix.Statfs_t
-	err := unix.Statfs(GIT_BASE_DIR, &statFs)
-	if err != nil {
-		return false
-	}
-	availableSpace := int64(statFs.Bavail) * int64(statFs.Bsize)
-	return availableSpace > 100*1024*1024
 }
