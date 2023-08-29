@@ -18,6 +18,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
@@ -124,29 +125,29 @@ func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, l
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 
-	//if !IsSpaceAvailableOnDisk() {
-	//	impl.logger.Infow("no space left, please increase disk size", "available disk size")
-	//	return false, nil, errors.New("no space left on device, please increase disk size")
-	//}
+	if !IsSpaceAvailableOnDisk() {
+		impl.logger.Infow("no space left, please increase disk size", "available disk size")
+		return false, nil, errors.New("no space left on device, please increase disk size")
+	}
 
 	r, err := git.PlainOpen(location)
 	if err != nil {
-		//err = os.RemoveAll(location)
-		//if err != nil {
-		//	impl.logger.Errorw("error in cleaning checkout path", "err", err)
-		//	return false, nil, err
-		//}
-		//err = impl.gitUtil.Init(location, url, true)
-		//if err != nil {
-		//	impl.logger.Errorw("err in git init", "err", err)
-		//	return false, nil, err
-		//}
-		//impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
-		//
-		//r, err = git.PlainOpen(location)
-		//if err != nil {
-		//	return false, nil, err
-		//}
+		err = os.RemoveAll(location)
+		if err != nil {
+			impl.logger.Errorw("error in cleaning checkout path", "err", err)
+			return false, nil, err
+		}
+		err = impl.gitUtil.Init(location, url, true)
+		if err != nil {
+			impl.logger.Errorw("err in git init", "err", err)
+			return false, nil, err
+		}
+		impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
+
+		r, err = git.PlainOpen(location)
+		if err != nil {
+			return false, nil, err
+		}
 		return false, nil, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
