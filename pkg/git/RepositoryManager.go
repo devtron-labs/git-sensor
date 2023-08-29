@@ -37,7 +37,7 @@ import (
 )
 
 type RepositoryManager interface {
-	Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *git.Repository, err error)
+	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error)
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -117,7 +117,7 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -125,9 +125,28 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	r, err := git.PlainOpen(location)
 	if err != nil {
-		return false, nil, err
+		err = os.RemoveAll(location)
+		if err != nil {
+			impl.logger.Errorw("error in cleaning checkout path", "err", err)
+			return false, nil, err
+		}
+		err = impl.gitUtil.Init(location, url, true)
+		if err != nil {
+			impl.logger.Errorw("err in git init", "err", err)
+			return false, nil, err
+		}
+		impl.logger.Infow("-----------***===---- error found in plain open method -----***===-------", "plain open method", location)
+
+		r, err = git.PlainOpen(location)
+		if err != nil {
+			return false, nil, err
+		}
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	}
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
