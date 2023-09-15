@@ -719,7 +719,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 
 	if len(commits) == 0 {
 		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
-		return nil, nil
+		return nil, fmt.Errorf("no commit found for commit hash %s in branch %s", gitHash, branchName)
 	}
 	commit := commits[0]
 	excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
