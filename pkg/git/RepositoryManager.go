@@ -245,6 +245,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	var err error
 	start := time.Now()
 	defer func() {
+		impl.logger.Errorw(".................... inside defer in ChangesSinceByRepository method ........................", "err", err)
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
 	if strings.HasPrefix(branch, "refs/heads/") {
@@ -271,33 +272,40 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	breakLoop := false
 	for {
 		if breakLoop {
+			impl.logger.Errorw("......................if breakLoop...................")
 			break
 		}
 		//TODO: move code out of this dummy function after removing defer inside loop
 		func() {
 			if itrCounter > 1000 || len(gitCommits) == count {
 				breakLoop = true
+				impl.logger.Errorw("......................first breakLoop set to true...................")
 				return
 			}
 			commit, err := itr.Next()
 			if err == io.EOF {
 				breakLoop = true
+				impl.logger.Errorw("......................second breakLoop set to true...................")
 				return
 			}
 			if err != nil {
 				impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
 				breakLoop = true
+				impl.logger.Errorw("......................third breakLoop set to true...................")
 				return
 			}
 			if !commitToFind && strings.Contains(commit.Hash.String(), to) {
 				commitToFind = true
+				impl.logger.Errorw("......................commitToFind was false initially and search pattern matches some commit so commitToFind set to true...................")
 			}
 			if !commitToFind {
+				impl.logger.Errorw("......................commitToFind was false initially and search pattern doesn't match any commit so commitToFind doesn't change...................")
 				return
 			}
 			if commit.Hash.String() == from && len(from) > 0 {
 				//found end
 				breakLoop = true
+				impl.logger.Errorw("......................fourth breakLoop set to true...................")
 				return
 			}
 			gitCommit := &GitCommit{
@@ -332,6 +340,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	var err error
 	start := time.Now()
 	defer func() {
+		impl.logger.Errorw("inside defer in ChangesSince method", "err", err)
 		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
@@ -339,6 +348,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	}
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
+		impl.logger.Errorw("error in PlainOpen at line 341", "err", err)
 		return nil, err
 	}
 	///---------------------
