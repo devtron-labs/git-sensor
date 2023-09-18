@@ -265,7 +265,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
 		return nil, err
 	}
-	var gitCommits []*GitCommit
+	//var gitCommits []*GitCommit
+	gitCommits := make([]*GitCommit, 0)
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	breakLoop := false
