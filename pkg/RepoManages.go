@@ -709,17 +709,17 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 	commits, err := impl.repositoryManager.ChangesSince(gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
-		return nil, err
+		return &git.GitCommit{}, err
 	}
 
 	if len(commits) > 1 {
 		impl.logger.Errorw("more than one commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
-		return nil, fmt.Errorf("more than one commit found for commit hash %s in branch %s", gitHash, branchName)
+		return &git.GitCommit{}, fmt.Errorf("more than one commit found for commit hash %s in branch %s", gitHash, branchName)
 	}
 
 	if len(commits) == 0 {
 		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
-		return nil, nil
+		return &git.GitCommit{}, nil
 	}
 	commit := commits[0]
 	excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
