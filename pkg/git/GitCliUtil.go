@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
@@ -63,6 +64,11 @@ func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err err
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
 			return "", string(outBytes), err
+		} else {
+			if strings.Contains(string(outBytes), "Authentication failed") {
+				impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
+				return "", "authentication failed", errors.New("authentication failed")
+			}
 		}
 		errOutput := string(exErr.Stderr)
 		return "", errOutput, err
