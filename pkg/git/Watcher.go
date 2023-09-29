@@ -53,7 +53,7 @@ type GitWatcher interface {
 }
 
 type PollConfig struct {
-	PollDuration int `env:"POLL_DURATION" envDefault:"200000"`
+	PollDuration int `env:"POLL_DURATION" envDefault:"2"`
 	PollWorker   int `env:"POLL_WORKER" envDefault:"5"`
 }
 
