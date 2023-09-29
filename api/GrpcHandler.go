@@ -161,6 +161,7 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 				CommitAuthor:  item.CommitAuthor,
 				CommitDate:    item.CommitDate.AsTime(),
 				CommitHistory: item.CommitHistory,
+				CommitMessage: item.CommitMessage,
 				Errored:       item.Errored,
 				ErrorMsg:      item.ErrorMsg,
 			})
