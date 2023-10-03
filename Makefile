@@ -22,7 +22,8 @@ wire:
 	wire
 
 clean:
-	rm -f git-sensor
+	rm -rf git-sensor
+	export GOFLAGS=-buildvcs=false
 
 run: build
 	./git-sensor

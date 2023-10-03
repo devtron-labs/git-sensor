@@ -20,6 +20,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"time"
+	"unicode/utf8"
 )
 
 type FetchScmChangesRequest struct {
@@ -62,6 +63,29 @@ type GitCommit struct {
 	FileStats   *object.FileStats `json:",omitempty"`
 	WebhookData *WebhookData      `json:"webhookData"`
 	Excluded    bool              `json:",omitempty"`
+}
+
+func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
+	maxLength := 1024
+	if len(gitCommit.Message) > maxLength {
+		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
+	}
+}
+
+// IsMessageValidUTF8 checks if a string is valid UTF-8.
+func (gitCommit *GitCommit) IsMessageValidUTF8() bool {
+	return utf8.ValidString(gitCommit.Message)
+}
+
+// FixInvalidUTF8Message replaces invalid UTF-8 sequences with the replacement character (U+FFFD).
+func (gitCommit *GitCommit) FixInvalidUTF8Message() {
+	invalidUTF8 := []rune(gitCommit.Message)
+	for i, r := range invalidUTF8 {
+		if !utf8.ValidRune(r) {
+			invalidUTF8[i] = utf8.RuneError
+		}
+	}
+	gitCommit.Message = string(invalidUTF8)
 }
 
 type WebhookAndCiData struct {

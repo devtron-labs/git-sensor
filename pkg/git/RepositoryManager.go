@@ -18,9 +18,11 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
+	"golang.org/x/sys/unix"
 	"io"
 	"log"
 	"os"
@@ -37,8 +39,8 @@ import (
 )
 
 type RepositoryManager interface {
-	Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error)
-	Add(gitProviderId int, location, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error)
+	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
 	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
@@ -58,7 +60,17 @@ func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, confi
 	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
 }
 
-func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, userName, password string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
+	var statFs unix.Statfs_t
+	err := unix.Statfs(GIT_BASE_DIR, &statFs)
+	if err != nil {
+		return false
+	}
+	availableSpace := int64(statFs.Bavail) * int64(statFs.Bsize)
+	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
+}
+
+func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -67,6 +79,10 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 	err = os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
+		return err
+	}
+	if !impl.IsSpaceAvailableOnDisk() {
+		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return err
 	}
 	err = impl.gitUtil.Init(location, url, true)
@@ -83,7 +99,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		}
 	}
 
-	opt, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	opt, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err
@@ -117,17 +133,38 @@ func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir stri
 	return repo, err
 }
 
-func (impl RepositoryManagerImpl) Fetch(userName, password string, url string, location string) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
 	}()
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
-	r, err := git.PlainOpen(location)
-	if err != nil {
+	if !impl.IsSpaceAvailableOnDisk() {
+		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	res, errorMsg, err := impl.gitUtil.Fetch(location, userName, password)
+	r, err := git.PlainOpen(location)
+	if err != nil {
+		err = os.RemoveAll(location)
+		if err != nil {
+			impl.logger.Errorw("error in cleaning checkout path", "err", err)
+			return false, nil, err
+		}
+		err = impl.gitUtil.Init(location, url, true)
+		if err != nil {
+			impl.logger.Errorw("err in git init", "err", err)
+			return false, nil, err
+		}
+		r, err = git.PlainOpen(location)
+		if err != nil {
+			return false, nil, err
+		}
+	}
+	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	}
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
@@ -231,41 +268,65 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	var gitCommits []*GitCommit
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
+	breakLoop := false
 	for {
-		if itrCounter > 1000 || len(gitCommits) == count {
+		if breakLoop {
 			break
 		}
-		commit, err := itr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
-			break
-		}
-		if !commitToFind && strings.Contains(commit.Hash.String(), to) {
-			commitToFind = true
-		}
-		if !commitToFind {
-			continue
-		}
-		if commit.Hash.String() == from && len(from) > 0 {
-			//found end
-			break
-		}
-		gitCommit := &GitCommit{
-			Author:  commit.Author.String(),
-			Commit:  commit.Hash.String(),
-			Date:    commit.Author.When,
-			Message: commit.Message,
-		}
-		stats, err := commit.Stats()
-		if err != nil {
-			impl.logger.Errorw("error in  fetching stats", "err", err)
-		}
-		gitCommit.FileStats = &stats
-		gitCommits = append(gitCommits, gitCommit)
-		itrCounter = itrCounter + 1
+		//TODO: move code out of this dummy function after removing defer inside loop
+		func() {
+			if itrCounter > 1000 || len(gitCommits) == count {
+				breakLoop = true
+				return
+			}
+			commit, err := itr.Next()
+			if err == io.EOF {
+				breakLoop = true
+				return
+			}
+			if err != nil {
+				impl.logger.Errorw("error in  iterating", "branch", branch, "err", err)
+				breakLoop = true
+				return
+			}
+			if !commitToFind && strings.Contains(commit.Hash.String(), to) {
+				commitToFind = true
+			}
+			if !commitToFind {
+				return
+			}
+			if commit.Hash.String() == from && len(from) > 0 {
+				//found end
+				breakLoop = true
+				return
+			}
+			gitCommit := &GitCommit{
+				Author:  commit.Author.String(),
+				Commit:  commit.Hash.String(),
+				Date:    commit.Author.When,
+				Message: commit.Message,
+			}
+			gitCommit.TruncateMessageIfExceedsMaxLength()
+			if !gitCommit.IsMessageValidUTF8() {
+				gitCommit.FixInvalidUTF8Message()
+			}
+			impl.logger.Debugw("commit dto for repo ", "repo", repository, commit)
+			gitCommits = append(gitCommits, gitCommit)
+			itrCounter = itrCounter + 1
+			if impl.configuration.EnableFileStats {
+				defer func() {
+					if err := recover(); err != nil {
+						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+					}
+				}()
+				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
+				stats, err := commit.Stats()
+				if err != nil {
+					impl.logger.Errorw("error in  fetching stats", "err", err)
+				}
+				gitCommit.FileStats = &stats
+			}
+		}()
 	}
 	return gitCommits, err
 }
@@ -277,7 +338,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		util.TriggerGitOperationMetrics("changesSince", start, err)
 	}()
 	if count == 0 {
-		count = 15
+		count = impl.configuration.GitHistoryCount
 	}
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
