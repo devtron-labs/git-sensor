@@ -1,0 +1,1 @@
+ALTER TABLE "public"."ci_pipeline_material" ADD COLUMN "commit_message";
