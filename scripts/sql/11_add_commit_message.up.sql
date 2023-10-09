@@ -1,1 +1,1 @@
-ALTER TABLE "public"."ci_pipeline_material" ADD COLUMN "commit_message";
+ALTER TABLE "public"."ci_pipeline_material" ADD COLUMN IF NOT EXISTS "commit_message" text;
