@@ -202,6 +202,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 					pipelineMaterial.LastSeenHash = latestCommit.Commit
 					pipelineMaterial.CommitAuthor = latestCommit.Author
 					pipelineMaterial.CommitDate = latestCommit.Date
+					pipelineMaterial.CommitMessage = latestCommit.Message
 				}
 				pipelineMaterial.Errored = false
 				pipelineMaterial.ErrorMsg = ""
@@ -416,9 +417,10 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 		Value:         material.Value,
 		Active:        material.Active,
 		GitCommit: &git.GitCommit{
-			Commit: material.LastSeenHash,
-			Author: material.CommitAuthor,
-			Date:   material.CommitDate,
+			Commit:  material.LastSeenHash,
+			Author:  material.CommitAuthor,
+			Date:    material.CommitDate,
+			Message: material.CommitMessage,
 		},
 	}
 	return materialBean

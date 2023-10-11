@@ -240,6 +240,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				material.LastSeenHash = latestCommit.Commit
 				material.CommitAuthor = latestCommit.Author
 				material.CommitDate = latestCommit.Date
+				material.CommitMessage = latestCommit.Message
 				commitJson, _ := json.Marshal(commits)
 				material.CommitHistory = string(commitJson)
 				material.Errored = false
