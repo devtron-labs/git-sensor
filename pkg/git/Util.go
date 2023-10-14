@@ -50,6 +50,13 @@ func GetLocationForMaterial(material *sql.GitMaterial) (location string, err err
 		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), locationWithoutProtocol)
 		return checkoutPath, nil
 	}
+	httpRegex := `^http.*`
+	httpsMatched, err := regexp.MatchString(httpRegex, material.Url)
+	if httpsMatched {
+		locationWithoutProtocol := strings.ReplaceAll(material.Url, "http://", "")
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), locationWithoutProtocol)
+		return checkoutPath, nil
+	}
 
 	sshRegex := `^git@.*`
 	sshMatched, err := regexp.MatchString(sshRegex, material.Url)
