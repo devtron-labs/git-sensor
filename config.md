@@ -13,4 +13,4 @@
 | COMMIT_STATS_TIMEOUT_IN_SEC       | "2"                                | Commit Stats Timeout (in seconds) |
 | ENABLE_FILE_STATS                | "false"                            | Enable File Stats (boolean)   |
 | GIT_HISTORY_COUNT                 | "15"                               | Git History Count              |
-| CLONING_MODE                     | FULL                               | Cloning Mode                   |
+| CLONING_MODE                     | FULL                               | Cloning Mode (Possible values: SHALLOW, FULL)       |
