@@ -32,12 +32,12 @@ type CiPipelineMaterial struct {
 	LastSeenHash  string     `sql:"last_seen_hash,notnull"`
 	CommitAuthor  string     `sql:"commit_author"`
 	CommitDate    time.Time  `sql:"commit_date"`
-	
-	CommitHistory string     `sql:"commit_history"` //last five commit for caching purpose1
-	Errored       bool       `sql:"errored,notnull"`
-	ErrorMsg      string     `sql:"error_msg,notnull"`
-}
+	CommitMessage string     `sql:"commit_message"`
 
+	CommitHistory string `sql:"commit_history"` //last five commit for caching purpose1
+	Errored       bool   `sql:"errored,notnull"`
+	ErrorMsg      string `sql:"error_msg,notnull"`
+}
 
 type CiPipelineMaterialRepository interface {
 	FindByGitMaterialId(gitMaterialId int) ([]*CiPipelineMaterial, error)

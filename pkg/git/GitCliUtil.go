@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
@@ -28,7 +29,10 @@ func NewGitUtil(logger *zap.SugaredLogger) *GitUtil {
 	}
 }
 
-const GIT_ASK_PASS = "/git-ask-pass.sh"
+const (
+	GIT_ASK_PASS                = "/git-ask-pass.sh"
+	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
+)
 
 func (impl *GitUtil) Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
@@ -63,6 +67,10 @@ func (impl *GitUtil) runCommand(cmd *exec.Cmd) (response, errMsg string, err err
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
 			return "", string(outBytes), err
+		}
+		if strings.Contains(string(outBytes), AUTHENTICATION_FAILED_ERROR) {
+			impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
+			return "", "authentication failed", errors.New("authentication failed")
 		}
 		errOutput := string(exErr.Stderr)
 		return "", errOutput, err
