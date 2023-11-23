@@ -49,6 +49,9 @@ const (
 	APPLICATION_STATUS_UPDATE_TOPIC     string = "APPLICATION_STATUS_UPDATE"
 	APPLICATION_STATUS_UPDATE_GROUP     string = "APPLICATION_STATUS_UPDATE_GROUP-1"
 	APPLICATION_STATUS_UPDATE_DURABLE   string = "APPLICATION_STATUS_UPDATE_DURABLE-1"
+	APPLICATION_STATUS_DELETE_TOPIC     string = "APPLICATION_STATUS_DELETE"
+	APPLICATION_STATUS_DELETE_GROUP     string = "APPLICATION_STATUS_DELETE_GROUP-1"
+	APPLICATION_STATUS_DELETE_DURABLE   string = "APPLICATION_STATUS_DELETE_DURABLE-1"
 	CRON_EVENTS                         string = "CRON_EVENTS"
 	CRON_EVENTS_GROUP                   string = "CRON_EVENTS_GROUP-2"
 	CRON_EVENTS_DURABLE                 string = "CRON_EVENTS_DURABLE-2"
@@ -77,6 +80,15 @@ const (
 	ARGO_PIPELINE_STATUS_UPDATE_TOPIC   string = "ARGO_PIPELINE_STATUS_UPDATE"
 	ARGO_PIPELINE_STATUS_UPDATE_GROUP   string = "ARGO_PIPELINE_STATUS_UPDATE_GROUP-1"
 	ARGO_PIPELINE_STATUS_UPDATE_DURABLE string = "ARGO_PIPELINE_STATUS_UPDATE_DURABLE-1"
+	CD_BULK_DEPLOY_TRIGGER_TOPIC        string = "CD-BULK-DEPLOY-TRIGGER"
+	CD_BULK_DEPLOY_TRIGGER_GROUP        string = "CD-BULK-DEPLOY-TRIGGER-GROUP-1"
+	CD_BULK_DEPLOY_TRIGGER_DURABLE      string = "CD-BULK-DEPLOY-TRIGGER-DURABLE-1"
+	HELM_CHART_INSTALL_STATUS_TOPIC     string = "HELM-CHART-INSTALL-STATUS-TOPIC"
+	HELM_CHART_INSTALL_STATUS_GROUP     string = "HELM-CHART-INSTALL-STATUS-GROUP"
+	HELM_CHART_INSTALL_STATUS_DURABLE   string = "HELM-CHART-INSTALL-STATUS-DURABLE"
+	DEVTRON_CHART_INSTALL_TOPIC         string = "DEVTRON-CHART-INSTALL-TOPIC"
+	DEVTRON_CHART_INSTALL_GROUP         string = "DEVTRON-CHART-INSTALL-GROUP"
+	DEVTRON_CHART_INSTALL_DURABLE       string = "DEVTRON-CHART-INSTALL-DURABLE"
 )
 
 type NatsTopic struct {
@@ -92,16 +104,18 @@ type ConfigJson struct {
 
 var natsTopicMapping = map[string]NatsTopic{
 
-	BULK_APPSTORE_DEPLOY_TOPIC: {topicName: BULK_APPSTORE_DEPLOY_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_APPSTORE_DEPLOY_GROUP, consumerName: BULK_APPSTORE_DEPLOY_DURABLE},
-	BULK_DEPLOY_TOPIC:          {topicName: BULK_DEPLOY_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_DEPLOY_GROUP, consumerName: BULK_DEPLOY_DURABLE},
-	BULK_HIBERNATE_TOPIC:       {topicName: BULK_HIBERNATE_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_HIBERNATE_GROUP, consumerName: BULK_HIBERNATE_DURABLE},
-	CD_SUCCESS:                 {topicName: CD_SUCCESS, streamName: ORCHESTRATOR_STREAM, queueName: CD_TRIGGER_GROUP, consumerName: CD_TRIGGER_DURABLE},
-	WEBHOOK_EVENT_TOPIC:        {topicName: WEBHOOK_EVENT_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: WEBHOOK_EVENT_GROUP, consumerName: WEBHOOK_EVENT_DURABLE},
+	BULK_APPSTORE_DEPLOY_TOPIC:   {topicName: BULK_APPSTORE_DEPLOY_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_APPSTORE_DEPLOY_GROUP, consumerName: BULK_APPSTORE_DEPLOY_DURABLE},
+	BULK_DEPLOY_TOPIC:            {topicName: BULK_DEPLOY_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_DEPLOY_GROUP, consumerName: BULK_DEPLOY_DURABLE},
+	BULK_HIBERNATE_TOPIC:         {topicName: BULK_HIBERNATE_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: BULK_HIBERNATE_GROUP, consumerName: BULK_HIBERNATE_DURABLE},
+	CD_SUCCESS:                   {topicName: CD_SUCCESS, streamName: ORCHESTRATOR_STREAM, queueName: CD_TRIGGER_GROUP, consumerName: CD_TRIGGER_DURABLE},
+	WEBHOOK_EVENT_TOPIC:          {topicName: WEBHOOK_EVENT_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: WEBHOOK_EVENT_GROUP, consumerName: WEBHOOK_EVENT_DURABLE},
+	CD_BULK_DEPLOY_TRIGGER_TOPIC: {topicName: CD_BULK_DEPLOY_TRIGGER_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: CD_BULK_DEPLOY_TRIGGER_GROUP, consumerName: CD_BULK_DEPLOY_TRIGGER_DURABLE},
 
 	CI_COMPLETE_TOPIC:       {topicName: CI_COMPLETE_TOPIC, streamName: CI_RUNNER_STREAM, queueName: CI_COMPLETE_GROUP, consumerName: CI_COMPLETE_DURABLE},
 	CD_STAGE_COMPLETE_TOPIC: {topicName: CD_STAGE_COMPLETE_TOPIC, streamName: CI_RUNNER_STREAM, queueName: CD_COMPLETE_GROUP, consumerName: CD_COMPLETE_DURABLE},
 
 	APPLICATION_STATUS_UPDATE_TOPIC: {topicName: APPLICATION_STATUS_UPDATE_TOPIC, streamName: KUBEWATCH_STREAM, queueName: APPLICATION_STATUS_UPDATE_GROUP, consumerName: APPLICATION_STATUS_UPDATE_DURABLE},
+	APPLICATION_STATUS_DELETE_TOPIC: {topicName: APPLICATION_STATUS_DELETE_TOPIC, streamName: KUBEWATCH_STREAM, queueName: APPLICATION_STATUS_DELETE_GROUP, consumerName: APPLICATION_STATUS_DELETE_DURABLE},
 	CRON_EVENTS:                     {topicName: CRON_EVENTS, streamName: KUBEWATCH_STREAM, queueName: CRON_EVENTS_GROUP, consumerName: CRON_EVENTS_DURABLE},
 	WORKFLOW_STATUS_UPDATE_TOPIC:    {topicName: WORKFLOW_STATUS_UPDATE_TOPIC, streamName: KUBEWATCH_STREAM, queueName: WORKFLOW_STATUS_UPDATE_GROUP, consumerName: WORKFLOW_STATUS_UPDATE_DURABLE},
 	CD_WORKFLOW_STATUS_UPDATE:       {topicName: CD_WORKFLOW_STATUS_UPDATE, streamName: KUBEWATCH_STREAM, queueName: CD_WORKFLOW_STATUS_UPDATE_GROUP, consumerName: CD_WORKFLOW_STATUS_UPDATE_DURABLE},
@@ -111,6 +125,8 @@ var natsTopicMapping = map[string]NatsTopic{
 	DEVTRON_TEST_TOPIC:                {topicName: DEVTRON_TEST_TOPIC, streamName: DEVTRON_TEST_STREAM, queueName: DEVTRON_TEST_QUEUE, consumerName: DEVTRON_TEST_CONSUMER},
 	TOPIC_CI_SCAN:                     {topicName: TOPIC_CI_SCAN, streamName: IMAGE_SCANNER_STREAM, queueName: TOPIC_CI_SCAN_GRP, consumerName: TOPIC_CI_SCAN_DURABLE},
 	ARGO_PIPELINE_STATUS_UPDATE_TOPIC: {topicName: ARGO_PIPELINE_STATUS_UPDATE_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: ARGO_PIPELINE_STATUS_UPDATE_GROUP, consumerName: ARGO_PIPELINE_STATUS_UPDATE_DURABLE},
+	HELM_CHART_INSTALL_STATUS_TOPIC:   {topicName: HELM_CHART_INSTALL_STATUS_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: HELM_CHART_INSTALL_STATUS_GROUP, consumerName: HELM_CHART_INSTALL_STATUS_DURABLE},
+	DEVTRON_CHART_INSTALL_TOPIC:       {topicName: DEVTRON_CHART_INSTALL_TOPIC, streamName: ORCHESTRATOR_STREAM, queueName: DEVTRON_CHART_INSTALL_GROUP, consumerName: DEVTRON_CHART_INSTALL_DURABLE},
 }
 
 var NatsStreamWiseConfigMapping = map[string]NatsStreamConfig{
@@ -129,6 +145,7 @@ var NatsConsumerWiseConfigMapping = map[string]NatsConsumerConfig{
 	WORKFLOW_STATUS_UPDATE_DURABLE:      {},
 	CRON_EVENTS_DURABLE:                 {},
 	APPLICATION_STATUS_UPDATE_DURABLE:   {},
+	APPLICATION_STATUS_DELETE_DURABLE:   {},
 	CD_COMPLETE_DURABLE:                 {},
 	CI_COMPLETE_DURABLE:                 {},
 	WEBHOOK_EVENT_DURABLE:               {},
@@ -136,6 +153,9 @@ var NatsConsumerWiseConfigMapping = map[string]NatsConsumerConfig{
 	BULK_HIBERNATE_DURABLE:              {},
 	BULK_DEPLOY_DURABLE:                 {},
 	BULK_APPSTORE_DEPLOY_DURABLE:        {},
+	CD_BULK_DEPLOY_TRIGGER_DURABLE:      {},
+	HELM_CHART_INSTALL_STATUS_DURABLE:   {},
+	DEVTRON_CHART_INSTALL_DURABLE:       {},
 }
 
 func getConsumerConfigMap(jsonString string) map[string]NatsConsumerConfig {
@@ -196,11 +216,31 @@ func ParseAndFillStreamWiseAndConsumerWiseConfigMaps() {
 		NatsMsgProcessingBatchSize: defaultConfig.NatsMsgProcessingBatchSize,
 	}
 
+	// default NATS Consumer config value for BULK CD TRIGGER topic
+	defaultConsumerConfigForBulkCdTriggerTopic := NatsConsumerConfig{}
+
+	err = json.Unmarshal([]byte(defaultConfig.NatsConsumerConfig), &defaultConsumerConfigForBulkCdTriggerTopic)
+
+	if err != nil {
+		log.Print("error in unmarshalling nats consumer config",
+			"consumer-config", defaultConfig.NatsConsumerConfig,
+			"err", err)
+	}
+
 	for key, _ := range NatsConsumerWiseConfigMapping {
 		defaultValue := defaultConsumerConfigVal
-		if _, ok := consumerConfigMap[key]; ok {
+
+		// Setting AckWait config. Only for BULK CD TRIGGER topics. Can be used for other topics
+		// if required to be made configurable
+		if key == BULK_DEPLOY_DURABLE || key == CD_BULK_DEPLOY_TRIGGER_DURABLE {
+			defaultValue.AckWaitInSecs = defaultConsumerConfigForBulkCdTriggerTopic.AckWaitInSecs
+		}
+
+		// Overriding default config with explicitly provided topic-specific config
+		if _, ok := consumerConfigMap[key]; ok && (key != BULK_DEPLOY_DURABLE && key != CD_BULK_DEPLOY_TRIGGER_DURABLE) {
 			defaultValue = consumerConfigMap[key]
 		}
+
 		NatsConsumerWiseConfigMapping[key] = defaultValue
 	}
 
@@ -246,6 +286,7 @@ func AddStream(js nats.JetStreamContext, streamConfig *nats.StreamConfig, stream
 			log.Fatal("Error while getting stream info", "stream name", streamName, "error", err)
 		} else {
 			config := streamInfo.Config
+			streamConfig.Name = streamName
 			if checkConfigChangeReqd(&config, streamConfig) {
 				_, err1 := js.UpdateStream(&config)
 				if err1 != nil {
@@ -260,8 +301,9 @@ func AddStream(js nats.JetStreamContext, streamConfig *nats.StreamConfig, stream
 func checkConfigChangeReqd(existingConfig *nats.StreamConfig, toUpdateConfig *nats.StreamConfig) bool {
 	configChanged := false
 	newStreamSubjects := GetStreamSubjects(toUpdateConfig.Name)
-	if toUpdateConfig.MaxAge != time.Duration(0) && toUpdateConfig.MaxAge != existingConfig.MaxAge || len(newStreamSubjects) != len(existingConfig.Subjects) {
+	if ((toUpdateConfig.MaxAge != time.Duration(0)) && (toUpdateConfig.MaxAge != existingConfig.MaxAge)) || (len(newStreamSubjects) != len(existingConfig.Subjects)) {
 		existingConfig.MaxAge = toUpdateConfig.MaxAge
+		existingConfig.Subjects = newStreamSubjects
 		configChanged = true
 	}
 
