@@ -10,8 +10,9 @@ github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/devtron-labs/common-lib v0.0.2
-## explicit; go 1.18
+# github.com/devtron-labs/common-lib v0.0.8-0.20231123064625-c63de2aa7e8b
+## explicit; go 1.20
+github.com/devtron-labs/common-lib/natsMetrics
 github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
 # github.com/devtron-labs/protos v0.0.2
