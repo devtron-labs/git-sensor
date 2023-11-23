@@ -10,9 +10,8 @@ github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/devtron-labs/common-lib v0.0.8-0.20231123055724-1d0e3c8c4955
-## explicit; go 1.20
-github.com/devtron-labs/common-lib/natsMetrics
+# github.com/devtron-labs/common-lib v0.0.2
+## explicit; go 1.18
 github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/utils
 # github.com/devtron-labs/protos v0.0.2
@@ -152,8 +151,8 @@ github.com/xanzy/ssh-agent
 # go.uber.org/atomic v1.10.0
 ## explicit; go 1.18
 go.uber.org/atomic
-# go.uber.org/multierr v1.11.0
-## explicit; go 1.19
+# go.uber.org/multierr v1.6.0
+## explicit; go 1.12
 go.uber.org/multierr
 # go.uber.org/zap v1.21.0
 ## explicit; go 1.13
@@ -207,6 +206,8 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+# golang.org/x/time v0.4.0
+## explicit; go 1.18
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20230525234030-28d5490b6b19
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/status
