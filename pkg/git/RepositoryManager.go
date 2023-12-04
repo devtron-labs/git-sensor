@@ -17,7 +17,6 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -35,15 +34,14 @@ import (
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport"
 )
 
 type RepositoryManager interface {
-	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error)
+	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, err error)
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
-	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
+	ChangesSinceByRepository(branch string, from string, to string, count int) ([]*GitCommit, error)
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
 	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
@@ -118,22 +116,23 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 	return err
 }
 
-func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir string, url string) (*git.Repository, error) {
-	timeoutContext, _ := context.WithTimeout(context.Background(), CLONE_TIMEOUT_SEC*time.Second)
-	impl.logger.Infow("cloning repository ", "url", url, "cloneDir", cloneDir)
-	repo, err := git.PlainCloneContext(timeoutContext, cloneDir, true, &git.CloneOptions{
-		URL:  url,
-		Auth: auth,
-	})
-	if err != nil {
-		impl.logger.Errorw("error in cloning repo ", "url", url, "err", err)
-	} else {
-		impl.logger.Infow("repo cloned", "url", url)
-	}
-	return repo, err
-}
+//
+//func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir string, url string) (*git.Repository, error) {
+//	timeoutContext, _ := context.WithTimeout(context.Background(), CLONE_TIMEOUT_SEC*time.Second)
+//	impl.logger.Infow("cloning repository ", "url", url, "cloneDir", cloneDir)
+//	repo, err := git.PlainCloneContext(timeoutContext, cloneDir, true, &git.CloneOptions{
+//		URL:  url,
+//		Auth: auth,
+//	})
+//	if err != nil {
+//		impl.logger.Errorw("error in cloning repo ", "url", url, "err", err)
+//	} else {
+//		impl.logger.Infow("repo cloned", "url", url)
+//	}
+//	return repo, err
+//}
 
-func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -141,24 +140,24 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	if !impl.IsSpaceAvailableOnDisk() {
 		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return false, nil, err
+		return false, err
 	}
-	r, err := git.PlainOpen(location)
+	//r, err := git.PlainOpen(location)
 	if err != nil {
 		err = os.RemoveAll(location)
 		if err != nil {
 			impl.logger.Errorw("error in cleaning checkout path", "err", err)
-			return false, nil, err
+			return false, err
 		}
 		err = impl.gitUtil.Init(location, url, true)
 		if err != nil {
 			impl.logger.Errorw("err in git init", "err", err)
-			return false, nil, err
+			return false, err
 		}
-		r, err = git.PlainOpen(location)
-		if err != nil {
-			return false, nil, err
-		}
+		//r, err = git.PlainOpen(location)
+		//if err != nil {
+		//	return false, nil, err
+		//}
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
 	if err == nil {
@@ -169,15 +168,15 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
 		middleware.GitPullDuration.WithLabelValues("true", "true").Observe(time.Since(start).Seconds())
-		return true, r, nil
+		return true, nil
 	} else if err == nil && len(res) == 0 {
 		impl.logger.Debugw("no update for ", "path", url)
 		middleware.GitPullDuration.WithLabelValues("true", "false").Observe(time.Since(start).Seconds())
-		return false, r, nil
+		return false, nil
 	} else {
 		impl.logger.Errorw("error in updating repository", "err", err, "location", url, "error msg", errorMsg)
 		middleware.GitPullDuration.WithLabelValues("false", "false").Observe(time.Since(start).Seconds())
-		return false, r, err
+		return false, err
 	}
 
 }
@@ -189,20 +188,21 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		util.TriggerGitOperationMetrics("getCommitForTag", start, err)
 	}()
 	tag = strings.TrimSpace(tag)
-	r, err := git.PlainOpen(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
-	tagRef, err := r.Tag(tag)
-	if err != nil {
-		impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "tag", tag, "err", err)
-		return nil, err
-	}
-	commit, err := r.CommitObject(plumbing.NewHash(tagRef.Hash().String()))
-	if err != nil {
-		impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "hash", tagRef, "err", err)
-		return nil, err
-	}
+	//r, err := git.PlainOpen(checkoutPath)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//tagRef, err := r.Tag(tag)
+	//if err != nil {
+	//	impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "tag", tag, "err", err)
+	//	return nil, err
+	//}
+	//commit, err := r.CommitObject(plumbing.NewHash(tagRef.Hash().String()))
+	//if err != nil {
+	//	impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "hash", tagRef, "err", err)
+	//	return nil, err
+	//}
+	var commit object.Commit
 	gitCommit := &GitCommit{
 		Author:  commit.Author.String(),
 		Commit:  commit.Hash.String(),
@@ -218,15 +218,16 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	defer func() {
 		util.TriggerGitOperationMetrics("getCommitMetadata", start, err)
 	}()
-	r, err := git.PlainOpen(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
-	commit, err := r.CommitObject(plumbing.NewHash(commitHash))
-	if err != nil {
-		impl.logger.Errorw("error in fetching commit", "path", checkoutPath, "hash", commitHash, "err", err)
-		return nil, err
-	}
+	//r, err := git.PlainOpen(checkoutPath)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//commit, err := r.CommitObject(plumbing.NewHash(commitHash))
+	//if err != nil {
+	//	impl.logger.Errorw("error in fetching commit", "path", checkoutPath, "hash", commitHash, "err", err)
+	//	return nil, err
+	//}
+	var commit object.Commit
 	gitCommit := &GitCommit{
 		Author:  commit.Author.String(),
 		Commit:  commit.Hash.String(),
@@ -238,7 +239,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(branch string, from string, to string, count int) ([]*GitCommit, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -251,20 +252,21 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 		branch = strings.ReplaceAll(branch, "refs/heads/", "")
 	}
 
-	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
-	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
-	if err != nil && err == plumbing.ErrReferenceNotFound {
-		impl.logger.Errorw("ref not found", "branch", branch, "err", err)
-		return nil, fmt.Errorf("branch %s not found in the repository ", branch)
-	} else if err != nil {
-		impl.logger.Errorw("error in getting reference", "branch", branch, "err", err)
-		return nil, err
-	}
-	itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
-	if err != nil {
-		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
-		return nil, err
-	}
+	//branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	//ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
+	//if err != nil && err == plumbing.ErrReferenceNotFound {
+	//	impl.logger.Errorw("ref not found", "branch", branch, "err", err)
+	//	return nil, fmt.Errorf("branch %s not found in the repository ", branch)
+	//} else if err != nil {
+	//	impl.logger.Errorw("error in getting reference", "branch", branch, "err", err)
+	//	return nil, err
+	//}
+	//itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
+	//if err != nil {
+	//	impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
+	//	return nil, err
+	//}
+	var itr object.CommitIter
 	var gitCommits []*GitCommit
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
@@ -311,7 +313,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			if !gitCommit.IsMessageValidUTF8() {
 				gitCommit.FixInvalidUTF8Message()
 			}
-			impl.logger.Debugw("commit dto for repo ", "repo", repository, commit)
+			impl.logger.Debugw("commit dto for repo ", "repo", "repository", commit)
 			gitCommits = append(gitCommits, gitCommit)
 			itrCounter = itrCounter + 1
 			if impl.configuration.EnableFileStats {
@@ -341,12 +343,12 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	if count == 0 {
 		count = impl.configuration.GitHistoryCount
 	}
-	r, err := git.PlainOpen(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
+	//r, err := git.PlainOpen(checkoutPath)
+	//if err != nil {
+	//	return nil, err
+	//}
 	///---------------------
-	return impl.ChangesSinceByRepository(r, branch, from, to, count)
+	return impl.ChangesSinceByRepository(branch, from, to, count)
 	///----------------------
 
 }
@@ -369,33 +371,45 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	defer func() {
 		util.TriggerGitOperationMetrics("changesSinceByRepositoryForAnalytics", start, err)
 	}()
-	GitChanges := &GitChanges{}
-	repository, err := git.PlainOpen(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
+	//GitChanges := &GitChanges{}
+	//repository, err := git.PlainOpen(checkoutPath)
+	//if err != nil {
+	//	return nil, err
+	//}
 	newHash := plumbing.NewHash(New)
 	oldHash := plumbing.NewHash(Old)
-	old, err := repository.CommitObject(newHash)
+	//old, err := repository.CommitObject(newHash)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//new, err := repository.CommitObject(oldHash)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//oldTree, err := old.Tree()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//newTree, err := new.Tree()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//patch, err := oldTree.Patch(newTree)
+	//if err != nil {
+	//	impl.logger.Errorw("can't get patch: ", "err", err)
+	//	return nil, err
+	//}
+
+	oldHashString := Old
+	newHashString := New
+	outputMsg, errorMsg, err := impl.gitUtil.FetchDiffStatBetweenCommits(nil, newHashString, oldHashString, checkoutPath)
 	if err != nil {
+		impl.logger.Errorw("error in fetching fileStat diff between commits ", "errorMsg", errorMsg, "err", err)
 		return nil, err
 	}
-	new, err := repository.CommitObject(oldHash)
+	fileStats, err := getFileStat(outputMsg)
 	if err != nil {
-		return nil, err
-	}
-	oldTree, err := old.Tree()
-	if err != nil {
-		return nil, err
-	}
-	newTree, err := new.Tree()
-	if err != nil {
-		return nil, err
-	}
-	patch, err := oldTree.Patch(newTree)
-	if err != nil {
-		impl.logger.Errorw("can't get patch: ", "err", err)
-		return nil, err
+		impl.logger.Errorw("can't convert git diff into fileStats ", "err", err)
 	}
 	commits, err := computeDiff(repository, &newHash, &oldHash)
 	if err != nil {

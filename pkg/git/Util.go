@@ -19,6 +19,7 @@ package git
 import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"io/ioutil"
 	"os"
 	"path"
@@ -123,4 +124,34 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 	}
 
 	return nil
+}
+
+func getFileStat(commitDiff string) (object.FileStats, error) {
+	filestat := object.FileStats{}
+	lines := strings.Split(strings.TrimSpace(commitDiff), "\n")
+
+	for _, line := range lines {
+		parts := strings.Fields(line)
+
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid git diff --numstat output")
+		}
+
+		added, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse number of lines added: %w", err)
+		}
+
+		deleted, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse number of lines deleted: %w", err)
+		}
+		filestat = append(filestat, object.FileStat{
+			Name:     parts[2],
+			Addition: added,
+			Deletion: deleted,
+		})
+	}
+
+	return filestat, nil
 }

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/config"
 	"os"
 	"os/exec"
 	"strings"
@@ -87,14 +85,14 @@ func (impl *GitUtil) Init(rootDir string, remoteUrl string, isBare bool) error {
 	if err != nil {
 		return err
 	}
-	repo, err := git.PlainInit(rootDir, isBare)
-	if err != nil {
-		return err
-	}
-	_, err = repo.CreateRemote(&config.RemoteConfig{
-		Name: git.DefaultRemoteName,
-		URLs: []string{remoteUrl},
-	})
+	//repo, err := git.PlainInit(rootDir, isBare)
+	//if err != nil {
+	//	return err
+	//}
+	//_, err = repo.CreateRemote(&config.RemoteConfig{
+	//	Name: git.DefaultRemoteName,
+	//	URLs: []string{remoteUrl},
+	//})
 	return err
 }
 
@@ -104,5 +102,13 @@ func (impl *GitUtil) ConfigureSshCommand(rootDir string, sshPrivateKeyPath strin
 	cmd := exec.Command("git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, errMsg, err
+}
+
+func (impl *GitUtil) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+	impl.logger.Debugw("git diff --numstat", "location", rootDir)
+	cmd := exec.Command("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }

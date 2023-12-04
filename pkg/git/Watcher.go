@@ -124,6 +124,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
 		wp.Submit(func() {
+			//impl.locker.LeaseLocker()
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
@@ -179,7 +180,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		Username: userName,
 		Password: password,
 	}
-	updated, repo, err := impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+	updated, err := impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
@@ -190,7 +191,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				return err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				updated, repo, err = impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+				updated, err = impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
@@ -218,7 +219,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		//parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(material.Value, "", "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
