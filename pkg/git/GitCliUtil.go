@@ -93,41 +93,6 @@ func (impl *GitUtil) ConfigureSshCommand(rootDir string, sshPrivateKeyPath strin
 	return output, errMsg, err
 }
 
-func (impl *GitUtil) InitCLI(rootDir string, remoteUrl string) error {
-	//-----------------
-
-	err := os.MkdirAll(rootDir, 0755)
-	if err != nil {
-		return err
-	}
-	//repo, err := git.PlainInit(rootDir, isBare)
-	//if err != nil {
-	//	return err
-	//}
-	//_, err = repo.CreateRemote(&config.RemoteConfig{
-	//	Name: git.DefaultRemoteName,
-	//	URLs: []string{remoteUrl},
-	//})
-	return err
-}
-
-//func (impl *GitUtil) GetCommitIteratorCLI(repository *GitRepository, branchRef string, branch string) (*CommitIterator, error) {
-//
-//	commits, _, _ := impl.GetCommits(branchRef, branch, repository.rootDir, 15)
-//
-//	//ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
-//	//if err != nil && err == plumbing.ErrReferenceNotFound {
-//	//	return nil, fmt.Errorf("ref not found %s branch  %s", err, branch)
-//	//} else if err != nil {
-//	//	return nil, fmt.Errorf("error in getting reference %s branch  %s", err, branch)
-//	//}
-//	//itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
-//	//if err != nil {
-//	//	return nil, fmt.Errorf("error in getting iterator %s branch  %s", err, branch)
-//	//}
-//	//return &CommitIterator{CommitIter: itr}, nil
-//}
-
 func (impl *GitUtil) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git diff --numstat", "location", rootDir)
 	cmd := exec.Command("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
