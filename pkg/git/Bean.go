@@ -17,7 +17,9 @@
 package git
 
 import (
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"time"
 	"unicode/utf8"
@@ -45,6 +47,72 @@ type CiPipelineMaterialBean struct {
 	ExtraEnvironmentVariables map[string]string // extra env variables which will be used for CI
 }
 
+type GitRepository struct {
+	git.Repository
+	rootDir string
+}
+
+type CommitIterator struct {
+	object.CommitIter
+	useCLI  bool
+	commits []*GitCommit
+	index   int
+}
+
+func transformFileStats(stats object.FileStats) FileStats {
+	fileStatList := make([]FileStat, 0)
+	for _, stat := range stats {
+		fileStatList = append(fileStatList, FileStat{
+			Name:     stat.Name,
+			Addition: stat.Addition,
+			Deletion: stat.Deletion,
+		})
+	}
+	return fileStatList
+}
+
+func (commit GitCommit) Stats() (FileStats, error) {
+	if !commit.useCLI {
+		stat, err := commit.cm.Stats()
+		if err != nil {
+			return nil, fmt.Errorf("error in  fetching stats %s", err)
+		}
+		return transformFileStats(stat), nil
+	}
+
+	fileStat, errorMsg, err := commit.gitUtil.FetchDiffStatBetweenCommits(&GitContext{}, commit.Commit, "", commit.CheckoutPath)
+	if err != nil {
+		commit.gitUtil.logger.Errorw("error in fetching fileStat of commit: ", commit.Commit, "checkoutPath", commit.CheckoutPath, "errorMsg", errorMsg, "err", err)
+		return nil, err
+	}
+	stats, err := getFileStat(fileStat)
+	if err != nil {
+		return nil, err
+	}
+	return transformFileStats(stats), nil
+}
+
+func (itr CommitIterator) Next() (*GitCommit, error) {
+	if !itr.useCLI {
+		commit, err := itr.CommitIter.Next()
+		gitCommit := &GitCommit{
+			cm:      commit,
+			Author:  commit.Author.String(),
+			Commit:  commit.Hash.String(),
+			Date:    commit.Author.When,
+			Message: commit.Message,
+			useCLI:  true,
+		}
+		return gitCommit, err
+	}
+	if itr.index < len(itr.commits) {
+		commit := itr.commits[itr.index]
+		itr.index++
+		return commit, nil
+	}
+	return nil, fmt.Errorf("no more commits")
+}
+
 type MaterialChangeResp struct {
 	Commits        []*GitCommit `json:"commits"`
 	LastFetchTime  time.Time    `json:"lastFetchTime"`
@@ -55,14 +123,18 @@ type MaterialChangeResp struct {
 }
 
 type GitCommit struct {
-	Commit      string
-	Author      string
-	Date        time.Time
-	Message     string
-	Changes     []string          `json:",omitempty"`
-	FileStats   *object.FileStats `json:",omitempty"`
-	WebhookData *WebhookData      `json:"webhookData"`
-	Excluded    bool              `json:",omitempty"`
+	cm           *object.Commit
+	Commit       string
+	Author       string
+	Date         time.Time
+	Message      string
+	Changes      []string   `json:",omitempty"`
+	FileStats    *FileStats `json:",omitempty"`
+	useCLI       bool
+	WebhookData  *WebhookData `json:"webhookData"`
+	Excluded     bool         `json:",omitempty"`
+	gitUtil      *GitUtil
+	CheckoutPath string
 }
 
 func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
@@ -207,3 +279,23 @@ type WebhookPayloadFilterDataSelectorResponse struct {
 	SelectorValue     string `json:"selectorValue"`
 	Match             bool   `json:"match"`
 }
+
+type GitChanges struct {
+	Commits   []*Commit
+	FileStats object.FileStats
+}
+
+type FileStatsResult struct {
+	FileStats object.FileStats
+	Error     error
+}
+
+// FileStat stores the status of changes in content of a file.
+type FileStat struct {
+	Name     string
+	Addition int
+	Deletion int
+}
+
+// FileStats is a collection of FileStat.
+type FileStats []FileStat

@@ -17,14 +17,12 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
 	"golang.org/x/sys/unix"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -32,20 +30,15 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing/transport"
 )
 
 type RepositoryManager interface {
-	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error)
+	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *GitRepository, err error)
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
-	ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error)
+	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommit, error)
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
-	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
 	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
 }
@@ -118,22 +111,7 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 	return err
 }
 
-func (impl RepositoryManagerImpl) clone(auth transport.AuthMethod, cloneDir string, url string) (*git.Repository, error) {
-	timeoutContext, _ := context.WithTimeout(context.Background(), CLONE_TIMEOUT_SEC*time.Second)
-	impl.logger.Infow("cloning repository ", "url", url, "cloneDir", cloneDir)
-	repo, err := git.PlainCloneContext(timeoutContext, cloneDir, true, &git.CloneOptions{
-		URL:  url,
-		Auth: auth,
-	})
-	if err != nil {
-		impl.logger.Errorw("error in cloning repo ", "url", url, "err", err)
-	} else {
-		impl.logger.Infow("repo cloned", "url", url)
-	}
-	return repo, err
-}
-
-func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *git.Repository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *GitRepository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -143,22 +121,9 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	r, err := git.PlainOpen(location)
+	r, err := impl.gitUtil.OpenNewRepo(location, url)
 	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			impl.logger.Errorw("error in cleaning checkout path", "err", err)
-			return false, nil, err
-		}
-		err = impl.gitUtil.Init(location, url, true)
-		if err != nil {
-			impl.logger.Errorw("err in git init", "err", err)
-			return false, nil, err
-		}
-		r, err = git.PlainOpen(location)
-		if err != nil {
-			return false, nil, err
-		}
+		return false, r, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
 	if err == nil {
@@ -189,27 +154,11 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		util.TriggerGitOperationMetrics("getCommitForTag", start, err)
 	}()
 	tag = strings.TrimSpace(tag)
-	r, err := git.PlainOpen(checkoutPath)
+	commit, err := impl.GetCommitForTag(checkoutPath, tag)
 	if err != nil {
 		return nil, err
 	}
-	tagRef, err := r.Tag(tag)
-	if err != nil {
-		impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "tag", tag, "err", err)
-		return nil, err
-	}
-	commit, err := r.CommitObject(plumbing.NewHash(tagRef.Hash().String()))
-	if err != nil {
-		impl.logger.Errorw("error in fetching tag", "path", checkoutPath, "hash", tagRef, "err", err)
-		return nil, err
-	}
-	gitCommit := &GitCommit{
-		Author:  commit.Author.String(),
-		Commit:  commit.Hash.String(),
-		Date:    commit.Author.When,
-		Message: commit.Message,
-	}
-	return gitCommit, nil
+	return commit, nil
 }
 
 func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error) {
@@ -218,30 +167,20 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	defer func() {
 		util.TriggerGitOperationMetrics("getCommitMetadata", start, err)
 	}()
-	r, err := git.PlainOpen(checkoutPath)
+	gitCommit, err := impl.gitUtil.GetCommitForHash(checkoutPath, commitHash)
 	if err != nil {
 		return nil, err
-	}
-	commit, err := r.CommitObject(plumbing.NewHash(commitHash))
-	if err != nil {
-		impl.logger.Errorw("error in fetching commit", "path", checkoutPath, "hash", commitHash, "err", err)
-		return nil, err
-	}
-	gitCommit := &GitCommit{
-		Author:  commit.Author.String(),
-		Commit:  commit.Hash.String(),
-		Date:    commit.Author.When,
-		Message: commit.Message,
 	}
 	return gitCommit, nil
 }
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repository, branch string, from string, to string, count int) ([]*GitCommit, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommit, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
+
 	var err error
 	start := time.Now()
 	defer func() {
@@ -252,17 +191,9 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 	}
 
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
-	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
-	if err != nil && err == plumbing.ErrReferenceNotFound {
-		impl.logger.Errorw("ref not found", "branch", branch, "err", err)
-		return nil, fmt.Errorf("branch %s not found in the repository ", branch)
-	} else if err != nil {
-		impl.logger.Errorw("error in getting reference", "branch", branch, "err", err)
-		return nil, err
-	}
-	itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
+
+	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch, impl.configuration.UseCli)
 	if err != nil {
-		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
 		return nil, err
 	}
 	var gitCommits []*GitCommit
@@ -289,24 +220,25 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 				breakLoop = true
 				return
 			}
-			if !commitToFind && strings.Contains(commit.Hash.String(), to) {
+			if !commitToFind && strings.Contains(commit.Commit, to) {
 				commitToFind = true
 			}
 			if !commitToFind {
 				return
 			}
-			if commit.Hash.String() == from && len(from) > 0 {
+			if commit.Commit == from && len(from) > 0 {
 				//found end
 				breakLoop = true
 				return
 			}
 
-			gitCommit := &GitCommit{
-				Author:  commit.Author.String(),
-				Commit:  commit.Hash.String(),
-				Date:    commit.Author.When,
-				Message: commit.Message,
-			}
+			gitCommit := commit
+			//&GitCommit{
+			//	Author:  commit.Author.String(),
+			//	Commit:  commit.Hash.String(),
+			//	Date:    commit.Author.When,
+			//	Message: commit.Message,
+			//}
 			gitCommit.TruncateMessageIfExceedsMaxLength()
 			if !gitCommit.IsMessageValidUTF8() {
 				gitCommit.FixInvalidUTF8Message()
@@ -341,79 +273,14 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	if count == 0 {
 		count = impl.configuration.GitHistoryCount
 	}
-	r, err := git.PlainOpen(checkoutPath)
+	r, err := impl.gitUtil.OpenRepoPlain(checkoutPath)
 	if err != nil {
 		return nil, err
 	}
 	///---------------------
-	return impl.ChangesSinceByRepository(r, branch, from, to, count)
+	return impl.ChangesSinceByRepository(r, branch, from, to, count, checkoutPath)
 	///----------------------
 
-}
-
-type GitChanges struct {
-	Commits   []*Commit
-	FileStats object.FileStats
-}
-
-type FileStatsResult struct {
-	FileStats object.FileStats
-	Error     error
-}
-
-// from -> old commit
-// to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("changesSinceByRepositoryForAnalytics", start, err)
-	}()
-	GitChanges := &GitChanges{}
-	repository, err := git.PlainOpen(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
-	newHash := plumbing.NewHash(New)
-	oldHash := plumbing.NewHash(Old)
-	old, err := repository.CommitObject(newHash)
-	if err != nil {
-		return nil, err
-	}
-	new, err := repository.CommitObject(oldHash)
-	if err != nil {
-		return nil, err
-	}
-	oldTree, err := old.Tree()
-	if err != nil {
-		return nil, err
-	}
-	newTree, err := new.Tree()
-	if err != nil {
-		return nil, err
-	}
-	patch, err := oldTree.Patch(newTree)
-	if err != nil {
-		impl.logger.Errorw("can't get patch: ", "err", err)
-		return nil, err
-	}
-	commits, err := computeDiff(repository, &newHash, &oldHash)
-	if err != nil {
-		impl.logger.Errorw("can't get commits: ", "err", err)
-	}
-	var serializableCommits []*Commit
-	for _, c := range commits {
-		t, err := repository.TagObject(c.Hash)
-		if err != nil && err != plumbing.ErrObjectNotFound {
-			impl.logger.Errorw("can't get tag: ", "err", err)
-		}
-		serializableCommits = append(serializableCommits, transform(c, t))
-	}
-	GitChanges.Commits = serializableCommits
-	fileStats := patch.Stats()
-	impl.logger.Debugw("computed files stats", "filestats", fileStats)
-	GitChanges.FileStats = fileStats
-	return GitChanges, nil
 }
 
 func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
@@ -437,151 +304,4 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	}
 
 	return nil
-}
-
-func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
-	processed := make(map[string]*object.Commit, 0)
-	//t := time.Now()
-	h := newHash  //plumbing.NewHash(newHash)
-	h2 := oldHash //plumbing.NewHash(oldHash)
-	c1, err := r.CommitObject(*h)
-	if err != nil {
-		return nil, fmt.Errorf("not found commit %s", h.String())
-	}
-	c2, err := r.CommitObject(*h2)
-	if err != nil {
-		return nil, fmt.Errorf("not found commit %s", h2.String())
-	}
-
-	var parents, ancestorStack []*object.Commit
-	ps := c1.Parents()
-	for {
-		n, err := ps.Next()
-		if err == io.EOF {
-			break
-		}
-		if n.Hash.String() != c2.Hash.String() {
-			parents = append(parents, n)
-		}
-	}
-	ancestorStack = append(ancestorStack, parents...)
-	processed[c1.Hash.String()] = c1
-
-	for len(ancestorStack) > 0 {
-		lastIndex := len(ancestorStack) - 1
-		//dont process already processed in this algorithm path is not important
-		if _, ok := processed[ancestorStack[lastIndex].Hash.String()]; ok {
-			ancestorStack = ancestorStack[:lastIndex]
-			continue
-		}
-		//if this is old commit provided for processing then ignore it
-		if ancestorStack[lastIndex].Hash.String() == c2.Hash.String() {
-			ancestorStack = ancestorStack[:lastIndex]
-			continue
-		}
-		m, err := ancestorStack[lastIndex].MergeBase(c2)
-		//fmt.Printf("mergebase between %s and %s is %s length %d\n", ancestorStack[lastIndex].Hash.String(), c2.Hash.String(), m[0].Hash.String(), len(m))
-		if err != nil {
-			log.Fatal("Error in mergebase " + ancestorStack[lastIndex].Hash.String() + " " + c2.Hash.String())
-		}
-		// if commit being analyzed is itself merge commit then dont process as it is common in both old and new
-		if in(ancestorStack[lastIndex], m) {
-			ancestorStack = ancestorStack[:lastIndex]
-			continue
-		}
-		d, p := getDiffTillBranchingOrDest(ancestorStack[lastIndex], m)
-		//fmt.Printf("length of diff %d\n", len(d))
-		for _, v := range d {
-			processed[v.Hash.String()] = v
-		}
-		curNodes := make(map[string]bool, 0)
-		for _, v := range ancestorStack {
-			curNodes[v.Hash.String()] = true
-		}
-		processed[ancestorStack[lastIndex].Hash.String()] = ancestorStack[lastIndex]
-		ancestorStack = ancestorStack[:lastIndex]
-		for _, v := range p {
-			if ok2, _ := curNodes[v.Hash.String()]; !ok2 {
-				ancestorStack = append(ancestorStack, v)
-			}
-		}
-	}
-	var commits []*object.Commit
-	for _, d := range processed {
-		commits = append(commits, d)
-	}
-	return commits, nil
-}
-
-func getDiffTillBranchingOrDest(src *object.Commit, dst []*object.Commit) (diff, parents []*object.Commit) {
-	if in(src, dst) {
-		return
-	}
-	new := src
-	for {
-		ps := new.Parents()
-		parents = make([]*object.Commit, 0)
-		for {
-			n, err := ps.Next()
-			if err == io.EOF {
-				break
-			}
-			parents = append(parents, n)
-		}
-		if len(parents) > 1 || len(parents) == 0 {
-			return
-		}
-		if in(parents[0], dst) {
-			parents = nil
-			return
-		} else {
-			//fmt.Printf("added %s when child is %s and merge base is %s", parents[0].Hash.String(), src.Hash.String(), dst[0].Hash.String())
-			diff = append(diff, parents[0])
-		}
-		new = parents[0]
-	}
-}
-
-func in(obj *object.Commit, list []*object.Commit) bool {
-	for _, v := range list {
-		if v.Hash.String() == obj.Hash.String() {
-			return true
-		}
-	}
-	return false
-}
-
-func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
-	if src == nil {
-		return nil
-	}
-	dst = &Commit{
-		Hash: &Hash{
-			Long:  src.Hash.String(),
-			Short: src.Hash.String()[:8],
-		},
-		Tree: &Tree{
-			Long:  src.TreeHash.String(),
-			Short: src.TreeHash.String()[:8],
-		},
-		Author: &Author{
-			Name:  src.Author.Name,
-			Email: src.Author.Email,
-			Date:  src.Author.When,
-		},
-		Committer: &Committer{
-			Name:  src.Committer.Name,
-			Email: src.Committer.Email,
-			Date:  src.Committer.When,
-		},
-		Subject: src.Message,
-		Body:    "",
-	}
-	if tag != nil {
-		dst.Tag = &Tag{
-			Name: tag.Name,
-			Date: tag.Tagger.When,
-		}
-	}
-	return
 }

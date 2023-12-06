@@ -52,6 +52,8 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(sql.GitProviderRepository), new(*sql.GitProviderRepositoryImpl)),
 		git.NewRepositoryManagerImpl,
 		wire.Bind(new(git.RepositoryManager), new(*git.RepositoryManagerImpl)),
+		git.NewRepositoryManagerAnalyticsImpl,
+		wire.Bind(new(git.RepositoryManagerAnalytics), new(*git.RepositoryManagerAnalyticsImpl)),
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
 		internal.NewRepositoryLocker,
