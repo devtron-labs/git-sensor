@@ -192,6 +192,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 
+	repository.commitCount = impl.configuration.GitHistoryCount
 	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch, impl.configuration.UseCli)
 	if err != nil {
 		return nil, err

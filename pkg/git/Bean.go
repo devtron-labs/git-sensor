@@ -49,7 +49,8 @@ type CiPipelineMaterialBean struct {
 
 type GitRepository struct {
 	git.Repository
-	rootDir string
+	rootDir     string
+	commitCount int
 }
 
 type CommitIterator struct {

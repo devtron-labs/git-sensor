@@ -108,7 +108,7 @@ func (impl *GitUtil) GetCommitForHash(checkoutPath, commitHash string) (*GitComm
 func (impl *GitUtil) GetCommitIterator(repository *GitRepository, branchRef string, branch string, useCli bool) (*CommitIterator, error) {
 
 	if useCli {
-		return impl.GetCommits(branchRef, branch, repository.rootDir, 15)
+		return impl.GetCommits(branchRef, branch, repository.rootDir, repository.commitCount)
 	}
 
 	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
