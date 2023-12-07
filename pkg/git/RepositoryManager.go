@@ -36,21 +36,34 @@ type RepositoryManager interface {
 	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *GitRepository, err error)
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
-	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error)
-	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommit, error)
-	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error)
-	GetCommitForTag(checkoutPath, tag string) (*GitCommit, error)
+	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error)
+	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error)
+	GetCommitForTag(checkoutPath, tag string) (*GitCommitBase, error)
 	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
 }
 
 type RepositoryManagerImpl struct {
 	logger        *zap.SugaredLogger
-	gitUtil       *GitUtil
+	gitUtil       GitManager
+	cliGitManager CliGitManager
+	goGitManager  GoGitManager
 	configuration *internal.Configuration
 }
 
-func NewRepositoryManagerImpl(logger *zap.SugaredLogger, gitUtil *GitUtil, configuration *internal.Configuration) *RepositoryManagerImpl {
-	return &RepositoryManagerImpl{logger: logger, gitUtil: gitUtil, configuration: configuration}
+func NewRepositoryManagerImpl(
+	logger *zap.SugaredLogger,
+	configuration *internal.Configuration,
+	cliGitManager CliGitManager,
+	goGitManager GoGitManager,
+) *RepositoryManagerImpl {
+	impl := &RepositoryManagerImpl{logger: logger, configuration: configuration}
+	if impl.configuration.UseCli {
+		impl.gitUtil = cliGitManager
+	} else {
+		impl.gitUtil = goGitManager
+	}
+	return impl
 }
 
 func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
@@ -147,7 +160,7 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 
 }
 
-func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*GitCommit, error) {
+func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -161,7 +174,7 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 	return commit, nil
 }
 
-func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash string) (*GitCommit, error) {
+func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -171,12 +184,12 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	if err != nil {
 		return nil, err
 	}
-	return gitCommit, nil
+	return gitCommit.GetCommit(), nil
 }
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommit, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -193,11 +206,11 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 
 	repository.commitCount = impl.configuration.GitHistoryCount
-	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch, impl.configuration.UseCli)
+	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch)
 	if err != nil {
 		return nil, err
 	}
-	var gitCommits []*GitCommit
+	var gitCommits []*GitCommitBase
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	breakLoop := false
@@ -221,19 +234,19 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 				breakLoop = true
 				return
 			}
-			if !commitToFind && strings.Contains(commit.Commit, to) {
+			if !commitToFind && strings.Contains(commit.GetCommit().Commit, to) {
 				commitToFind = true
 			}
 			if !commitToFind {
 				return
 			}
-			if commit.Commit == from && len(from) > 0 {
+			if commit.GetCommit().Commit == from && len(from) > 0 {
 				//found end
 				breakLoop = true
 				return
 			}
 
-			gitCommit := commit
+			gitCommit := commit.GetCommit()
 			//&GitCommit{
 			//	Author:  commit.Author.String(),
 			//	Commit:  commit.Hash.String(),
@@ -258,14 +271,14 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 				if err != nil {
 					impl.logger.Errorw("error in  fetching stats", "err", err)
 				}
-				gitCommit.FileStats = &stats
+				gitCommit.SetFileStats(&stats)
 			}
 		}()
 	}
 	return gitCommits, err
 }
 
-func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommit, error) {
+func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {

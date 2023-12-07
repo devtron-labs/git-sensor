@@ -41,7 +41,9 @@ type GitWatcherImpl struct {
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
 	configuration                *internal.Configuration
-	gitUtil                      *GitUtil
+	cliGitManager                CliGitManager
+	goGitManager                 GoGitManager
+	gitUtil                      GitManager
 }
 
 type GitWatcher interface {
@@ -59,7 +61,10 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration) (*GitWatcherImpl, error) {
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration,
+	cliGitManager CliGitManager,
+	goGitManager GoGitManager,
+) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -83,6 +88,11 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
 		configuration:                configuration,
+	}
+	if watcher.configuration.UseCli {
+		watcher.gitUtil = cliGitManager
+	} else {
+		watcher.gitUtil = goGitManager
 	}
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
@@ -223,7 +233,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			erroredMaterialsModels = append(erroredMaterialsModels, material)
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
-			if latestCommit.Commit != material.LastSeenHash {
+			if latestCommit.GetCommit().Commit != material.LastSeenHash {
 				//new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,

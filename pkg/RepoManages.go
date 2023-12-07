@@ -31,9 +31,9 @@ import (
 type RepoManager interface {
 	GetHeadForPipelineMaterials(ids []int) ([]*git.CiPipelineMaterialBean, error)
 	FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) //limit
-	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
-	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error)
-	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
+	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
+	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error)
+	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
 
 	SaveGitProvider(provider *sql.GitProvider) (*sql.GitProvider, error)
 	AddRepo(material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
@@ -42,7 +42,7 @@ type RepoManager interface {
 	ReloadAllRepo()
 	ResetRepo(materialId int) error
 	GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error)
-	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
+	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
@@ -67,7 +67,9 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 	configuration                                 *internal.Configuration
-	gitUtil                                       *git.GitUtil
+	cliGitManager                                 git.CliGitManager
+	goGitManager                                  git.GoGitManager
+	gitUtil                                       git.GitManager
 }
 
 func NewRepoManagerImpl(
@@ -84,8 +86,10 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
 	configuration *internal.Configuration,
+	cliGitManager git.CliGitManager,
+	goGitManager git.GoGitManager,
 ) *RepoManagerImpl {
-	return &RepoManagerImpl{
+	impl := &RepoManagerImpl{
 		logger:                            logger,
 		materialRepository:                materialRepository,
 		repositoryManager:                 repositoryManager,
@@ -100,7 +104,15 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 		configuration:                                 configuration,
+		cliGitManager:                                 cliGitManager,
+		goGitManager:                                  goGitManager,
 	}
+	if impl.configuration.UseCli {
+		impl.gitUtil = cliGitManager
+	} else {
+		impl.gitUtil = goGitManager
+	}
+	return impl
 }
 
 func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error) {
@@ -420,7 +432,7 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 		GitMaterialId: material.GitMaterialId,
 		Value:         material.Value,
 		Active:        material.Active,
-		GitCommit: &git.GitCommit{
+		GitCommit: &git.GitCommitBase{
 			Commit:  material.LastSeenHash,
 			Author:  material.CommitAuthor,
 			Date:    material.CommitDate,
@@ -468,7 +480,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 
 		return response, nil
 	}
-	commits := make([]*git.GitCommit, 0)
+	commits := make([]*git.GitCommitBase, 0)
 	err := json.Unmarshal([]byte(pipelineMaterial.CommitHistory), &commits)
 	if err != nil {
 		return nil, err
@@ -478,7 +490,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 		return response, nil
 	}
 
-	filterCommits := make([]*git.GitCommit, 0)
+	filterCommits := make([]*git.GitCommitBase, 0)
 	for _, commit := range commits {
 		excluded := impl.gitUtil.PathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Debugw("include exclude result", "excluded", excluded)
@@ -539,9 +551,9 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 		return response, nil
 	}
 
-	var commits []*git.GitCommit
+	var commits []*git.GitCommitBase
 	for _, webhookEventData := range webhookEventDataArr {
-		gitCommit := &git.GitCommit{
+		gitCommit := &git.GitCommitBase{
 			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventData),
 		}
 		commits = append(commits, gitCommit)
@@ -550,7 +562,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 	return response, nil
 }
 
-func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.PipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -580,7 +592,7 @@ func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataReque
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -602,7 +614,7 @@ func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash st
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 
 	if err != nil {
@@ -672,7 +684,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}
 }
 
-func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	// fetch ciPipelineMaterial
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
