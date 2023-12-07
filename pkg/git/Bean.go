@@ -178,17 +178,6 @@ type GitCommitCli struct {
 type GitCommitGoGit struct {
 	GitCommitBase
 	cm *object.Commit
-	//Commit       string
-	//Author       string
-	//Date         time.Time
-	//Message      string
-	//Changes      []string   `json:",omitempty"`
-	//FileStats    *FileStats `json:",omitempty"`
-	//useCLI       bool
-	//WebhookData  *WebhookData `json:"webhookData"`
-	//Excluded     bool         `json:",omitempty"`
-	//gitUtil      *GitUtil
-	//CheckoutPath string
 }
 
 func (gitCommit *GitCommitBase) TruncateMessageIfExceedsMaxLength() {
