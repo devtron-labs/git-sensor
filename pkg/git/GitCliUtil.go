@@ -119,7 +119,7 @@ func (impl *GitUtil) GitCreateRemote(rootDir string, url string) error {
 
 func (impl *GitUtil) GetCommits(branchRef string, branch string, rootDir string, numCommits int) (*CommitIterator, error) {
 	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", string(rune(numCommits)), "--date=iso-strict")
+	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", string(rune(numCommits)), "--date=iso-strict", GITFORMAT)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	commits, err := impl.processGitLogOutput(output, rootDir)
@@ -134,7 +134,7 @@ func (impl *GitUtil) GetCommits(branchRef string, branch string, rootDir string,
 
 func (impl *GitUtil) GitShow(rootDir string, hash string) (*GitCommit, error) {
 	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "show", hash)
+	cmd := exec.Command("git", "-C", rootDir, "show", hash, GITFORMAT)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	commits, err := impl.processGitLogOutput(output, rootDir)
