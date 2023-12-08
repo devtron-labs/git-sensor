@@ -46,7 +46,6 @@ type GitWatcherImpl struct {
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
-	//PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
 }
 
 type PollConfig struct {

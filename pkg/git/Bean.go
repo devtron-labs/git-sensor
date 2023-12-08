@@ -93,11 +93,7 @@ func (commit GitCommitCli) Stats() (FileStats, error) {
 		commit.impl.logger.Errorw("error in fetching fileStat of commit: ", commit.Commit, "checkoutPath", commit.CheckoutPath, "errorMsg", errorMsg, "err", err)
 		return nil, err
 	}
-	stats, err := getFileStat(fileStat)
-	if err != nil {
-		return nil, err
-	}
-	return transformFileStats(stats), nil
+	return getFileStat(fileStat)
 }
 
 func (itr CommitIteratorGoGit) Next() (GitCommit, error) {
