@@ -1,7 +1,6 @@
 package git
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -26,27 +25,6 @@ const (
 	GIT_ASK_PASS                = "/git-ask-pass.sh"
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
 )
-
-func (impl *CliGitManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {
-
-	r, err := impl.OpenRepoPlain(location)
-	//r := &GitRepository{Repository: *repo}
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.Init(location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-	}
-	return r, nil
-}
 
 func (impl *CliGitManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------

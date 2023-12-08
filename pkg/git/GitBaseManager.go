@@ -23,7 +23,6 @@ type GitManager interface {
 }
 
 type GitManagerBase interface {
-	OpenNewRepo(location string, url string) (*GitRepository, error)
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
 	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)
 	Checkout(rootDir string, branch string) (response, errMsg string, err error)
