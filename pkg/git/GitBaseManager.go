@@ -156,7 +156,6 @@ func (impl *GitManagerBaseImpl) processGitLogOutput(out string, rootDir string) 
 			Author:       formattedCommit.Commiter.Name + formattedCommit.Commiter.Email,
 			Date:         formattedCommit.Commiter.Date,
 			Message:      formattedCommit.Subject + formattedCommit.Body,
-			useCLI:       true,
 			CheckoutPath: rootDir,
 		}
 		gitCommits = append(gitCommits, &GitCommitCli{

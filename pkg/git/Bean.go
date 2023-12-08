@@ -81,10 +81,7 @@ func transformFileStats(stats object.FileStats) FileStats {
 
 func (commit GitCommitGoGit) Stats() (FileStats, error) {
 	stat, err := commit.cm.Stats()
-	if err != nil {
-		return nil, fmt.Errorf("error in  fetching stats %s", err)
-	}
-	return transformFileStats(stat), nil
+	return transformFileStats(stat), err
 }
 
 func (commit GitCommitCli) Stats() (FileStats, error) {
@@ -99,12 +96,10 @@ func (commit GitCommitCli) Stats() (FileStats, error) {
 func (itr CommitIteratorGoGit) Next() (GitCommit, error) {
 	commit, err := itr.CommitIter.Next()
 	gitCommit := GitCommitBase{
-		//cm:      commit,
 		Author:  commit.Author.String(),
 		Commit:  commit.Hash.String(),
 		Date:    commit.Author.When,
 		Message: commit.Message,
-		useCLI:  true,
 	}
 	return &GitCommitGoGit{
 		GitCommitBase: gitCommit,
@@ -150,9 +145,8 @@ type GitCommitBase struct {
 	Author       string
 	Date         time.Time
 	Message      string
-	Changes      []string   `json:",omitempty"`
-	FileStats    *FileStats `json:",omitempty"`
-	useCLI       bool
+	Changes      []string     `json:",omitempty"`
+	FileStats    *FileStats   `json:",omitempty"`
 	WebhookData  *WebhookData `json:"webhookData"`
 	Excluded     bool         `json:",omitempty"`
 	CheckoutPath string
