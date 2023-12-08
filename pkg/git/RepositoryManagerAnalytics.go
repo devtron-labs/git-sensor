@@ -24,11 +24,14 @@ type RepositoryManagerAnalyticsImpl struct {
 func NewRepositoryManagerAnalyticsImpl(
 	logger *zap.SugaredLogger,
 	configuration *internal.Configuration,
-	cliGitManager CliGitManager,
-	goGitManager GoGitManager) *RepositoryManagerAnalyticsImpl {
-	impl := &RepositoryManagerAnalyticsImpl{RepositoryManagerImpl: RepositoryManagerImpl{logger: logger, configuration: configuration}}
-	impl.gitUtil = GetGitManager(impl.configuration, cliGitManager, goGitManager)
-	return impl
+	manager GitManager,
+) *RepositoryManagerAnalyticsImpl {
+	return &RepositoryManagerAnalyticsImpl{
+		RepositoryManagerImpl: RepositoryManagerImpl{
+			logger:        logger,
+			configuration: configuration,
+			gitUtil:       manager,
+		}}
 }
 
 func computeDiff(r *GitRepository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {

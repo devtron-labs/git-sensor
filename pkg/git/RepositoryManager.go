@@ -52,11 +52,9 @@ type RepositoryManagerImpl struct {
 func NewRepositoryManagerImpl(
 	logger *zap.SugaredLogger,
 	configuration *internal.Configuration,
-	cliGitManager CliGitManager,
-	goGitManager GoGitManager,
+	gitUtil GitManager,
 ) *RepositoryManagerImpl {
-	impl := &RepositoryManagerImpl{logger: logger, configuration: configuration}
-	impl.gitUtil = GetGitManager(impl.configuration, cliGitManager, goGitManager)
+	impl := &RepositoryManagerImpl{logger: logger, configuration: configuration, gitUtil: gitUtil}
 	return impl
 }
 

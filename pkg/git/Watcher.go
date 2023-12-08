@@ -59,8 +59,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
 	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration,
-	cliGitManager CliGitManager,
-	goGitManager GoGitManager,
+	gitmanager GitManager,
 ) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
@@ -85,8 +84,8 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
 		configuration:                configuration,
+		gitUtil:                      gitmanager,
 	}
-	watcher.gitUtil = GetGitManager(watcher.configuration, cliGitManager, goGitManager)
 
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)

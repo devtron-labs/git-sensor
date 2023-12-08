@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
@@ -30,6 +31,40 @@ type GitManagerBase interface {
 }
 type GitManagerBaseImpl struct {
 	logger *zap.SugaredLogger
+}
+
+type GitManagerImpl struct {
+	gitUtil GitManager
+}
+
+func NewGitManagerImpl(configuration *internal.Configuration,
+	cliGitManager CliGitManager,
+	goGitManager GoGitManager) GitManager {
+
+	if configuration.UseCli {
+		return cliGitManager
+	}
+	return goGitManager
+}
+
+func (impl *GitManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {
+
+	r, err := impl.gitUtil.OpenRepoPlain(location)
+	if err != nil {
+		err = os.RemoveAll(location)
+		if err != nil {
+			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
+		}
+		err = impl.gitUtil.Init(location, url, true)
+		if err != nil {
+			return r, fmt.Errorf("err in git init: %s", err)
+		}
+		r, err = impl.gitUtil.OpenRepoPlain(location)
+		if err != nil {
+			return r, fmt.Errorf("err in git init: %s", err)
+		}
+	}
+	return r, nil
 }
 
 func (impl *GitManagerBaseImpl) Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error) {

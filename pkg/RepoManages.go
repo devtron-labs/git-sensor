@@ -84,10 +84,9 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
 	configuration *internal.Configuration,
-	cliGitManager git.CliGitManager,
-	goGitManager git.GoGitManager,
+	gitManager git.GitManager,
 ) *RepoManagerImpl {
-	impl := &RepoManagerImpl{
+	return &RepoManagerImpl{
 		logger:                            logger,
 		materialRepository:                materialRepository,
 		repositoryManager:                 repositoryManager,
@@ -102,10 +101,8 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 		configuration:                                 configuration,
+		gitUtil:                                       gitManager,
 	}
-	impl.gitUtil = git.GetGitManager(impl.configuration, cliGitManager, goGitManager)
-
-	return impl
 }
 
 func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error) {
