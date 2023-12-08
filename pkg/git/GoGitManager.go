@@ -14,16 +14,13 @@ type GoGitManager interface {
 }
 type GoGitManagerImpl struct {
 	GitManagerBaseImpl
+	logger *zap.SugaredLogger
 }
 
 func NewGoGitManagerImpl(logger *zap.SugaredLogger) *GoGitManagerImpl {
 	return &GoGitManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{GitManagerImpl: GitManagerImpl{logger}},
+		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
 	}
-}
-
-type GitManagerImpl struct {
-	logger *zap.SugaredLogger
 }
 
 func (impl *GoGitManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {

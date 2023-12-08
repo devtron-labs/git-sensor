@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal/sql"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -11,7 +10,7 @@ import (
 
 func NewCliGitManagerImpl(logger *zap.SugaredLogger) *CliGitManagerImpl {
 	return &CliGitManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{GitManagerImpl: GitManagerImpl{logger}},
+		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
 	}
 }
 
@@ -21,16 +20,6 @@ type CliGitManager interface {
 
 type CliGitManagerImpl struct {
 	GitManagerBaseImpl
-}
-type GitManagerBase interface {
-	OpenNewRepo(location string, url string) (*GitRepository, error)
-	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
-	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)
-	Checkout(rootDir string, branch string) (response, errMsg string, err error)
-	ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
-}
-type GitManagerBaseImpl struct {
-	GitManagerImpl
 }
 
 const (

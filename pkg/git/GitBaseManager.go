@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/util"
+	"go.uber.org/zap"
 	"os"
 	"os/exec"
 	"regexp"
@@ -19,6 +20,17 @@ type GitManager interface {
 	GetCommitsForTag(checkoutPath, tag string) (GitCommit, error)
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	Init(rootDir string, remoteUrl string, isBare bool) error
+}
+
+type GitManagerBase interface {
+	OpenNewRepo(location string, url string) (*GitRepository, error)
+	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
+	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)
+	Checkout(rootDir string, branch string) (response, errMsg string, err error)
+	ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+}
+type GitManagerBaseImpl struct {
+	logger *zap.SugaredLogger
 }
 
 func (impl *GitManagerBaseImpl) Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error) {
