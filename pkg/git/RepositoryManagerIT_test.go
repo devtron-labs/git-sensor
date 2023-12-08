@@ -186,7 +186,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitContext, tt.payload.url, tt.payload.location, "")
+			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitContext, tt.payload.url, tt.payload.location)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
