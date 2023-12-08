@@ -229,6 +229,6 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	GitChanges.Commits = serializableCommits
 	fileStats := patch.Stats()
 	impl.logger.Debugw("computed files stats", "filestats", fileStats)
-	GitChanges.FileStats = fileStats
+	GitChanges.FileStats = transformFileStats(fileStats)
 	return GitChanges, nil
 }

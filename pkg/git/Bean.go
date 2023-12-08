@@ -321,11 +321,11 @@ type WebhookPayloadFilterDataSelectorResponse struct {
 
 type GitChanges struct {
 	Commits   []*Commit
-	FileStats object.FileStats
+	FileStats FileStats
 }
 
 type FileStatsResult struct {
-	FileStats object.FileStats
+	FileStats FileStats
 	Error     error
 }
 

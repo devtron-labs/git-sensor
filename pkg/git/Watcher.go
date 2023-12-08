@@ -180,7 +180,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		Username: userName,
 		Password: password,
 	}
-	updated, repo, err := impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+	updated, repo, err := impl.FetchAndUpdateMaterial(material, gitContext, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
@@ -191,7 +191,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				return err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				updated, repo, err = impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+				updated, repo, err = impl.FetchAndUpdateMaterial(material, gitContext, location)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
@@ -271,6 +271,15 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		}
 	}
 	return nil
+}
+
+func (impl GitWatcherImpl) FetchAndUpdateMaterial(material *sql.GitMaterial, gitContext *GitContext, location string) (bool, *GitRepository, error) {
+	updated, repo, err := impl.repositoryManager.Fetch(gitContext, material.Url, location)
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	}
+	return updated, repo, err
 }
 
 func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMaterialBean, gitMaterial *sql.GitMaterial) error {

@@ -33,7 +33,7 @@ import (
 )
 
 type RepositoryManager interface {
-	Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *GitRepository, err error)
+	Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
@@ -118,7 +118,7 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 	return err
 }
 
-func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string, material *sql.GitMaterial) (updated bool, repo *GitRepository, err error) {
+func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *GitRepository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -133,10 +133,7 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		return false, r, err
 	}
 	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
-	if err == nil {
-		material.CheckoutLocation = location
-		material.CheckoutStatus = true
-	}
+
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
