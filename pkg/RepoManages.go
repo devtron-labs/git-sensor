@@ -67,8 +67,6 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 	configuration                                 *internal.Configuration
-	cliGitManager                                 git.CliGitManager
-	goGitManager                                  git.GoGitManager
 	gitUtil                                       git.GitManager
 }
 
@@ -104,14 +102,9 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 		configuration:                                 configuration,
-		cliGitManager:                                 cliGitManager,
-		goGitManager:                                  goGitManager,
 	}
-	if impl.configuration.UseCli {
-		impl.gitUtil = cliGitManager
-	} else {
-		impl.gitUtil = goGitManager
-	}
+	impl.gitUtil = git.GetGitManager(impl.configuration, cliGitManager, goGitManager)
+
 	return impl
 }
 

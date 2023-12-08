@@ -1,6 +1,8 @@
 package internal
 
-import "github.com/caarlos0/env"
+import (
+	"github.com/caarlos0/env"
+)
 
 type Configuration struct {
 	CommitStatsTimeoutInSec int  `env:"COMMIT_STATS_TIMEOUT_IN_SEC" envDefault:"2"`

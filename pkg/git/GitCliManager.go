@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 )
 
-func NewCliGitManagerImpl(logger *zap.SugaredLogger) *CliGitManagerImpl {
-	return &CliGitManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
-	}
-}
-
 type CliGitManager interface {
 	GitManager
 }
 
 type CliGitManagerImpl struct {
 	GitManagerBaseImpl
+}
+
+func NewCliGitManagerImpl(logger *zap.SugaredLogger) *CliGitManagerImpl {
+	return &CliGitManagerImpl{
+		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
+	}
 }
 
 const (

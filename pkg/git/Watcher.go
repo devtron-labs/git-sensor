@@ -41,8 +41,6 @@ type GitWatcherImpl struct {
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
 	configuration                *internal.Configuration
-	cliGitManager                CliGitManager
-	goGitManager                 GoGitManager
 	gitUtil                      GitManager
 }
 
@@ -89,11 +87,8 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		webhookHandler:               webhookHandler,
 		configuration:                configuration,
 	}
-	if watcher.configuration.UseCli {
-		watcher.gitUtil = cliGitManager
-	} else {
-		watcher.gitUtil = goGitManager
-	}
+	watcher.gitUtil = GetGitManager(watcher.configuration, cliGitManager, goGitManager)
+
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
 	if err != nil {

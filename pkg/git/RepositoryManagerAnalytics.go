@@ -27,11 +27,7 @@ func NewRepositoryManagerAnalyticsImpl(
 	cliGitManager CliGitManager,
 	goGitManager GoGitManager) *RepositoryManagerAnalyticsImpl {
 	impl := &RepositoryManagerAnalyticsImpl{RepositoryManagerImpl: RepositoryManagerImpl{logger: logger, configuration: configuration}}
-	if impl.configuration.UseCli {
-		impl.gitUtil = cliGitManager
-	} else {
-		impl.gitUtil = goGitManager
-	}
+	impl.gitUtil = GetGitManager(impl.configuration, cliGitManager, goGitManager)
 	return impl
 }
 
