@@ -24,7 +24,7 @@ type RepositoryManagerAnalyticsImpl struct {
 func NewRepositoryManagerAnalyticsImpl(
 	logger *zap.SugaredLogger,
 	configuration *internal.Configuration,
-	manager GitManager,
+	manager GitManagerImpl,
 ) *RepositoryManagerAnalyticsImpl {
 	return &RepositoryManagerAnalyticsImpl{
 		RepositoryManagerImpl: RepositoryManagerImpl{

@@ -18,7 +18,6 @@ package git
 
 import (
 	"errors"
-	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
 	"golang.org/x/sys/unix"
@@ -45,14 +44,14 @@ type RepositoryManager interface {
 
 type RepositoryManagerImpl struct {
 	logger        *zap.SugaredLogger
-	gitUtil       GitManager
+	gitUtil       GitManagerImpl
 	configuration *internal.Configuration
 }
 
 func NewRepositoryManagerImpl(
 	logger *zap.SugaredLogger,
 	configuration *internal.Configuration,
-	gitUtil GitManager,
+	gitUtil GitManagerImpl,
 ) *RepositoryManagerImpl {
 	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitUtil: gitUtil}
 }
@@ -125,7 +124,7 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	r, err := impl.OpenNewRepo(location, url)
+	r, err := impl.gitUtil.OpenNewRepo(location, url)
 	if err != nil {
 		return false, r, err
 	}
@@ -187,12 +186,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 	defer func() {
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
-	if strings.HasPrefix(branch, "refs/heads/") {
-		branch = strings.ReplaceAll(branch, "refs/heads/", "")
-	}
-
-	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
-
+	branch, branchRef := GetBranchReference(branch)
 	repository.commitCount = impl.configuration.GitHistoryCount
 	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch)
 	if err != nil {
@@ -306,24 +300,4 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	}
 
 	return nil
-}
-
-func (impl *RepositoryManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {
-
-	r, err := impl.gitUtil.OpenRepoPlain(location)
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.gitUtil.Init(location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.gitUtil.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-	}
-	return r, nil
 }

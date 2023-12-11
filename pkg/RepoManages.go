@@ -67,7 +67,7 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 	configuration                                 *internal.Configuration
-	gitUtil                                       git.GitManager
+	gitUtil                                       git.GitManagerImpl
 }
 
 func NewRepoManagerImpl(
@@ -84,7 +84,7 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
 	configuration *internal.Configuration,
-	gitManager git.GitManager,
+	gitManager git.GitManagerImpl,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                            logger,

@@ -34,32 +34,32 @@ type GitManagerBaseImpl struct {
 }
 
 type GitManagerImpl struct {
-	gitUtil GitManager
+	GitManager
 }
 
 func NewGitManagerImpl(configuration *internal.Configuration,
 	cliGitManager CliGitManager,
-	goGitManager GoGitManager) GitManager {
+	goGitManager GoGitManager) GitManagerImpl {
 
 	if configuration.UseCli {
-		return cliGitManager
+		return GitManagerImpl{cliGitManager}
 	}
-	return goGitManager
+	return GitManagerImpl{goGitManager}
 }
 
 func (impl *GitManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {
 
-	r, err := impl.gitUtil.OpenRepoPlain(location)
+	r, err := impl.OpenRepoPlain(location)
 	if err != nil {
 		err = os.RemoveAll(location)
 		if err != nil {
 			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
 		}
-		err = impl.gitUtil.Init(location, url, true)
+		err = impl.Init(location, url, true)
 		if err != nil {
 			return r, fmt.Errorf("err in git init: %s", err)
 		}
-		r, err = impl.gitUtil.OpenRepoPlain(location)
+		r, err = impl.OpenRepoPlain(location)
 		if err != nil {
 			return r, fmt.Errorf("err in git init: %s", err)
 		}
@@ -120,85 +120,6 @@ func (impl *GitManagerBaseImpl) ConfigureSshCommand(rootDir string, sshPrivateKe
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
-}
-
-func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
-	impl.logger.Debugw("git diff --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, errMsg, err
-}
-
-func (impl *GitManagerBaseImpl) GitInit(rootDir string) error {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "init")
-	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return err
-}
-
-func (impl *GitManagerBaseImpl) GitCreateRemote(rootDir string, url string) error {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "remote", "add", "origin", url)
-	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git remote add output", "url", url, "opt", output, "errMsg", errMsg, "error", err)
-	return err
-}
-
-func (impl *GitManagerBaseImpl) GetCommits(branchRef string, branch string, rootDir string, numCommits int) (CommitIterator, error) {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", string(rune(numCommits)), "--date=iso-strict", GITFORMAT)
-	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	commits, err := impl.processGitLogOutput(output, rootDir)
-	if err != nil {
-		return nil, err
-	}
-	return CommitIteratorCli{
-		commits: commits,
-	}, nil
-}
-
-func (impl *GitManagerBaseImpl) GitShow(rootDir string, hash string) (GitCommit, error) {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "show", hash, GITFORMAT)
-	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	commits, err := impl.processGitLogOutput(output, rootDir)
-	if err != nil {
-		return nil, err
-	}
-	return commits[0], nil
-}
-
-func (impl *GitManagerBaseImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
-	logOut := out
-	logOut = logOut[:len(logOut)-1]      // Remove the last ","
-	logOut = fmt.Sprintf("[%s]", logOut) // Add []
-
-	var gitCommitFormattedList []GitCommitFormat
-	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
-	if err != nil {
-		return nil, err
-	}
-
-	gitCommits := make([]GitCommit, 0)
-	for _, formattedCommit := range gitCommitFormattedList {
-
-		cm := GitCommitBase{
-			Commit:       formattedCommit.Commit,
-			Author:       formattedCommit.Commiter.Name + formattedCommit.Commiter.Email,
-			Date:         formattedCommit.Commiter.Date,
-			Message:      formattedCommit.Subject + formattedCommit.Body,
-			CheckoutPath: rootDir,
-		}
-		gitCommits = append(gitCommits, &GitCommitCli{
-			GitCommitBase: cm,
-			impl:          impl,
-		})
-	}
-	return gitCommits, nil
 }
 
 func (impl *GitManagerBaseImpl) PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool {
@@ -272,4 +193,13 @@ func (impl *GitManagerBaseImpl) PathMatcher(fileStats *FileStats, gitMaterial *s
 	}
 
 	return excluded
+}
+
+func GetBranchReference(branch string) (string, string) {
+	if strings.HasPrefix(branch, "refs/heads/") {
+		branch = strings.ReplaceAll(branch, "refs/heads/", "")
+	}
+
+	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	return branch, branchRef
 }

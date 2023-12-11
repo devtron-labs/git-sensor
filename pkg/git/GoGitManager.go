@@ -14,7 +14,6 @@ type GoGitManager interface {
 }
 type GoGitManagerImpl struct {
 	GitManagerBaseImpl
-	logger *zap.SugaredLogger
 }
 
 func NewGoGitManagerImpl(logger *zap.SugaredLogger) *GoGitManagerImpl {
@@ -98,6 +97,10 @@ func (impl *GoGitManagerImpl) GetCommitIterator(repository *GitRepository, branc
 func (impl *GoGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {
 
 	r, err := git.PlainOpen(checkoutPath)
+	if err != nil {
+		impl.logger.Errorf("error in OpenRepoPlain go-git %s for path %s", err, checkoutPath)
+		return nil, err
+	}
 	return &GitRepository{Repository: *r}, err
 }
 

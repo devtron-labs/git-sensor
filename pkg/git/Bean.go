@@ -162,7 +162,7 @@ func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
 
 type GitCommitCli struct {
 	GitCommitBase
-	impl *GitManagerBaseImpl
+	impl *CliGitManagerImpl
 }
 
 type GitCommitGoGit struct {

@@ -7,7 +7,7 @@ var GITFORMAT = `--pretty=format:{
   "parent": "%P",
   "refs": "%D",
   "subject": "%s",
-  "body": "%b"
+  "body": "%b",
   "author": { "name": "%aN", "email": "%aE", "date": "%ad" },
   "commiter": { "name": "%cN", "email": "%cE", "date": "%cd" }
  },`
