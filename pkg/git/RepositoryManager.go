@@ -54,8 +54,7 @@ func NewRepositoryManagerImpl(
 	configuration *internal.Configuration,
 	gitUtil GitManager,
 ) *RepositoryManagerImpl {
-	impl := &RepositoryManagerImpl{logger: logger, configuration: configuration, gitUtil: gitUtil}
-	return impl
+	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitUtil: gitUtil}
 }
 
 func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
