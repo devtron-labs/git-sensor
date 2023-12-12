@@ -26,7 +26,7 @@ func NewGitCliManagerImpl(logger *zap.SugaredLogger) *GitCliManagerImpl {
 }
 
 const (
-	GIT_ASK_PASS                = "/Users/subhashish/git-ask-pass.sh"
+	GIT_ASK_PASS                = "/git-ask-pass.sh"
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
 )
 

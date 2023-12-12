@@ -42,7 +42,7 @@ func NewGitManagerImpl(configuration *internal.Configuration,
 	cliGitManager GitCliManager,
 	goGitManager GoGitSDKManager) GitManagerImpl {
 
-	if configuration.UseCli {
+	if configuration.UseGitCli {
 		return GitManagerImpl{cliGitManager}
 	}
 	return GitManagerImpl{goGitManager}

@@ -9,7 +9,7 @@ type Configuration struct {
 	EnableFileStats         bool `env:"ENABLE_FILE_STATS" envDefault:"false"`
 	GitHistoryCount         int  `env:"GIT_HISTORY_COUNT" envDefault:"15"`
 	MinLimit                int  `env:"MIN_LIMIT_FOR_PVC" envDefault:"1"` // in MB
-	UseCli                  bool `env:"USE_CLI" envDefault:"false"`
+	UseGitCli               bool `env:"USE_GIT_CLI" envDefault:"false"`
 }
 
 func ParseConfiguration() (*Configuration, error) {
