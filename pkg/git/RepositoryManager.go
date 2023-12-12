@@ -44,16 +44,16 @@ type RepositoryManager interface {
 
 type RepositoryManagerImpl struct {
 	logger        *zap.SugaredLogger
-	gitUtil       GitManagerImpl
+	gitManager    GitManagerImpl
 	configuration *internal.Configuration
 }
 
 func NewRepositoryManagerImpl(
 	logger *zap.SugaredLogger,
 	configuration *internal.Configuration,
-	gitUtil GitManagerImpl,
+	gitManager GitManagerImpl,
 ) *RepositoryManagerImpl {
-	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitUtil: gitUtil}
+	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitManager: gitManager}
 }
 
 func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
@@ -81,7 +81,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return err
 	}
-	err = impl.gitUtil.Init(location, url, true)
+	err = impl.gitManager.Init(location, url, true)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
@@ -95,7 +95,7 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		}
 	}
 
-	opt, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
+	opt, errorMsg, err := impl.gitManager.Fetch(gitContext, location)
 	if err != nil {
 		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
 		return err
@@ -124,11 +124,11 @@ func (impl RepositoryManagerImpl) Fetch(gitContext *GitContext, url string, loca
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	r, err := impl.gitUtil.OpenNewRepo(location, url)
+	r, err := impl.gitManager.OpenNewRepo(location, url)
 	if err != nil {
 		return false, r, err
 	}
-	res, errorMsg, err := impl.gitUtil.Fetch(gitContext, location)
+	res, errorMsg, err := impl.gitManager.Fetch(gitContext, location)
 
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
@@ -154,7 +154,7 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		util.TriggerGitOperationMetrics("getCommitForTag", start, err)
 	}()
 	tag = strings.TrimSpace(tag)
-	commit, err := impl.gitUtil.GetCommitsForTag(checkoutPath, tag)
+	commit, err := impl.gitManager.GetCommitsForTag(checkoutPath, tag)
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +167,11 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	defer func() {
 		util.TriggerGitOperationMetrics("getCommitMetadata", start, err)
 	}()
-	gitCommit, err := impl.gitUtil.GetCommitForHash(checkoutPath, commitHash)
+	gitCommit, err := impl.gitManager.GetCommitForHash(checkoutPath, commitHash)
 	if err != nil {
 		return nil, err
 	}
+
 	return gitCommit.GetCommit(), nil
 }
 
@@ -187,8 +188,13 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
 	branch, branchRef := GetBranchReference(branch)
-	repository.commitCount = impl.configuration.GitHistoryCount
-	itr, err := impl.gitUtil.GetCommitIterator(repository, branchRef, branch)
+	itr, err := impl.gitManager.GetCommitIterator(repository, IteratorRequest{
+		BranchRef:      branchRef,
+		Branch:         branch,
+		CommitCount:    count,
+		FromCommitHash: from,
+		ToCommitHash:   to,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +249,8 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 					}
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
-				stats, err := commit.Stats()
+
+				stats, err := impl.gitManager.GetCommitStats(commit)
 				if err != nil {
 					impl.logger.Errorw("error in  fetching stats", "err", err)
 				}
@@ -263,7 +270,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 	if count == 0 {
 		count = impl.configuration.GitHistoryCount
 	}
-	r, err := impl.gitUtil.OpenRepoPlain(checkoutPath)
+	r, err := impl.gitManager.OpenRepoPlain(checkoutPath)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +294,7 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	}
 
 	//git config core.sshCommand
-	_, errorMsg, err := impl.gitUtil.ConfigureSshCommand(location, sshPrivateKeyPath)
+	_, errorMsg, err := impl.gitManager.ConfigureSshCommand(location, sshPrivateKeyPath)
 	if err != nil {
 		impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
 		return err

@@ -67,7 +67,7 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 	configuration                                 *internal.Configuration
-	gitUtil                                       git.GitManagerImpl
+	gitManager                                    git.GitManagerImpl
 }
 
 func NewRepoManagerImpl(
@@ -101,7 +101,7 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 		configuration:                                 configuration,
-		gitUtil:                                       gitManager,
+		gitManager:                                    gitManager,
 	}
 }
 
@@ -482,7 +482,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 
 	filterCommits := make([]*git.GitCommitBase, 0)
 	for _, commit := range commits {
-		excluded := impl.gitUtil.PathMatcher(commit.FileStats, gitMaterial)
+		excluded := impl.gitManager.PathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Debugw("include exclude result", "excluded", excluded)
 		if showAll {
 			commit.Excluded = excluded
@@ -730,7 +730,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		return nil, nil
 	}
 	commit := commits[0]
-	excluded := impl.gitUtil.PathMatcher(commit.FileStats, gitMaterial)
+	excluded := impl.gitManager.PathMatcher(commit.FileStats, gitMaterial)
 	commit.Excluded = excluded
 	return commits[0], err
 }

@@ -9,20 +9,20 @@ import (
 	"os"
 )
 
-type GoGitManager interface {
+type GoGitSDKManager interface {
 	GitManager
 }
-type GoGitManagerImpl struct {
+type GoGitSDKManagerImpl struct {
 	GitManagerBaseImpl
 }
 
-func NewGoGitManagerImpl(logger *zap.SugaredLogger) *GoGitManagerImpl {
-	return &GoGitManagerImpl{
+func NewGoGitSDKManagerImpl(logger *zap.SugaredLogger) *GoGitSDKManagerImpl {
+	return &GoGitSDKManagerImpl{
 		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
 	}
 }
 
-func (impl *GoGitManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
 
 	r, err := impl.OpenRepoPlain(checkoutPath)
 	if err != nil {
@@ -48,13 +48,13 @@ func (impl *GoGitManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCom
 
 	gitCommit := &GitCommitGoGit{
 		GitCommitBase: cm,
-		cm:            commit,
+		Cm:            commit,
 	}
 
 	return gitCommit, nil
 }
 
-func (impl *GoGitManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
 	r, err := impl.OpenRepoPlain(checkoutPath)
 	if err != nil {
 		return nil, err
@@ -74,27 +74,27 @@ func (impl *GoGitManagerImpl) GetCommitForHash(checkoutPath, commitHash string) 
 
 	gitCommit := &GitCommitGoGit{
 		GitCommitBase: cm,
-		cm:            commit,
+		Cm:            commit,
 	}
 	return gitCommit, nil
 }
 
-func (impl *GoGitManagerImpl) GetCommitIterator(repository *GitRepository, branchRef string, branch string) (CommitIterator, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
-	ref, err := repository.Reference(plumbing.ReferenceName(branchRef), true)
+	ref, err := repository.Reference(plumbing.ReferenceName(iteratorRequest.BranchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
-		return nil, fmt.Errorf("ref not found %s branch  %s", err, branch)
+		return nil, fmt.Errorf("ref not found %s branch  %s", err, iteratorRequest.Branch)
 	} else if err != nil {
-		return nil, fmt.Errorf("error in getting reference %s branch  %s", err, branch)
+		return nil, fmt.Errorf("error in getting reference %s branch  %s", err, iteratorRequest.Branch)
 	}
 	itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
 	if err != nil {
-		return nil, fmt.Errorf("error in getting iterator %s branch  %s", err, branch)
+		return nil, fmt.Errorf("error in getting iterator %s branch  %s", err, iteratorRequest.Branch)
 	}
-	return &CommitIteratorGoGit{itr}, nil
+	return &CommitGoGitIterator{itr}, nil
 }
 
-func (impl *GoGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {
+func (impl *GoGitSDKManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {
 
 	r, err := git.PlainOpen(checkoutPath)
 	if err != nil {
@@ -104,7 +104,7 @@ func (impl *GoGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository
 	return &GitRepository{Repository: *r}, err
 }
 
-func (impl *GoGitManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GoGitSDKManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
@@ -121,4 +121,14 @@ func (impl *GoGitManagerImpl) Init(rootDir string, remoteUrl string, isBare bool
 		URLs: []string{remoteUrl},
 	})
 	return err
+}
+
+func (impl *GoGitSDKManagerImpl) GetCommitStats(commit GitCommit) (FileStats, error) {
+	gitCommit := commit.(*GitCommitGoGit)
+
+	stats, err := gitCommit.Cm.Stats()
+	if err != nil {
+		return nil, err
+	}
+	return transformFileStats(stats), err
 }

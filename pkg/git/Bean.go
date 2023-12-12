@@ -50,20 +50,19 @@ type CiPipelineMaterialBean struct {
 
 type GitRepository struct {
 	git.Repository
-	rootDir     string
-	commitCount int
+	rootDir string
 }
 
 type CommitIterator interface {
 	Next() (GitCommit, error)
 }
 
-type CommitIteratorCli struct {
+type CommitCliIterator struct {
 	commits []GitCommit
 	index   int
 }
 
-type CommitIteratorGoGit struct {
+type CommitGoGitIterator struct {
 	object.CommitIter
 }
 
@@ -79,21 +78,7 @@ func transformFileStats(stats object.FileStats) FileStats {
 	return fileStatList
 }
 
-func (commit GitCommitGoGit) Stats() (FileStats, error) {
-	stat, err := commit.cm.Stats()
-	return transformFileStats(stat), err
-}
-
-func (commit GitCommitCli) Stats() (FileStats, error) {
-	fileStat, errorMsg, err := commit.impl.FetchDiffStatBetweenCommits(&GitContext{}, commit.Commit, "", commit.CheckoutPath)
-	if err != nil {
-		commit.impl.logger.Errorw("error in fetching fileStat of commit: ", commit.Commit, "checkoutPath", commit.CheckoutPath, "errorMsg", errorMsg, "err", err)
-		return nil, err
-	}
-	return getFileStat(fileStat)
-}
-
-func (itr *CommitIteratorGoGit) Next() (GitCommit, error) {
+func (itr *CommitGoGitIterator) Next() (GitCommit, error) {
 	commit, err := itr.CommitIter.Next()
 	gitCommit := GitCommitBase{
 		Author:  commit.Author.String(),
@@ -103,11 +88,11 @@ func (itr *CommitIteratorGoGit) Next() (GitCommit, error) {
 	}
 	return &GitCommitGoGit{
 		GitCommitBase: gitCommit,
-		cm:            commit,
+		Cm:            commit,
 	}, err
 }
 
-func (itr *CommitIteratorCli) Next() (GitCommit, error) {
+func (itr *CommitCliIterator) Next() (GitCommit, error) {
 
 	if itr.index < len(itr.commits) {
 		commit := itr.commits[itr.index]
@@ -127,20 +112,23 @@ type MaterialChangeResp struct {
 }
 
 type GitCommit interface {
-	GitCommitBaseInterface
-	Stats() (FileStats, error)
+	GetCommit() *GitCommitBase
 }
 
-type GitCommitBaseInterface interface {
-	TruncateMessageIfExceedsMaxLength()
-	IsMessageValidUTF8() bool
-	FixInvalidUTF8Message()
-	GetCommit() *GitCommitBase
-	SetFileStats(stats *FileStats)
+type GitCommitCli struct {
+	GitCommitBase
+}
+
+type GitCommitGoGit struct {
+	GitCommitBase
+	Cm *object.Commit
+}
+
+func (gitCommit *GitCommitBase) GetCommit() *GitCommitBase {
+	return gitCommit
 }
 
 type GitCommitBase struct {
-	//cm           *object.Commit
 	Commit       string
 	Author       string
 	Date         time.Time
@@ -152,22 +140,8 @@ type GitCommitBase struct {
 	CheckoutPath string
 }
 
-func (gitCommit *GitCommitBase) GetCommit() *GitCommitBase {
-	return gitCommit
-}
-
 func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
 	gitCommit.FileStats = stats
-}
-
-type GitCommitCli struct {
-	GitCommitBase
-	impl *CliGitManagerImpl
-}
-
-type GitCommitGoGit struct {
-	GitCommitBase
-	cm *object.Commit
 }
 
 func (gitCommit *GitCommitBase) TruncateMessageIfExceedsMaxLength() {
@@ -338,4 +312,12 @@ type GitContext struct {
 	Username        string
 	Password        string
 	CloningMode     string
+}
+
+type IteratorRequest struct {
+	BranchRef      string
+	Branch         string
+	CommitCount    int
+	FromCommitHash string
+	ToCommitHash   string
 }

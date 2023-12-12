@@ -33,9 +33,9 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	cliGitManagerImpl := git.NewCliGitManagerImpl(sugaredLogger)
-	goGitManagerImpl := git.NewGoGitManagerImpl(sugaredLogger)
-	gitManagerImpl := git.NewGitManagerImpl(configuration, cliGitManagerImpl, goGitManagerImpl)
+	gitCliManagerImpl := git.NewGitCliManagerImpl(sugaredLogger)
+	goGitSDKManagerImpl := git.NewGoGitSDKManagerImpl(sugaredLogger)
+	gitManagerImpl := git.NewGitManagerImpl(configuration, gitCliManagerImpl, goGitSDKManagerImpl)
 	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, configuration, gitManagerImpl)
 	repositoryManagerAnalyticsImpl := git.NewRepositoryManagerAnalyticsImpl(sugaredLogger, configuration, gitManagerImpl)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)

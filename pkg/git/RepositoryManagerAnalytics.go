@@ -30,7 +30,7 @@ func NewRepositoryManagerAnalyticsImpl(
 		RepositoryManagerImpl: RepositoryManagerImpl{
 			logger:        logger,
 			configuration: configuration,
-			gitUtil:       manager,
+			gitManager:    manager,
 		}}
 }
 
@@ -190,7 +190,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 		util.TriggerGitOperationMetrics("changesSinceByRepositoryForAnalytics", start, err)
 	}()
 	GitChanges := &GitChanges{}
-	repository, err := impl.gitUtil.OpenRepoPlain(checkoutPath)
+	repository, err := impl.gitManager.OpenRepoPlain(checkoutPath)
 	if err != nil {
 		return nil, err
 	}

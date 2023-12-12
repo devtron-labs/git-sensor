@@ -11,26 +11,26 @@ import (
 	"strconv"
 )
 
-type CliGitManager interface {
+type GitCliManager interface {
 	GitManager
 }
 
-type CliGitManagerImpl struct {
+type GitCliManagerImpl struct {
 	GitManagerBaseImpl
 }
 
-func NewCliGitManagerImpl(logger *zap.SugaredLogger) *CliGitManagerImpl {
-	return &CliGitManagerImpl{
+func NewGitCliManagerImpl(logger *zap.SugaredLogger) *GitCliManagerImpl {
+	return &GitCliManagerImpl{
 		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
 	}
 }
 
 const (
-	GIT_ASK_PASS                = "/git-ask-pass.sh"
+	GIT_ASK_PASS                = "/Users/subhashish/git-ask-pass.sh"
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
 )
 
-func (impl *CliGitManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GitCliManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
@@ -46,7 +46,7 @@ func (impl *CliGitManagerImpl) Init(rootDir string, remoteUrl string, isBare boo
 
 }
 
-func (impl *CliGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {
+func (impl *GitCliManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {
 
 	err := openGitRepo(checkoutPath)
 	if err != nil {
@@ -57,17 +57,24 @@ func (impl *CliGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepositor
 	}, nil
 }
 
-func (impl *CliGitManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
 	return impl.GitShow(checkoutPath, tag)
 }
 
-func (impl *CliGitManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
 
 	return impl.GitShow(checkoutPath, commitHash)
 }
-func (impl *CliGitManagerImpl) GetCommitIterator(repository *GitRepository, branchRef string, branch string) (CommitIterator, error) {
+func (impl *GitCliManagerImpl) GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
-	return impl.GetCommits(branchRef, branch, repository.rootDir, repository.commitCount)
+	commits, err := impl.GetCommits(iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
+	if err != nil {
+		impl.logger.Errorw("error in fetching commits for", "err", err, "path", repository.rootDir)
+		return nil, err
+	}
+	return &CommitCliIterator{
+		commits: commits,
+	}, nil
 }
 
 func openGitRepo(path string) error {
@@ -81,7 +88,7 @@ func openGitRepo(path string) error {
 	}
 	return nil
 }
-func (impl *CliGitManagerImpl) GitInit(rootDir string) error {
+func (impl *GitCliManagerImpl) GitInit(rootDir string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "init")
 	cmd := exec.Command("git", "-C", rootDir, "init")
 	output, errMsg, err := impl.runCommand(cmd)
@@ -89,7 +96,7 @@ func (impl *CliGitManagerImpl) GitInit(rootDir string) error {
 	return err
 }
 
-func (impl *CliGitManagerImpl) GitCreateRemote(rootDir string, url string) error {
+func (impl *GitCliManagerImpl) GitCreateRemote(rootDir string, url string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	cmd := exec.Command("git", "-C", rootDir, "remote", "add", "origin", url)
 	output, errMsg, err := impl.runCommand(cmd)
@@ -97,21 +104,38 @@ func (impl *CliGitManagerImpl) GitCreateRemote(rootDir string, url string) error
 	return err
 }
 
-func (impl *CliGitManagerImpl) GetCommits(branchRef string, branch string, rootDir string, numCommits int) (CommitIterator, error) {
-	impl.logger.Debugw("git", "-C", rootDir, "log", branchRef, "-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT)
-	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT)
+func (impl *GitCliManagerImpl) GetCommits(branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
+	baseCmdArgs := []string{"-C", rootDir, "log"}
+	rangeCmdArgs := []string{branchRef}
+	extraCmdArgs := []string{"-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT}
+	cmdArgs := impl.getCommandForLogRange(branchRef, from, to, rangeCmdArgs, baseCmdArgs, extraCmdArgs)
+
+	impl.logger.Debugw("git", cmdArgs)
+	cmd := exec.Command("git", cmdArgs...)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	if err != nil {
+		return nil, err
+	}
 	commits, err := impl.processGitLogOutput(output, rootDir)
 	if err != nil {
 		return nil, err
 	}
-	return &CommitIteratorCli{
-		commits: commits,
-	}, nil
+	return commits, nil
 }
 
-func (impl *CliGitManagerImpl) GitShow(rootDir string, hash string) (GitCommit, error) {
+func (impl *GitCliManagerImpl) getCommandForLogRange(branchRef string, from string, to string, rangeCmdArgs []string, baseCmdArgs []string, extraCmdArgs []string) []string {
+	if from != "" && to != "" {
+		rangeCmdArgs = []string{from + "^.." + to}
+	} else if from != "" {
+		rangeCmdArgs = []string{from + "^.." + branchRef}
+	} else if to != "" {
+		rangeCmdArgs = []string{to}
+	}
+	return append(baseCmdArgs, append(rangeCmdArgs, extraCmdArgs...)...)
+}
+
+func (impl *GitCliManagerImpl) GitShow(rootDir string, hash string) (GitCommit, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	cmd := exec.Command("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	output, errMsg, err := impl.runCommand(cmd)
@@ -124,9 +148,9 @@ func (impl *CliGitManagerImpl) GitShow(rootDir string, hash string) (GitCommit, 
 	return commits[0], nil
 }
 
-func (impl *CliGitManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
+func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no output to process")
+		return make([]GitCommit, 0), nil
 	}
 	logOut := out
 	logOut = logOut[:len(logOut)-1]      // Remove the last ","
@@ -150,13 +174,12 @@ func (impl *CliGitManagerImpl) processGitLogOutput(out string, rootDir string) (
 		}
 		gitCommits = append(gitCommits, &GitCommitCli{
 			GitCommitBase: cm,
-			impl:          impl,
 		})
 	}
 	return gitCommits, nil
 }
 
-func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+func (impl *GitCliManagerImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	if newHash == "" {
@@ -168,4 +191,14 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext *GitConte
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
+}
+
+func (impl *GitCliManagerImpl) GetCommitStats(commit GitCommit) (FileStats, error) {
+	gitCommit := commit.GetCommit()
+	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(&GitContext{}, gitCommit.Commit, "", gitCommit.CheckoutPath)
+	if err != nil {
+		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", gitCommit.CheckoutPath, "errorMsg", errorMsg, "err", err)
+		return nil, err
+	}
+	return getFileStat(fileStat)
 }

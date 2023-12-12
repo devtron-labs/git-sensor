@@ -16,7 +16,8 @@ import (
 
 type GitManager interface {
 	GitManagerBase
-	GetCommitIterator(repository *GitRepository, branchRef string, branch string) (CommitIterator, error)
+	GetCommitStats(commit GitCommit) (FileStats, error)
+	GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
 	GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error)
 	GetCommitsForTag(checkoutPath, tag string) (GitCommit, error)
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
@@ -38,8 +39,8 @@ type GitManagerImpl struct {
 }
 
 func NewGitManagerImpl(configuration *internal.Configuration,
-	cliGitManager CliGitManager,
-	goGitManager GoGitManager) GitManagerImpl {
+	cliGitManager GitCliManager,
+	goGitManager GoGitSDKManager) GitManagerImpl {
 
 	if configuration.UseCli {
 		return GitManagerImpl{cliGitManager}

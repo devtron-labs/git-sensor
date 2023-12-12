@@ -41,7 +41,7 @@ type GitWatcherImpl struct {
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
 	configuration                *internal.Configuration
-	gitUtil                      GitManagerImpl
+	gitManager                   GitManagerImpl
 }
 
 type GitWatcher interface {
@@ -84,7 +84,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
 		configuration:                configuration,
-		gitUtil:                      gitmanager,
+		gitManager:                   gitmanager,
 	}
 
 	logger.Info()
@@ -285,7 +285,7 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 
 	impl.logger.Warnw("material notification", "materials", materials)
 	for _, material := range materials {
-		excluded := impl.gitUtil.PathMatcher(material.GitCommit.FileStats, gitMaterial)
+		excluded := impl.gitManager.PathMatcher(material.GitCommit.FileStats, gitMaterial)
 		if excluded {
 			impl.logger.Infow("skip this auto trigger", "exclude", excluded)
 			continue
