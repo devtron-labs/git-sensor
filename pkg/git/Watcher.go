@@ -211,7 +211,6 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	var updatedMaterials []*CiPipelineMaterialBean
 	var updatedMaterialsModel []*sql.CiPipelineMaterial
 	var erroredMaterialsModels []*sql.CiPipelineMaterial
-	checkoutLocation := material.CheckoutLocation
 	for _, material := range materials {
 		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
 			continue
@@ -219,7 +218,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		//parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount, checkoutLocation)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()

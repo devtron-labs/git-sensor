@@ -36,7 +36,7 @@ type RepositoryManager interface {
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	Clean(cloneDir string) error
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
-	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error)
 	GetCommitForTag(checkoutPath, tag string) (*GitCommitBase, error)
 	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
@@ -177,7 +177,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -275,7 +275,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		return nil, err
 	}
 	///---------------------
-	return impl.ChangesSinceByRepository(r, branch, from, to, count, checkoutPath)
+	return impl.ChangesSinceByRepository(r, branch, from, to, count)
 	///----------------------
 
 }
