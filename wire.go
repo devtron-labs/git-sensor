@@ -58,8 +58,6 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.GoGitSDKManager), new(*git.GoGitSDKManagerImpl)),
 		git.NewGitCliManagerImpl,
 		wire.Bind(new(git.GitCliManager), new(*git.GitCliManagerImpl)),
-		//git.NewGitManagerImpl,
-		//wire.Bind(new(git.GitManager), new(*git.GitManagerImpl)),
 		git.NewGitManagerImpl,
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
