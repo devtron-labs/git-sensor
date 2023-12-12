@@ -102,7 +102,7 @@ func (impl *CliGitManagerImpl) GetCommits(branchRef string, branch string, rootD
 	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	commits, err := impl.processGitLogOutput(output, rootDir, branchRef)
+	commits, err := impl.processGitLogOutput(output, rootDir)
 	if err != nil {
 		return nil, err
 	}
