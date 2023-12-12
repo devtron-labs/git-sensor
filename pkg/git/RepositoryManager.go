@@ -154,11 +154,11 @@ func (impl RepositoryManagerImpl) GetCommitForTag(checkoutPath, tag string) (*Gi
 		util.TriggerGitOperationMetrics("getCommitForTag", start, err)
 	}()
 	tag = strings.TrimSpace(tag)
-	commit, err := impl.GetCommitForTag(checkoutPath, tag)
+	commit, err := impl.gitUtil.GetCommitsForTag(checkoutPath, tag)
 	if err != nil {
 		return nil, err
 	}
-	return commit, nil
+	return commit.GetCommit(), nil
 }
 
 func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error) {
@@ -229,12 +229,6 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 			}
 
 			gitCommit := commit.GetCommit()
-			//&GitCommit{
-			//	Author:  commit.Author.String(),
-			//	Commit:  commit.Hash.String(),
-			//	Date:    commit.Author.When,
-			//	Message: commit.Message,
-			//}
 			gitCommit.TruncateMessageIfExceedsMaxLength()
 			if !gitCommit.IsMessageValidUTF8() {
 				gitCommit.FixInvalidUTF8Message()

@@ -18,10 +18,10 @@ package git
 
 import (
 	"context"
-	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"io"
 	"time"
 	"unicode/utf8"
 )
@@ -93,7 +93,7 @@ func (commit GitCommitCli) Stats() (FileStats, error) {
 	return getFileStat(fileStat)
 }
 
-func (itr CommitIteratorGoGit) Next() (GitCommit, error) {
+func (itr *CommitIteratorGoGit) Next() (GitCommit, error) {
 	commit, err := itr.CommitIter.Next()
 	gitCommit := GitCommitBase{
 		Author:  commit.Author.String(),
@@ -107,14 +107,14 @@ func (itr CommitIteratorGoGit) Next() (GitCommit, error) {
 	}, err
 }
 
-func (itr CommitIteratorCli) Next() (GitCommit, error) {
+func (itr *CommitIteratorCli) Next() (GitCommit, error) {
 
 	if itr.index < len(itr.commits) {
 		commit := itr.commits[itr.index]
 		itr.index++
 		return commit, nil
 	}
-	return nil, fmt.Errorf("no more commits")
+	return nil, io.EOF
 }
 
 type MaterialChangeResp struct {
@@ -157,7 +157,7 @@ func (gitCommit *GitCommitBase) GetCommit() *GitCommitBase {
 }
 
 func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
-	gitCommit.SetFileStats(stats)
+	gitCommit.FileStats = stats
 }
 
 type GitCommitCli struct {

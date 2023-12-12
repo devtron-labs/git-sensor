@@ -91,7 +91,7 @@ func (impl *GoGitManagerImpl) GetCommitIterator(repository *GitRepository, branc
 	if err != nil {
 		return nil, fmt.Errorf("error in getting iterator %s branch  %s", err, branch)
 	}
-	return CommitIteratorGoGit{itr}, nil
+	return &CommitIteratorGoGit{itr}, nil
 }
 
 func (impl *GoGitManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {

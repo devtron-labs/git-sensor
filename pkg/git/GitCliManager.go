@@ -82,41 +82,40 @@ func openGitRepo(path string) error {
 	return nil
 }
 func (impl *CliGitManagerImpl) GitInit(rootDir string) error {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
+	impl.logger.Debugw("git", "-C", rootDir, "init")
 	cmd := exec.Command("git", "-C", rootDir, "init")
 	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
 
 func (impl *CliGitManagerImpl) GitCreateRemote(rootDir string, url string) error {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
+	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	cmd := exec.Command("git", "-C", rootDir, "remote", "add", "origin", url)
 	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git remote add output", "url", url, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
 
 func (impl *CliGitManagerImpl) GetCommits(branchRef string, branch string, rootDir string, numCommits int) (CommitIterator, error) {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
-	//cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", string(rune(numCommits)), "--date=iso-strict", GITFORMAT)
+	impl.logger.Debugw("git", "-C", rootDir, "log", branchRef, "-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT)
 	cmd := exec.Command("git", "-C", rootDir, "log", branchRef, "-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT)
 	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	commits, err := impl.processGitLogOutput(output, rootDir)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	commits, err := impl.processGitLogOutput(output, rootDir, branchRef)
 	if err != nil {
 		return nil, err
 	}
-	return CommitIteratorCli{
+	return &CommitIteratorCli{
 		commits: commits,
 	}, nil
 }
 
 func (impl *CliGitManagerImpl) GitShow(rootDir string, hash string) (GitCommit, error) {
-	//impl.logger.Debugw("git log --numstat", "location", rootDir)
+	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	cmd := exec.Command("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	output, errMsg, err := impl.runCommand(cmd)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	commits, err := impl.processGitLogOutput(output, rootDir)
 	if err != nil || len(commits) == 0 {
 		return nil, err
@@ -158,9 +157,15 @@ func (impl *CliGitManagerImpl) processGitLogOutput(out string, rootDir string) (
 }
 
 func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
-	impl.logger.Debugw("git diff --numstat", "location", rootDir)
+	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+
+	if newHash == "" {
+		newHash = oldHash
+		oldHash = oldHash + "^"
+	}
 	cmd := exec.Command("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
-	impl.logger.Debugw("git diff --stat output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
