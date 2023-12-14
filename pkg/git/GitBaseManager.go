@@ -24,6 +24,7 @@ type GitManager interface {
 	Init(rootDir string, remoteUrl string, isBare bool) error
 }
 
+// GitManagerBase Base methods which will be available to all implementation of the parent interface
 type GitManagerBase interface {
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
 	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)

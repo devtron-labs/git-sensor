@@ -101,7 +101,7 @@ func (impl *GoGitSDKManagerImpl) OpenRepoPlain(checkoutPath string) (*GitReposit
 		impl.logger.Errorf("error in OpenRepoPlain go-git %s for path %s", err, checkoutPath)
 		return nil, err
 	}
-	return &GitRepository{Repository: *r}, err
+	return &GitRepository{Repository: r}, err
 }
 
 func (impl *GoGitSDKManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {

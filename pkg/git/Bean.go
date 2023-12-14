@@ -49,7 +49,7 @@ type CiPipelineMaterialBean struct {
 }
 
 type GitRepository struct {
-	git.Repository
+	*git.Repository
 	rootDir string
 }
 
