@@ -32,13 +32,22 @@ import (
 )
 
 type RepositoryManager interface {
+	// Fetch Fetches latest commit for  repo. Creates a new repo if it doesn't already exist
+	// and returns the reference to the repo
 	Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
+	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
 	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	// Clean cleans a directory
 	Clean(cloneDir string) error
+	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
 	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
 	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error)
+	// GetCommitForTag retrieves the commit metadata for given tag
 	GetCommitForTag(checkoutPath, tag string) (*GitCommitBase, error)
+	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
 	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
 }
 

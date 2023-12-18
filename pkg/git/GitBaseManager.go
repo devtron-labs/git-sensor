@@ -16,19 +16,29 @@ import (
 
 type GitManager interface {
 	GitManagerBase
+	// GetCommitStats retrieves the stats for the given commit vs its parent
 	GetCommitStats(commit GitCommit) (FileStats, error)
+	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
 	GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
+	// GetCommitForHash retrieves the commit reference for given tag
 	GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error)
+	// GetCommitsForTag retrieves the commit reference for given tag
 	GetCommitsForTag(checkoutPath, tag string) (GitCommit, error)
+	// OpenRepoPlain opens a new git repo at the given path
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
+	// Init initializes a git repo
 	Init(rootDir string, remoteUrl string, isBare bool) error
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
 type GitManagerBase interface {
+	// PathMatcher matches paths of files changes with defined regex expression
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
+	// Fetch executes git fetch
 	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)
+	// Checkout executes git checkout
 	Checkout(rootDir string, branch string) (response, errMsg string, err error)
+	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
