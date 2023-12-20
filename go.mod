@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.9-0.20231220075013-7fcf9a7fd519
+	github.com/devtron-labs/common-lib v0.0.9-0.20231220132531-ea8f659a9848
 	github.com/devtron-labs/protos v0.0.2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/gjson v1.8.0
