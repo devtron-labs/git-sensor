@@ -27,7 +27,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
-	cron "github.com/robfig/cron/v3"
+	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"regexp"
