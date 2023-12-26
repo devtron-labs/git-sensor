@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.9-0.20231222072542-2cdd4186f5a7
+	github.com/devtron-labs/common-lib v0.0.9-0.20231226070212-c47f7a07ebf5
 	github.com/devtron-labs/protos v0.0.2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
