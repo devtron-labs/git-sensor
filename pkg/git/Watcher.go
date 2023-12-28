@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/caarlos0/env"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
+	"github.com/devtron-labs/common-lib/pubsub-lib/model"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
@@ -94,7 +95,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		return nil, err
 	}
 
-	//err = watcher.SubscribePull()
+	// err = watcher.SubscribePull()
 	watcher.SubscribeWebhookEvent()
 	return watcher, err
 }
@@ -109,7 +110,7 @@ func (impl GitWatcherImpl) Watch() {
 		impl.logger.Error("error in fetching watchlist", "err", err)
 		return
 	}
-	//impl.Publish(materials)
+	// impl.Publish(materials)
 	middleware.ActiveGitRepoCount.WithLabelValues().Set(float64(len(materials)))
 	impl.RunOnWorker(materials)
 	impl.logger.Infow("stop git watch thread")
@@ -134,7 +135,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 }
 
 func (impl GitWatcherImpl) PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error) {
-	//tmp expose remove in future
+	// tmp expose remove in future
 	return impl.pollAndUpdateGitMaterial(material)
 }
 
@@ -217,7 +218,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		}
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
-		//parse env variables here, then search for the count field and pass here.
+		// parse env variables here, then search for the count field and pass here.
 		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
@@ -226,7 +227,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
 			if latestCommit.GetCommit().Commit != material.LastSeenHash {
-				//new commit found
+				// new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
 					Value:         material.Value,
@@ -304,9 +305,9 @@ func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMateri
 }
 
 func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
-	callback := func(msg *pubsub.PubSubMsg) {
+	callback := func(msg *model.PubSubMsg) {
 		impl.logger.Debugw("received msg", "msg", msg)
-		//msg.Ack() //ack immediate if lost next min it would get a new message
+		// msg.Ack() //ack immediate if lost next min it would get a new message
 		webhookEvent := &WebhookEvent{}
 		err := json.Unmarshal([]byte(msg.Data), webhookEvent)
 		if err != nil {
