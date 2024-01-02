@@ -55,9 +55,9 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, repositoryManagerAnalyticsImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl, webhookEventParsedDataRepositoryImpl, webhookEventDataMappingRepositoryImpl, webhookEventDataMappingFilterResultRepositoryImpl, webhookEventBeanConverterImpl, configuration, gitManagerImpl)
-	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger)
+	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger, configuration)
 	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
-	grpcHandlerImpl := api.NewGrpcHandlerImpl(repoManagerImpl, sugaredLogger)
+	grpcHandlerImpl := api.NewGrpcHandlerImpl(repoManagerImpl, sugaredLogger, configuration)
 	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcHandlerImpl)
 	return app, nil
 }

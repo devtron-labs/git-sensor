@@ -14,7 +14,7 @@ import (
 
 type RepositoryManagerAnalytics interface {
 	RepositoryManager
-	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
+	ChangesSinceByRepositoryForAnalytics(gitContext GitContext, checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 }
 
 type RepositoryManagerAnalyticsImpl struct {
@@ -183,7 +183,7 @@ func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(gitContext GitContext, checkoutPath string, branch string, Old string, New string) (*GitChanges, error) {
 	var err error
 	start := time.Now()
 	defer func() {

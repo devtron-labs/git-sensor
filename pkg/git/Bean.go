@@ -317,6 +317,26 @@ type GitContext struct {
 	CloningMode     string
 }
 
+func (context GitContext) WithCredentials(Username string, Password string) GitContext {
+	context.Username = Username
+	context.Password = Password
+	return context
+}
+
+func NewGitContext(ctx context.Context) GitContext {
+	return GitContext{
+		Context: ctx,
+	}
+}
+
+func (gitContext GitContext) WithTimeout(timeout int) (GitContext, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(gitContext.Context, time.Duration(timeout))
+	gitContext.Context = ctx
+	return GitContext{
+		Context: ctx,
+	}, cancel
+}
+
 type IteratorRequest struct {
 	BranchRef      string
 	Branch         string

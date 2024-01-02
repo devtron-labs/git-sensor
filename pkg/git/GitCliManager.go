@@ -30,7 +30,7 @@ const (
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
 )
 
-func (impl *GitCliManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GitCliManagerImpl) Init(gitContext GitContext, rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
@@ -38,11 +38,11 @@ func (impl *GitCliManagerImpl) Init(rootDir string, remoteUrl string, isBare boo
 		return err
 	}
 
-	err = impl.GitInit(rootDir)
+	err = impl.GitInit(gitContext, rootDir)
 	if err != nil {
 		return err
 	}
-	return impl.GitCreateRemote(rootDir, remoteUrl)
+	return impl.GitCreateRemote(gitContext, rootDir, remoteUrl)
 
 }
 
@@ -57,15 +57,15 @@ func (impl *GitCliManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepositor
 	}, nil
 }
 
-func (impl *GitCliManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
-	return impl.GitShow(checkoutPath, tag)
+func (impl *GitCliManagerImpl) GetCommitsForTag(gitContext GitContext, checkoutPath, tag string) (GitCommit, error) {
+	return impl.GitShow(gitContext, checkoutPath, tag)
 }
 
-func (impl *GitCliManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommitForHash(gitContext GitContext, checkoutPath, commitHash string) (GitCommit, error) {
 
-	return impl.GitShow(checkoutPath, commitHash)
+	return impl.GitShow(gitContext, checkoutPath, commitHash)
 }
-func (impl *GitCliManagerImpl) GetCommitIterator(gitContext *GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GitCliManagerImpl) GetCommitIterator(gitContext GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
 	commits, err := impl.GetCommits(gitContext, iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
 	if err != nil {
@@ -88,23 +88,23 @@ func openGitRepo(path string) error {
 	}
 	return nil
 }
-func (impl *GitCliManagerImpl) GitInit(rootDir string) error {
+func (impl *GitCliManagerImpl) GitInit(gitContext GitContext, rootDir string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "init")
-	cmd := exec.Command("git", "-C", rootDir, "init")
+	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "init")
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
 
-func (impl *GitCliManagerImpl) GitCreateRemote(rootDir string, url string) error {
+func (impl *GitCliManagerImpl) GitCreateRemote(gitContext GitContext, rootDir string, url string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
-	cmd := exec.Command("git", "-C", rootDir, "remote", "add", "origin", url)
+	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "remote", "add", "origin", url)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
 
-func (impl *GitCliManagerImpl) GetCommits(gitContext *GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommits(gitContext GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
 	baseCmdArgs := []string{"-C", rootDir, "log"}
 	rangeCmdArgs := []string{branchRef}
 	extraCmdArgs := []string{"-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT}
@@ -135,9 +135,9 @@ func (impl *GitCliManagerImpl) getCommandForLogRange(branchRef string, from stri
 	return append(baseCmdArgs, append(rangeCmdArgs, extraCmdArgs...)...)
 }
 
-func (impl *GitCliManagerImpl) GitShow(rootDir string, hash string) (GitCommit, error) {
+func (impl *GitCliManagerImpl) GitShow(gitContext GitContext, rootDir string, hash string) (GitCommit, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
-	cmd := exec.Command("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
+	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	commits, err := impl.processGitLogOutput(output, rootDir)
@@ -179,23 +179,23 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) (
 	return gitCommits, nil
 }
 
-func (impl *GitCliManagerImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+func (impl *GitCliManagerImpl) FetchDiffStatBetweenCommits(gitContext GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	if newHash == "" {
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
-	cmd := exec.Command("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
-func (impl *GitCliManagerImpl) GetCommitStats(commit GitCommit) (FileStats, error) {
+func (impl *GitCliManagerImpl) GetCommitStats(gitContext GitContext, commit GitCommit) (FileStats, error) {
 	gitCommit := commit.GetCommit()
-	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(&GitContext{}, gitCommit.Commit, "", gitCommit.CheckoutPath)
+	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitContext, gitCommit.Commit, "", gitCommit.CheckoutPath)
 	if err != nil {
 		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", gitCommit.CheckoutPath, "errorMsg", errorMsg, "err", err)
 		return nil, err

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
@@ -39,14 +40,16 @@ type GrpcHandlerImpl struct {
 	pb.GitSensorServiceServer
 	logger            *zap.SugaredLogger
 	repositoryManager pkg.RepoManager
+	configuration     *internal.Configuration
 }
 
 func NewGrpcHandlerImpl(
-	repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *GrpcHandlerImpl {
+	repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, configuration *internal.Configuration) *GrpcHandlerImpl {
 
 	return &GrpcHandlerImpl{
 		repositoryManager: repositoryManager,
 		logger:            logger,
+		configuration:     configuration,
 	}
 }
 
@@ -103,7 +106,10 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 		}
 	}
 
-	_, err := impl.repositoryManager.AddRepo(gitMaterials)
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+	_, err := impl.repositoryManager.AddRepo(gitContext, gitMaterials)
 	if err != nil {
 		impl.logger.Errorw("error while adding repo",
 			"err", err)
@@ -115,6 +121,9 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 // UpdateRepo updates GitMaterial
 func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
 	*pb.Empty, error) {
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
 
 	// Mapping
 	mappedGitMaterial := &sql.GitMaterial{
@@ -131,7 +140,7 @@ func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial
 	}
 
 	// Update repo
-	_, err := impl.repositoryManager.UpdateRepo(mappedGitMaterial)
+	_, err := impl.repositoryManager.UpdateRepo(gitContext, mappedGitMaterial)
 	if err != nil {
 		impl.logger.Errorw("error while updating repo",
 			"name", mappedGitMaterial.Name,
@@ -168,10 +177,9 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 		}
 	}
 
-	//TODO add timeout
-	gitContext := &git.GitContext{
-		Context: ctx,
-	}
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
 	// TODO: Check if we can change the argument type for the below method to avoid mapping
 	_, err := impl.repositoryManager.SavePipelineMaterial(gitContext, ciPipelineMaterials)
 	if err != nil {
@@ -285,6 +293,10 @@ func (impl *GrpcHandlerImpl) GetHeadForPipelineMaterials(ctx context.Context, re
 func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.CommitMetadataRequest) (
 	*pb.GitCommit, error) {
 
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+
 	// Mapping req body
 	mappedReq := &git.CommitMetadataRequest{
 		PipelineMaterialId: int(req.PipelineMaterialId),
@@ -297,14 +309,14 @@ func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.Comm
 	var err error
 
 	if len(req.GitTag) > 0 {
-		gitCommit, err = impl.repositoryManager.GetCommitInfoForTag(mappedReq)
+		gitCommit, err = impl.repositoryManager.GetCommitInfoForTag(gitContext, mappedReq)
 
 	} else if len(req.BranchName) > 0 {
-		gitCommit, err = impl.repositoryManager.GetLatestCommitForBranch(mappedReq.PipelineMaterialId,
+		gitCommit, err = impl.repositoryManager.GetLatestCommitForBranch(gitContext, mappedReq.PipelineMaterialId,
 			mappedReq.BranchName)
 
 	} else {
-		gitCommit, err = impl.repositoryManager.GetCommitMetadata(mappedReq.PipelineMaterialId,
+		gitCommit, err = impl.repositoryManager.GetCommitMetadata(gitContext, mappedReq.PipelineMaterialId,
 			mappedReq.GitHash)
 	}
 
@@ -342,9 +354,9 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		BranchName:         req.BranchName,
 	}
 
-	gitContext := &git.GitContext{
-		Context: ctx,
-	}
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
 	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(gitContext, mappedReq.PipelineMaterialId,
 		mappedReq.GitHash)
 
@@ -381,8 +393,10 @@ func (impl *GrpcHandlerImpl) GetCommitInfoForTag(ctx context.Context, req *pb.Co
 		GitTag:             req.GitTag,
 		BranchName:         req.BranchName,
 	}
-
-	res, err := impl.repositoryManager.GetCommitInfoForTag(mappedReq)
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+	res, err := impl.repositoryManager.GetCommitInfoForTag(gitContext, mappedReq)
 
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info for tag",
@@ -441,14 +455,19 @@ func (impl *GrpcHandlerImpl) RefreshGitMaterial(ctx context.Context, req *pb.Ref
 }
 
 func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	impl.repositoryManager.ReloadAllRepo()
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+	impl.repositoryManager.ReloadAllRepo(gitContext)
 	return &pb.Empty{}, nil
 }
 
 func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (
 	*pb.GenericResponse, error) {
-
-	err := impl.repositoryManager.ResetRepo(int(req.MaterialId))
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+	err := impl.repositoryManager.ResetRepo(gitContext, int(req.MaterialId))
 	if err != nil {
 		impl.logger.Errorw("error while reloading material",
 			"materialId", req.MaterialId,
@@ -471,7 +490,11 @@ func (impl *GrpcHandlerImpl) GetChangesInRelease(ctx context.Context, req *pb.Re
 		NewCommit:          req.NewCommit,
 	}
 
-	res, err := impl.repositoryManager.GetReleaseChanges(mappedReq)
+	gitContext, cancel := git.NewGitContext(ctx).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+
+	res, err := impl.repositoryManager.GetReleaseChanges(gitContext, mappedReq)
 	if err != nil {
 		impl.logger.Errorw("error while fetching release changes",
 			"pipelineMaterialId", mappedReq.PipelineMaterialId,
