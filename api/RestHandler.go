@@ -139,8 +139,9 @@ func (handler RestHandlerImpl) AddRepo(w http.ResponseWriter, r *http.Request) {
 
 func (handler RestHandlerImpl) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitContext := git.NewGitContext(r.Context())
-
+	gitContext, cancel := git.NewGitContext(r.Context()).
+		WithTimeout(handler.configuration.ProcessTimeout)
+	defer cancel()
 	var Repo *sql.GitMaterial
 	err := decoder.Decode(&Repo)
 	if err != nil {
@@ -182,15 +183,18 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 
 func (handler RestHandlerImpl) ReloadAllMaterial(w http.ResponseWriter, r *http.Request) {
 	handler.logger.Infow("reload all pipelineMaterial request")
-	gitContext := git.NewGitContext(r.Context())
+	gitContext, cancel := git.NewGitContext(r.Context()).
+		WithTimeout(handler.configuration.ProcessTimeout)
+	defer cancel()
 	handler.repositoryManager.ReloadAllRepo(gitContext)
 	handler.writeJsonResp(w, nil, "reloaded se logs for detail", http.StatusOK)
 }
 
 func (handler RestHandlerImpl) ReloadMaterial(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	gitContext := git.NewGitContext(r.Context())
-
+	gitContext, cancel := git.NewGitContext(r.Context()).
+		WithTimeout(handler.configuration.ProcessTimeout)
+	defer cancel()
 	materialId, err := strconv.Atoi(vars["materialId"])
 	if err != nil {
 		handler.logger.Error(err)
