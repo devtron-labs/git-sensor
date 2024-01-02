@@ -168,8 +168,12 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 		}
 	}
 
+	//TODO add timeout
+	gitContext := &git.GitContext{
+		Context: ctx,
+	}
 	// TODO: Check if we can change the argument type for the below method to avoid mapping
-	_, err := impl.repositoryManager.SavePipelineMaterial(ciPipelineMaterials)
+	_, err := impl.repositoryManager.SavePipelineMaterial(gitContext, ciPipelineMaterials)
 	if err != nil {
 		impl.logger.Errorw("error while adding repo",
 			"err", err)
@@ -338,7 +342,10 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		BranchName:         req.BranchName,
 	}
 
-	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(mappedReq.PipelineMaterialId,
+	gitContext := &git.GitContext{
+		Context: ctx,
+	}
+	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(gitContext, mappedReq.PipelineMaterialId,
 		mappedReq.GitHash)
 
 	if err != nil {

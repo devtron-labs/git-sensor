@@ -40,9 +40,9 @@ type RepositoryManager interface {
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
-	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	ChangesSince(gitContext *GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(gitContext *GitContext, repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error)
 	// GetCommitForTag retrieves the commit metadata for given tag
@@ -186,7 +186,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitContext *GitContext, repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -197,7 +197,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
 	branch, branchRef := GetBranchReference(branch)
-	itr, err := impl.gitManager.GetCommitIterator(repository, IteratorRequest{
+	itr, err := impl.gitManager.GetCommitIterator(gitContext, repository, IteratorRequest{
 		BranchRef:      branchRef,
 		Branch:         branch,
 		CommitCount:    count,
@@ -270,7 +270,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 	return gitCommits, err
 }
 
-func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func (impl RepositoryManagerImpl) ChangesSince(gitContext *GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -284,7 +284,7 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		return nil, err
 	}
 	///---------------------
-	return impl.ChangesSinceByRepository(r, branch, from, to, count)
+	return impl.ChangesSinceByRepository(gitContext, r, branch, from, to, count)
 	///----------------------
 
 }

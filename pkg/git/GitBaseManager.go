@@ -19,7 +19,7 @@ type GitManager interface {
 	// GetCommitStats retrieves the stats for the given commit vs its parent
 	GetCommitStats(commit GitCommit) (FileStats, error)
 	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
-	GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
+	GetCommitIterator(gitContext *GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
 	// GetCommitForHash retrieves the commit reference for given tag
 	GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error)
 	// GetCommitsForTag retrieves the commit reference for given tag

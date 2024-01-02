@@ -158,8 +158,13 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
+	ctx := r.Context()
+	//TODO add timeout
+	gitContext := &git.GitContext{
+		Context: ctx,
+	}
 	handler.logger.Infow("update pipelineMaterial request ", "req", material)
-	res, err := handler.repositoryManager.SavePipelineMaterial(material)
+	res, err := handler.repositoryManager.SavePipelineMaterial(gitContext, material)
 	if err != nil {
 		handler.logger.Errorw("error in saving pipeline material", "err", err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
@@ -263,8 +268,14 @@ func (handler RestHandlerImpl) GetCommitMetadataForPipelineMaterial(w http.Respo
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
+	ctx := r.Context()
+	//TODO add timeout
+	gitContext := &git.GitContext{
+		Context: ctx,
+	}
+
 	handler.logger.Infow("commit detail request for pipeline material", "req", material)
-	commit, err := handler.repositoryManager.GetCommitMetadataForPipelineMaterial(material.PipelineMaterialId, material.GitHash)
+	commit, err := handler.repositoryManager.GetCommitMetadataForPipelineMaterial(gitContext, material.PipelineMaterialId, material.GitHash)
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 	} else {

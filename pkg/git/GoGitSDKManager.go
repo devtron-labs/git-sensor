@@ -79,7 +79,7 @@ func (impl *GoGitSDKManagerImpl) GetCommitForHash(checkoutPath, commitHash strin
 	return gitCommit, nil
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitIterator(gitContext *GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
 	ref, err := repository.Reference(plumbing.ReferenceName(iteratorRequest.BranchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {

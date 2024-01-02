@@ -17,6 +17,7 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/caarlos0/env"
@@ -176,9 +177,12 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(impl.configuration.ProcessTimeout))
+	defer cancel()
 	gitContext := &GitContext{
 		Username: userName,
 		Password: password,
+		Context:  ctx,
 	}
 	updated, repo, err := impl.FetchAndUpdateMaterial(material, gitContext, location)
 	if err != nil {
@@ -219,7 +223,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitContext, repo, material.Value, "", "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()

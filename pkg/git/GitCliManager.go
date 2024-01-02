@@ -65,9 +65,9 @@ func (impl *GitCliManagerImpl) GetCommitForHash(checkoutPath, commitHash string)
 
 	return impl.GitShow(checkoutPath, commitHash)
 }
-func (impl *GitCliManagerImpl) GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GitCliManagerImpl) GetCommitIterator(gitContext *GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
-	commits, err := impl.GetCommits(iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
+	commits, err := impl.GetCommits(gitContext, iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
 	if err != nil {
 		impl.logger.Errorw("error in fetching commits for", "err", err, "path", repository.rootDir)
 		return nil, err
@@ -104,14 +104,14 @@ func (impl *GitCliManagerImpl) GitCreateRemote(rootDir string, url string) error
 	return err
 }
 
-func (impl *GitCliManagerImpl) GetCommits(branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommits(gitContext *GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
 	baseCmdArgs := []string{"-C", rootDir, "log"}
 	rangeCmdArgs := []string{branchRef}
 	extraCmdArgs := []string{"-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT}
 	cmdArgs := impl.getCommandForLogRange(branchRef, from, to, rangeCmdArgs, baseCmdArgs, extraCmdArgs)
 
 	impl.logger.Debugw("git", cmdArgs)
-	cmd := exec.Command("git", cmdArgs...)
+	cmd := exec.CommandContext(gitContext.Context, "git", cmdArgs...)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {

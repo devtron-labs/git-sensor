@@ -10,6 +10,7 @@ type Configuration struct {
 	GitHistoryCount         int  `env:"GIT_HISTORY_COUNT" envDefault:"15"`
 	MinLimit                int  `env:"MIN_LIMIT_FOR_PVC" envDefault:"1"` // in MB
 	UseGitCli               bool `env:"USE_GIT_CLI" envDefault:"false"`
+	ProcessTimeout          int  `env:"PROCESS_TIMEOUT" envDefault:"5"`
 }
 
 func ParseConfiguration() (*Configuration, error) {
