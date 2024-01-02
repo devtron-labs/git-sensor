@@ -80,6 +80,9 @@ func transformFileStats(stats object.FileStats) FileStats {
 
 func (itr *CommitGoGitIterator) Next() (GitCommit, error) {
 	commit, err := itr.CommitIter.Next()
+	if err != nil {
+		return nil, err
+	}
 	gitCommit := GitCommitBase{
 		Author:  commit.Author.String(),
 		Commit:  commit.Hash.String(),
