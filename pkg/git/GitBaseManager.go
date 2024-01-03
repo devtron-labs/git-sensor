@@ -17,17 +17,17 @@ import (
 type GitManager interface {
 	GitManagerBase
 	// GetCommitStats retrieves the stats for the given commit vs its parent
-	GetCommitStats(gitContext GitContext, commit GitCommit) (FileStats, error)
+	GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error)
 	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
-	GetCommitIterator(gitContext GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
+	GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
 	// GetCommitForHash retrieves the commit reference for given tag
-	GetCommitForHash(gitContext GitContext, checkoutPath, commitHash string) (GitCommit, error)
+	GetCommitForHash(gitCtx GitContext, checkoutPath, commitHash string) (GitCommit, error)
 	// GetCommitsForTag retrieves the commit reference for given tag
-	GetCommitsForTag(gitContext GitContext, checkoutPath, tag string) (GitCommit, error)
+	GetCommitsForTag(gitCtx GitContext, checkoutPath, tag string) (GitCommit, error)
 	// OpenRepoPlain opens a new git repo at the given path
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
-	Init(gitContext GitContext, rootDir string, remoteUrl string, isBare bool) error
+	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -35,11 +35,11 @@ type GitManagerBase interface {
 	// PathMatcher matches paths of files changes with defined regex expression
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
 	// Fetch executes git fetch
-	Fetch(gitContext GitContext, rootDir string) (response, errMsg string, err error)
+	Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error)
 	// Checkout executes git checkout
-	Checkout(gitContext GitContext, rootDir, branch string) (response, errMsg string, err error)
+	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
-	ConfigureSshCommand(gitContext GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger *zap.SugaredLogger
@@ -59,7 +59,7 @@ func NewGitManagerImpl(configuration *internal.Configuration,
 	return GitManagerImpl{goGitManager}
 }
 
-func (impl *GitManagerImpl) OpenNewRepo(gitContext GitContext, location string, url string) (*GitRepository, error) {
+func (impl *GitManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
 
 	r, err := impl.OpenRepoPlain(location)
 	if err != nil {
@@ -67,7 +67,7 @@ func (impl *GitManagerImpl) OpenNewRepo(gitContext GitContext, location string, 
 		if err != nil {
 			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
 		}
-		err = impl.Init(gitContext, location, url, true)
+		err = impl.Init(gitCtx, location, url, true)
 		if err != nil {
 			return r, fmt.Errorf("err in git init: %s", err)
 		}
@@ -79,17 +79,17 @@ func (impl *GitManagerImpl) OpenNewRepo(gitContext GitContext, location string, 
 	return r, nil
 }
 
-func (impl *GitManagerBaseImpl) Fetch(gitContext GitContext, rootDir string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
-	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
-func (impl *GitManagerBaseImpl) Checkout(gitContext GitContext, rootDir, branch string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git checkout ", "location", rootDir)
-	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "checkout", branch, "--force")
+	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "checkout", branch, "--force")
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -125,10 +125,10 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 	return output, "", nil
 }
 
-func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitContext GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
 	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
-	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -216,16 +216,16 @@ func GetBranchReference(branch string) (string, string) {
 	return branch, branchRef
 }
 
-func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	if newHash == "" {
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
-	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
