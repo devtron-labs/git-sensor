@@ -215,3 +215,17 @@ func GetBranchReference(branch string) (string, string) {
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 	return branch, branchRef
 }
+
+func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+
+	if newHash == "" {
+		newHash = oldHash
+		oldHash = oldHash + "^"
+	}
+	cmd := exec.CommandContext(gitContext.Context, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, errMsg, err
+}

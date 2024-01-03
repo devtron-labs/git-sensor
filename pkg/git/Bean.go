@@ -317,10 +317,10 @@ type GitContext struct {
 	CloningMode     string
 }
 
-func (context GitContext) WithCredentials(Username string, Password string) GitContext {
-	context.Username = Username
-	context.Password = Password
-	return context
+func (gitContext GitContext) WithCredentials(Username string, Password string) GitContext {
+	gitContext.Username = Username
+	gitContext.Password = Password
+	return gitContext
 }
 
 func NewGitContext(ctx context.Context) GitContext {
@@ -332,9 +332,7 @@ func NewGitContext(ctx context.Context) GitContext {
 func (gitContext GitContext) WithTimeout(timeout int) (GitContext, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(gitContext.Context, time.Duration(timeout))
 	gitContext.Context = ctx
-	return GitContext{
-		Context: ctx,
-	}, cancel
+	return gitContext, cancel
 }
 
 type IteratorRequest struct {
