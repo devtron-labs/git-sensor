@@ -106,7 +106,7 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 		}
 	}
 
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	_, err := impl.repositoryManager.AddRepo(gitCtx, gitMaterials)
@@ -121,7 +121,7 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 // UpdateRepo updates GitMaterial
 func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
 	*pb.Empty, error) {
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -177,7 +177,7 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 		}
 	}
 
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	// TODO: Check if we can change the argument type for the below method to avoid mapping
@@ -293,7 +293,7 @@ func (impl *GrpcHandlerImpl) GetHeadForPipelineMaterials(ctx context.Context, re
 func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.CommitMetadataRequest) (
 	*pb.GitCommit, error) {
 
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -354,7 +354,7 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		BranchName:         req.BranchName,
 	}
 
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(gitCtx, mappedReq.PipelineMaterialId,
@@ -393,7 +393,7 @@ func (impl *GrpcHandlerImpl) GetCommitInfoForTag(ctx context.Context, req *pb.Co
 		GitTag:             req.GitTag,
 		BranchName:         req.BranchName,
 	}
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	res, err := impl.repositoryManager.GetCommitInfoForTag(gitCtx, mappedReq)
@@ -455,7 +455,7 @@ func (impl *GrpcHandlerImpl) RefreshGitMaterial(ctx context.Context, req *pb.Ref
 }
 
 func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	impl.repositoryManager.ReloadAllRepo(gitCtx)
@@ -464,7 +464,7 @@ func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empt
 
 func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (
 	*pb.GenericResponse, error) {
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 	err := impl.repositoryManager.ResetRepo(gitCtx, int(req.MaterialId))
@@ -490,7 +490,7 @@ func (impl *GrpcHandlerImpl) GetChangesInRelease(ctx context.Context, req *pb.Re
 		NewCommit:          req.NewCommit,
 	}
 
-	gitCtx, cancel := git.NewGitContext(ctx).
+	gitCtx, cancel := git.BuildGitContext(ctx).
 		WithTimeout(impl.configuration.ProcessTimeout)
 	defer cancel()
 

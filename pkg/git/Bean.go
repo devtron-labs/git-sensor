@@ -323,7 +323,7 @@ func (gitCtx GitContext) WithCredentials(Username string, Password string) GitCo
 	return gitCtx
 }
 
-func NewGitContext(ctx context.Context) GitContext {
+func BuildGitContext(ctx context.Context) GitContext {
 	return GitContext{
 		Context: ctx,
 	}

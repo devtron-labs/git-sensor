@@ -118,7 +118,7 @@ func (handler RestHandlerImpl) SaveGitProvider(w http.ResponseWriter, r *http.Re
 func (handler RestHandlerImpl) AddRepo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 	var Repo []*sql.GitMaterial
@@ -139,7 +139,7 @@ func (handler RestHandlerImpl) AddRepo(w http.ResponseWriter, r *http.Request) {
 
 func (handler RestHandlerImpl) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 	var Repo *sql.GitMaterial
@@ -167,7 +167,7 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -183,7 +183,7 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 
 func (handler RestHandlerImpl) ReloadAllMaterial(w http.ResponseWriter, r *http.Request) {
 	handler.logger.Infow("reload all pipelineMaterial request")
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 	handler.repositoryManager.ReloadAllRepo(gitCtx)
@@ -192,7 +192,7 @@ func (handler RestHandlerImpl) ReloadAllMaterial(w http.ResponseWriter, r *http.
 
 func (handler RestHandlerImpl) ReloadMaterial(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 	materialId, err := strconv.Atoi(vars["materialId"])
@@ -250,7 +250,7 @@ func (handler RestHandlerImpl) GetHeadForPipelineMaterials(w http.ResponseWriter
 
 func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -286,7 +286,7 @@ func (handler RestHandlerImpl) GetCommitMetadataForPipelineMaterial(w http.Respo
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -309,7 +309,7 @@ func (handler RestHandlerImpl) GetCommitInfoForTag(w http.ResponseWriter, r *htt
 		return
 	}
 	handler.logger.Infow("tag detail request", "req", material)
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 
@@ -324,7 +324,7 @@ func (handler RestHandlerImpl) GetCommitInfoForTag(w http.ResponseWriter, r *htt
 
 func (handler RestHandlerImpl) GetChangesInRelease(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitCtx, cancel := git.NewGitContext(r.Context()).
+	gitCtx, cancel := git.BuildGitContext(r.Context()).
 		WithTimeout(handler.configuration.ProcessTimeout)
 	defer cancel()
 	request := &pkg.ReleaseChangesRequest{}
