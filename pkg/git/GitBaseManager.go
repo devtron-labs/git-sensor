@@ -8,7 +8,9 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/util"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 	"regexp"
@@ -44,8 +46,28 @@ type GitManagerBase interface {
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
-	logger *zap.SugaredLogger
-	conf   *internal.Configuration
+	logger            *zap.SugaredLogger
+	conf              *internal.Configuration
+	commandTimeoutMap map[string]time.Duration
+}
+
+func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitManagerBaseImpl {
+
+	commandTimeoutMap, err := parseCmdTimeoutJson(config)
+	if err != nil {
+		logger.Errorw("error in parsing CLI_CMD_TIMEOUT_JSON", "value", config.CliCmdTimeoutJson, "err", err)
+	}
+
+	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
+}
+
+func parseCmdTimeoutJson(config *internal.Configuration) (map[string]time.Duration, error) {
+	commandTimeoutMap := make(map[string]time.Duration)
+	var err error
+	if config.CliCmdTimeoutJson != "" {
+		err = json.Unmarshal([]byte(config.CliCmdTimeoutJson), &commandTimeoutMap)
+	}
+	return commandTimeoutMap, err
 }
 
 type GitManagerImpl struct {
@@ -240,9 +262,23 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
 	newCtx := ctx.Context
 	cancel := func() {}
-	if impl.conf.CliCmdTimeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx.Context, time.Duration(impl.conf.CliCmdTimeout))
+
+	//TODO: how to make it generic, currently works because the
+	// git command is placed at index 2 for current implementations
+	timeout := impl.getCommandTimeout(arg[2])
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx.Context, timeout)
 	}
 	cmd := exec.CommandContext(newCtx, name, arg...)
 	return cmd, cancel
+}
+
+func (impl *GitManagerBaseImpl) getCommandTimeout(command string) time.Duration {
+	timeout := time.Duration(impl.conf.CliCmdTimeoutGlobal)
+	overridenCommands := lo.Keys[string, time.Duration](impl.commandTimeoutMap)
+	if slices.Contains(overridenCommands, command) {
+		timeout = impl.commandTimeoutMap[command]
+	}
+	return timeout
 }

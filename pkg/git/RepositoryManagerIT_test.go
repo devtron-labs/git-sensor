@@ -11,29 +11,32 @@ import (
 	"time"
 )
 
-var gitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs.git"
-var location1 = "/tmp/git-base/1/github.com/devtron-labs/getting-started-nodejs.git"
-var location2 = "/tmp/git-base/2/github.com/devtron-labs/getting-started-nodejs.git"
+var gitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs"
+var location1 = baseDir + "/git-base/1/github.com/devtron-labs/getting-started-nodejs.git"
+var location2 = baseDir + "/git-base/2/github.com/devtron-labs/getting-started-nodejs.git"
 var commitHash = "dfde5ecae5cd1ae6a7e3471a63a8277177898a7d"
 var tag = "v0.0.2"
 var branchName = "do-not-touch-this-branch"
-var baseDir = "tmp/"
-var privateGitRepoUrl = "https://github.com/prakash100198/HelloWorldProject.git"
-var privateGitRepoLocation = "/tmp/git-base/42/github.com/prakash100198/HelloWorldProject.git"
-var username = "prakash100198"
-var password = ""
+var baseDir = "/Users/subhashish/tmp1"
+var privateGitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs.git"
+var privateGitRepoLocation = baseDir + "/git-base/42/github.com/devtron-labs/getting-started-nodejs.git"
+var username = "subhashish-devtron"
+var password = "Subs2303"
 var sshPrivateKey = ``
 
 func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	logger, err := utils.NewSugardLogger()
 	assert.Nil(t, err)
-	gitCliImpl := NewCliGitManagerImpl(logger)
-	gogitImpl := NewGoGitManagerImpl(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, &internal.Configuration{
+	gitCliImpl := NewGitCliManagerImpl(logger)
+	gogitImpl := NewGoGitSDKManagerImpl(logger)
+	conf := &internal.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,
-	}, gitCliImpl, gogitImpl)
+		UseGitCli:               true,
+	}
+	gitUtil := NewGitManagerImpl(conf, gitCliImpl, gogitImpl)
+	repositoryManagerImpl := NewRepositoryManagerImpl(logger, conf, gitUtil)
 	return repositoryManagerImpl
 }
 
@@ -52,7 +55,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 		gitProviderId        int
 		location             string
 		url                  string
-		gitContext           *GitContext
+		gitCtx           *GitContext
 		authMode             sql.AuthMode
 		sshPrivateKeyContent string
 	}
@@ -66,7 +69,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      privateGitRepoLocation,
 				url:           privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: username,
 					Password: password,
 				},
@@ -79,7 +82,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      privateGitRepoLocation,
 				url:           privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: "",
 					Password: "",
 				},
@@ -92,7 +95,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      location1,
 				url:           gitRepoUrl + "dhs",
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: "",
 					Password: "",
 				},
@@ -105,7 +108,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      location2,
 				url:           gitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: "",
 					Password: "",
 				},
@@ -117,11 +120,11 @@ func TestRepositoryManager_Add(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		if tt.payload.authMode == "SSH" {
-			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
+			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(
 			assert.Nil(t, err)
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			err := repositoryManagerImpl.Add(tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.gitContext, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
+			err := repositoryManagerImpl.Add(tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.gitCtx, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Add() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -135,7 +138,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 	type args struct {
 		location   string
 		url        string
-		gitContext *GitContext
+		gitCtx *GitContext
 	}
 	tests := []struct {
 		name    string
@@ -146,7 +149,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test1_Fetch_InvokingWithValidGitUrlWithoutCreds", payload: args{
 				location: location2,
 				url:      gitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: "",
 					Password: "",
 				},
@@ -156,7 +159,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test2_Fetch_InvokingWithInvalidGitUrlWithoutCreds", payload: args{
 				location: location1,
 				url:      gitRepoUrl + "dhs",
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: "",
 					Password: "",
 				},
@@ -166,7 +169,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test3_Fetch_InvokingWithCorrectArgumentsWithCreds", payload: args{
 				location: privateGitRepoLocation,
 				url:      privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: username,
 					Password: password,
 				},
@@ -174,9 +177,9 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 		},
 		{
 			name: "Test4_Fetch_InvokingWithWrongLocationOfLocalDir", payload: args{
-				location: privateGitRepoLocation + "/hjwbwfdj",
+				location: baseDir + "/git-base/42/github.com/devtron-labs/agetting-started-nodejsgits",
 				url:      privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: &GitContext{
 					Username: username,
 					Password: password,
 				},
@@ -186,7 +189,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitContext, tt.payload.url, tt.payload.location)
+			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitCtx, tt.payload.url, tt.payload.location)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
@@ -249,6 +252,7 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 				got.Author = ""
 				got.Message = ""
 				got.Changes = nil
+				got.CheckoutPath = ""
 
 				if !reflect.DeepEqual(*got, *tt.want) {
 					t.Errorf("GetCommitMetadata() got = %v, want %v", got, tt.want)
@@ -380,6 +384,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 					}
 
 					got[index].FileStats = nil
+					got[index].CheckoutPath = ""
 					want.FileStats = nil
 
 					if !reflect.DeepEqual(*got[index], *want) {
@@ -561,10 +566,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		//r, err := git.PlainOpen(tt.payload.checkoutPath)
-		r, err := repositoryManagerImpl.gitUtil.OpenRepoPlain(tt.payload.checkoutPath)
+		r, err := repositoryManagerImpl.gitManager.OpenRepoPlain(tt.payload.checkoutPath)
 		assert.Nil(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, "")
+			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -580,6 +585,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 					got[index].Author = ""
 					got[index].Message = ""
 					got[index].Changes = nil
+					got[index].CheckoutPath = ""
 
 					if !reflect.DeepEqual(*got[index], *want) {
 						t.Errorf("ChangesSinceByRepository() got = %v, want %v", got, tt.want)
@@ -643,6 +649,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 				got.Author = ""
 				got.Message = ""
 				got.Changes = nil
+				got.CheckoutPath = ""
 
 				if !reflect.DeepEqual(*got, *tt.want) {
 					t.Errorf("GetCommitMetadata() got = %v, want %v", got, tt.want)

@@ -3,8 +3,6 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
@@ -16,12 +14,13 @@ type GitCliManager interface {
 }
 
 type GitCliManagerImpl struct {
-	GitManagerBaseImpl
+	*GitManagerBaseImpl
 }
 
-func NewGitCliManagerImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitCliManagerImpl {
+func NewGitCliManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GitCliManagerImpl {
+
 	return &GitCliManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger, conf: config},
+		GitManagerBaseImpl: baseManagerImpl,
 	}
 }
 

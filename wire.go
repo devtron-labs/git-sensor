@@ -59,6 +59,7 @@ func InitializeApp() (*App, error) {
 		git.NewGitCliManagerImpl,
 		wire.Bind(new(git.GitCliManager), new(*git.GitCliManagerImpl)),
 		git.NewGitManagerImpl,
+		git.NewGitManagerBaseImpl,
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
 		internal.NewRepositoryLocker,
