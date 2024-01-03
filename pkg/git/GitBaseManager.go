@@ -278,7 +278,10 @@ func (impl *GitManagerBaseImpl) getCommandTimeout(command string) time.Duration 
 	timeout := time.Duration(impl.conf.CliCmdTimeoutGlobal)
 	overridenCommands := lo.Keys[string, time.Duration](impl.commandTimeoutMap)
 	if slices.Contains(overridenCommands, command) {
-		timeout = impl.commandTimeoutMap[command]
+		cmdTimeout := impl.commandTimeoutMap[command]
+		if cmdTimeout > 0 {
+			timeout = impl.commandTimeoutMap[command]
+		}
 	}
 	return timeout
 }
