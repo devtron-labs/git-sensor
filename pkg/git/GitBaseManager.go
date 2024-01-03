@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type GitManager interface {
@@ -233,4 +235,14 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
+	newCtx := ctx.Context
+	cancel := func() {}
+	if impl.conf.CliCmdTimeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx.Context, time.Duration(impl.conf.CliCmdTimeout))
+	}
+	cmd := exec.CommandContext(newCtx, name, arg...)
+	return cmd, cancel
 }

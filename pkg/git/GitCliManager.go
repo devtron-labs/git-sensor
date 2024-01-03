@@ -1,17 +1,14 @@
 package git
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 type GitCliManager interface {
@@ -98,16 +95,6 @@ func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) error 
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return err
-}
-
-func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
-	newCtx := ctx.Context
-	cancel := func() {}
-	if impl.conf.CliCmdTimeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx.Context, time.Duration(impl.conf.CliCmdTimeout))
-	}
-	cmd := exec.CommandContext(newCtx, name, arg...)
-	return cmd, cancel
 }
 
 func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) error {
