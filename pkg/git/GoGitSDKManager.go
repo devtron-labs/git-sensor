@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internal"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
@@ -16,9 +17,9 @@ type GoGitSDKManagerImpl struct {
 	GitManagerBaseImpl
 }
 
-func NewGoGitSDKManagerImpl(logger *zap.SugaredLogger) *GoGitSDKManagerImpl {
+func NewGoGitSDKManagerImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GoGitSDKManagerImpl {
 	return &GoGitSDKManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
+		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger, conf: config},
 	}
 }
 

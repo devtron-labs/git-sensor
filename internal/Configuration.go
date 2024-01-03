@@ -11,6 +11,7 @@ type Configuration struct {
 	MinLimit                int  `env:"MIN_LIMIT_FOR_PVC" envDefault:"1"` // in MB
 	UseGitCli               bool `env:"USE_GIT_CLI" envDefault:"false"`
 	ProcessTimeout          int  `env:"PROCESS_TIMEOUT" envDefault:"5"`
+	CliCmdTimeout           int  `env:"CLI_CMD_TIMEOUT" envDefault:"0"`
 }
 
 func ParseConfiguration() (*Configuration, error) {

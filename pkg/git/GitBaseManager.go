@@ -43,6 +43,7 @@ type GitManagerBase interface {
 }
 type GitManagerBaseImpl struct {
 	logger *zap.SugaredLogger
+	conf   *internal.Configuration
 }
 
 type GitManagerImpl struct {
@@ -81,7 +82,8 @@ func (impl *GitManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url 
 
 func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
-	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -89,7 +91,8 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 
 func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git checkout ", "location", rootDir)
-	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "checkout", branch, "--force")
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
+	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -128,7 +131,8 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
 	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
-	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -223,7 +227,8 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
-	cmd := exec.CommandContext(gitCtx.Context, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	defer cancel()
 
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
