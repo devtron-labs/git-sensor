@@ -172,17 +172,18 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
+
+	gitCtx, cancel := NewGitContext(context.Background()).
+		WithCredentials(userName, password).
+		WithTimeout(impl.configuration.ProcessTimeout)
+	defer cancel()
+
 	location, err := GetLocationForMaterial(material)
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
 
-	gitCtx, cancel := NewGitContext(context.Background()).
-		WithCredentials(userName, password).
-		WithTimeout(impl.configuration.ProcessTimeout)
-
-	defer cancel()
 	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
