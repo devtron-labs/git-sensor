@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"github.com/devtron-labs/common-lib/utils/bean"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
@@ -351,7 +350,7 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		return nil, err
 	}
 	if res == nil {
-		return nil, errors.New(bean.ErrNoCommitFound)
+		return nil, bean.ErrNoCommitFound
 	}
 
 	// Mapping GitCommit
