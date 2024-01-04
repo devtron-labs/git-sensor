@@ -18,6 +18,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/devtron-labs/common-lib/analytics"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -29,13 +30,18 @@ type MuxRouter struct {
 	logger      *zap.SugaredLogger
 	Router      *mux.Router
 	restHandler RestHandler
+	*analytics.AnalyticsRouter
 }
 
-func NewMuxRouter(logger *zap.SugaredLogger, restHandler RestHandler) *MuxRouter {
-	return &MuxRouter{logger: logger, Router: mux.NewRouter(), restHandler: restHandler}
+func NewMuxRouter(logger *zap.SugaredLogger, restHandler RestHandler, analyticsRouter *analytics.AnalyticsRouter) *MuxRouter {
+	return &MuxRouter{logger: logger, Router: mux.NewRouter(), restHandler: restHandler, AnalyticsRouter: analyticsRouter}
 }
 
 func (r MuxRouter) Init() {
+	pProfListenerRouter := r.Router.PathPrefix("/debug/pprof/").Subrouter()
+	statsVizRouter := r.Router.Methods("GET").Subrouter()
+
+	r.AnalyticsRouter.InitAnalyticsRouter(pProfListenerRouter, statsVizRouter)
 	r.Router.StrictSlash(true)
 	r.Router.Handle("/metrics", promhttp.Handler())
 	r.Router.Path("/health").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
