@@ -315,7 +315,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *git.Repos
 			gitCommits = append(gitCommits, gitCommit)
 			itrCounter = itrCounter + 1
 			if itrCounter == 1 {
-				testVal := itrCounter/itrCounter - 1
+				testVal := itrCounter / (itrCounter - 1)
 				impl.logger.Warnw(string(rune(testVal)))
 			}
 			if impl.configuration.EnableFileStats {
