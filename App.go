@@ -134,10 +134,12 @@ func (app *App) initGrpcServer(port int) error {
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionAge: 10 * time.Second,
 		}),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
-		grpc.StreamInterceptor(recovery.StreamServerInterceptor(recoveryOption)),
-		grpc.UnaryInterceptor(recovery.UnaryServerInterceptor(recoveryOption)),
+		grpc.ChainStreamInterceptor(
+			grpc_prometheus.StreamServerInterceptor,
+			recovery.StreamServerInterceptor(recoveryOption)),
+		grpc.ChainUnaryInterceptor(
+			grpc_prometheus.UnaryServerInterceptor,
+			recovery.UnaryServerInterceptor(recoveryOption)),
 	}
 	// create a new gRPC grpcServer
 	app.grpcServer = grpc.NewServer(opts...)
