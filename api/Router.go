@@ -38,8 +38,8 @@ func NewMuxRouter(logger *zap.SugaredLogger, restHandler RestHandler, analyticsR
 }
 
 func (r MuxRouter) Init() {
-	pProfListenerRouter := r.Router.PathPrefix("/debug/pprof/").Subrouter()
-	statsVizRouter := r.Router.Methods("GET").Subrouter()
+	pProfListenerRouter := r.Router.PathPrefix("/gitsensor/debug/pprof/").Subrouter()
+	statsVizRouter := r.Router.PathPrefix("/gitsensor").Subrouter()
 
 	r.AnalyticsRouter.InitAnalyticsRouter(pProfListenerRouter, statsVizRouter)
 	r.Router.StrictSlash(true)
