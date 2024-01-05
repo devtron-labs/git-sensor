@@ -126,7 +126,7 @@ func (app *App) initGrpcServer(port int) error {
 	}
 
 	grpcPanicRecoveryHandler := func(p any) (err error) {
-		app.Logger.Error("msg", "recovered from panic", "panic", p, "stack", debug.Stack())
+		app.Logger.Error("msg", "recovered from panic", "panic", p, "stack", string(debug.Stack()))
 		return status.Errorf(codes.Internal, "%s", p)
 	}
 	recoveryOption := recovery.WithRecoveryHandler(grpcPanicRecoveryHandler)
