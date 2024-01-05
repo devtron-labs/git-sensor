@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/caarlos0/env"
+	constants "github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
@@ -126,7 +127,7 @@ func (app *App) initGrpcServer(port int) error {
 	}
 
 	grpcPanicRecoveryHandler := func(p any) (err error) {
-		app.Logger.Error("msg", "recovered from panic", "panic", p, "stack", string(debug.Stack()))
+		app.Logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", p, "stack", string(debug.Stack()))
 		return status.Errorf(codes.Internal, "%s", p)
 	}
 	recoveryOption := recovery.WithRecoveryHandler(grpcPanicRecoveryHandler)
@@ -136,10 +137,10 @@ func (app *App) initGrpcServer(port int) error {
 		}),
 		grpc.ChainStreamInterceptor(
 			grpc_prometheus.StreamServerInterceptor,
-			recovery.StreamServerInterceptor(recoveryOption)),
+			recovery.StreamServerInterceptor(recoveryOption)), // panic interceptor, should be at last
 		grpc.ChainUnaryInterceptor(
 			grpc_prometheus.UnaryServerInterceptor,
-			recovery.UnaryServerInterceptor(recoveryOption)),
+			recovery.UnaryServerInterceptor(recoveryOption)), // panic interceptor, should be at last
 	}
 	// create a new gRPC grpcServer
 	app.grpcServer = grpc.NewServer(opts...)

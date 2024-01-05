@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/caarlos0/env"
+	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -122,7 +123,8 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 
 	handlePanic := func() {
 		if err := recover(); err != nil {
-			impl.logger.Error(err, string(debug.Stack()))
+			impl.logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", err, "stack", string(debug.Stack()))
+
 		}
 	}
 
