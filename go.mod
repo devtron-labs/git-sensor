@@ -4,13 +4,14 @@ go 1.20
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.9-0.20231226070212-c47f7a07ebf5
+	github.com/devtron-labs/common-lib v0.0.9
 	github.com/devtron-labs/protos v0.0.2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
 	github.com/google/wire v0.4.0
 	github.com/gorilla/handlers v1.4.2
-	github.com/gorilla/mux v1.7.4
+	github.com/gorilla/mux v1.8.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron/v3 v3.0.0
@@ -24,12 +25,14 @@ require (
 )
 
 require (
+	github.com/arl/statsviz v0.6.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/gammazero/deque v0.0.0-20200124200322-7e84b94275b8 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20190725054713-01f96b0aa0cd // indirect
