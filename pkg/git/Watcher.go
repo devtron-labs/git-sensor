@@ -31,6 +31,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -125,6 +126,12 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
 		wp.Submit(func() {
+			handle := func() {
+				if err := recover(); err != nil {
+					impl.logger.Error(err, string(debug.Stack()))
+				}
+			}
+			defer handle()
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
