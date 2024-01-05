@@ -20,7 +20,7 @@
 package main
 
 import (
-	"github.com/devtron-labs/common-lib/analytics"
+	"github.com/devtron-labs/common-lib/monitoring"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -75,7 +75,7 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.WebhookEventParser), new(*git.WebhookEventParserImpl)),
 		git.NewWebhookHandlerImpl,
 		wire.Bind(new(git.WebhookHandler), new(*git.WebhookHandlerImpl)),
-		analytics.NewAnalyticsRouter,
+		monitoring.NewMonitoringRouter,
 	)
 	return &App{}, nil
 }

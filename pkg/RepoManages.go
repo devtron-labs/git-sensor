@@ -426,8 +426,6 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 	return materialBean
 }
 
-const one = 1
-
 func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
@@ -437,9 +435,6 @@ func (impl RepoManagerImpl) FetchChanges(pipelineMaterialId int, from string, to
 	if err != nil {
 		return nil, err
 	}
-
-	x := 1
-	impl.logger.Info(x / (one - x))
 
 	pipelineMaterialType := pipelineMaterial.Type
 

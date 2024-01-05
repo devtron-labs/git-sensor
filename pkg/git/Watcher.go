@@ -119,6 +119,13 @@ func (impl GitWatcherImpl) Watch() {
 
 func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp := workerpool.New(impl.pollConfig.PollWorker)
+
+	handlePanic := func() {
+		if err := recover(); err != nil {
+			impl.logger.Error(err, string(debug.Stack()))
+		}
+	}
+
 	for _, material := range materials {
 		if len(material.CiPipelineMaterials) == 0 {
 			impl.logger.Infow("no ci pipeline, skipping", "id", material.Id, "url", material.Url)
@@ -126,12 +133,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
 		wp.Submit(func() {
-			handle := func() {
-				if err := recover(); err != nil {
-					impl.logger.Error(err, string(debug.Stack()))
-				}
-			}
-			defer handle()
+			defer handlePanic()
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
