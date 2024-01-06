@@ -29,10 +29,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"regexp"
 	"runtime/debug"
-	"strings"
 	"time"
 )
 
