@@ -7,6 +7,7 @@
 package main
 
 import (
+	"github.com/devtron-labs/common-lib/monitoring"
 	"github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -56,7 +57,8 @@ func InitializeApp() (*App, error) {
 	}
 	repoManagerImpl := pkg.NewRepoManagerImpl(sugaredLogger, materialRepositoryImpl, repositoryManagerImpl, repositoryManagerAnalyticsImpl, gitProviderRepositoryImpl, ciPipelineMaterialRepositoryImpl, repositoryLocker, gitWatcherImpl, webhookEventRepositoryImpl, webhookEventParsedDataRepositoryImpl, webhookEventDataMappingRepositoryImpl, webhookEventDataMappingFilterResultRepositoryImpl, webhookEventBeanConverterImpl, configuration, gitManagerImpl)
 	restHandlerImpl := api.NewRestHandlerImpl(repoManagerImpl, sugaredLogger)
-	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl)
+	monitoringRouter := monitoring.NewMonitoringRouter(sugaredLogger)
+	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl, monitoringRouter)
 	grpcHandlerImpl := api.NewGrpcHandlerImpl(repoManagerImpl, sugaredLogger)
 	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcHandlerImpl)
 	return app, nil
