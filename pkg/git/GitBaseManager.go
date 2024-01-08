@@ -8,9 +8,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/util"
-	"github.com/samber/lo"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 	"os"
 	"os/exec"
 	"regexp"
@@ -276,12 +274,8 @@ func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string
 
 func (impl *GitManagerBaseImpl) getCommandTimeout(command string) time.Duration {
 	timeout := time.Duration(impl.conf.CliCmdTimeoutGlobal)
-	overridenCommands := lo.Keys[string, time.Duration](impl.commandTimeoutMap)
-	if slices.Contains(overridenCommands, command) {
-		cmdTimeout := impl.commandTimeoutMap[command]
-		if cmdTimeout > 0 {
-			timeout = cmdTimeout
-		}
+	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok && cmdTimeout > 0 {
+		timeout = cmdTimeout
 	}
 	return timeout
 }
