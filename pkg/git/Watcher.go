@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/caarlos0/env"
+	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -29,6 +30,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"runtime/debug"
 	"time"
 )
 
@@ -119,6 +121,14 @@ func (impl GitWatcherImpl) Watch() {
 
 func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp := workerpool.New(impl.pollConfig.PollWorker)
+
+	handlePanic := func() {
+		if err := recover(); err != nil {
+			impl.logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", err, "stack", string(debug.Stack()))
+
+		}
+	}
+
 	for _, material := range materials {
 		if len(material.CiPipelineMaterials) == 0 {
 			impl.logger.Infow("no ci pipeline, skipping", "id", material.Id, "url", material.Url)
@@ -126,6 +136,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
 		wp.Submit(func() {
+			defer handlePanic()
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
