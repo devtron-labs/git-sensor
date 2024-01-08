@@ -184,10 +184,8 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
 
-	gitCtx, cancel := BuildGitContext(context.Background()).
-		WithCredentials(userName, password).
-		WithTimeout(impl.configuration.ProcessTimeout)
-	defer cancel()
+	gitCtx := BuildGitContext(context.Background()).
+		WithCredentials(userName, password)
 
 	location, err := GetLocationForMaterial(material)
 	if err != nil {
