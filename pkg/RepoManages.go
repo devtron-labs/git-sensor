@@ -31,9 +31,9 @@ import (
 type RepoManager interface {
 	GetHeadForPipelineMaterials(ids []int) ([]*git.CiPipelineMaterialBean, error)
 	FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) //limit
-	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
-	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error)
-	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error)
+	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
+	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error)
+	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
 
 	SaveGitProvider(provider *sql.GitProvider) (*sql.GitProvider, error)
 	AddRepo(material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
@@ -42,7 +42,7 @@ type RepoManager interface {
 	ReloadAllRepo()
 	ResetRepo(materialId int) error
 	GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error)
-	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error)
+	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
@@ -56,6 +56,7 @@ type RepoManagerImpl struct {
 	logger                                        *zap.SugaredLogger
 	materialRepository                            sql.MaterialRepository
 	repositoryManager                             git.RepositoryManager
+	repositoryManagerAnalytics                    git.RepositoryManagerAnalytics
 	gitProviderRepository                         sql.GitProviderRepository
 	ciPipelineMaterialRepository                  sql.CiPipelineMaterialRepository
 	locker                                        *internal.RepositoryLocker
@@ -66,12 +67,14 @@ type RepoManagerImpl struct {
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
 	configuration                                 *internal.Configuration
+	gitManager                                    git.GitManagerImpl
 }
 
 func NewRepoManagerImpl(
 	logger *zap.SugaredLogger,
 	materialRepository sql.MaterialRepository,
 	repositoryManager git.RepositoryManager,
+	repositoryManagerAnalytics git.RepositoryManagerAnalytics,
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
@@ -81,11 +84,13 @@ func NewRepoManagerImpl(
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
 	configuration *internal.Configuration,
+	gitManager git.GitManagerImpl,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                            logger,
 		materialRepository:                materialRepository,
 		repositoryManager:                 repositoryManager,
+		repositoryManagerAnalytics:        repositoryManagerAnalytics,
 		gitProviderRepository:             gitProviderRepository,
 		ciPipelineMaterialRepository:      ciPipelineMaterialRepository,
 		locker:                            locker,
@@ -96,6 +101,7 @@ func NewRepoManagerImpl(
 		webhookEventDataMappingFilterResultRepository: webhookEventDataMappingFilterResultRepository,
 		webhookEventBeanConverter:                     webhookEventBeanConverter,
 		configuration:                                 configuration,
+		gitManager:                                    gitManager,
 	}
 }
 
@@ -416,7 +422,7 @@ func (impl RepoManagerImpl) materialTOMaterialBeanConverter(material *sql.CiPipe
 		GitMaterialId: material.GitMaterialId,
 		Value:         material.Value,
 		Active:        material.Active,
-		GitCommit: &git.GitCommit{
+		GitCommit: &git.GitCommitBase{
 			Commit:  material.LastSeenHash,
 			Author:  material.CommitAuthor,
 			Date:    material.CommitDate,
@@ -464,7 +470,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 
 		return response, nil
 	}
-	commits := make([]*git.GitCommit, 0)
+	commits := make([]*git.GitCommitBase, 0)
 	err := json.Unmarshal([]byte(pipelineMaterial.CommitHistory), &commits)
 	if err != nil {
 		return nil, err
@@ -474,9 +480,9 @@ func (impl RepoManagerImpl) FetchGitCommitsForBranchFixPipeline(pipelineMaterial
 		return response, nil
 	}
 
-	filterCommits := make([]*git.GitCommit, 0)
+	filterCommits := make([]*git.GitCommitBase, 0)
 	for _, commit := range commits {
-		excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
+		excluded := impl.gitManager.PathMatcher(commit.FileStats, gitMaterial)
 		impl.logger.Debugw("include exclude result", "excluded", excluded)
 		if showAll {
 			commit.Excluded = excluded
@@ -535,9 +541,9 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 		return response, nil
 	}
 
-	var commits []*git.GitCommit
+	var commits []*git.GitCommitBase
 	for _, webhookEventData := range webhookEventDataArr {
-		gitCommit := &git.GitCommit{
+		gitCommit := &git.GitCommitBase{
 			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventData),
 		}
 		commits = append(commits, gitCommit)
@@ -546,7 +552,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 	return response, nil
 }
 
-func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.PipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -576,7 +582,7 @@ func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataReque
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -598,7 +604,7 @@ func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash st
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 
 	if err != nil {
@@ -628,7 +634,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		Username: userName,
 		Password: password,
 	}
-	updated, repo, err := impl.repositoryManager.Fetch(gitContext, gitMaterial.Url, gitMaterial.CheckoutLocation, gitMaterial)
+	updated, repo, err := impl.repositoryManager.Fetch(gitContext, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
 	}
@@ -668,7 +674,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}
 }
 
-func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommit, error) {
+func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	// fetch ciPipelineMaterial
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
@@ -724,7 +730,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		return nil, nil
 	}
 	commit := commits[0]
-	excluded := impl.gitWatcher.PathMatcher(commit.FileStats, gitMaterial)
+	excluded := impl.gitManager.PathMatcher(commit.FileStats, gitMaterial)
 	commit.Excluded = excluded
 	return commits[0], err
 }
@@ -747,7 +753,7 @@ func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	gitChanges, err := impl.repositoryManager.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
+	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
 	if err != nil {
 		impl.logger.Errorw("error in computing changes", "req", request, "err", err)
 	} else {

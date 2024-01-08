@@ -284,7 +284,7 @@ func (impl WebhookEventServiceImpl) BuildNotifyCiObject(ciPipelineMaterial *sql.
 		GitMaterialId: ciPipelineMaterial.GitMaterialId,
 		Type:          ciPipelineMaterial.Type,
 		Active:        ciPipelineMaterial.Active,
-		GitCommit: &GitCommit{
+		GitCommit: &GitCommitBase{
 			WebhookData: impl.webhookEventBeanConverter.ConvertFromWebhookParsedDataSqlBean(webhookEventParsedData),
 		},
 		ExtraEnvironmentVariables: extraEnvironmentVariables,
