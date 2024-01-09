@@ -18,7 +18,7 @@
 package git
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"time"

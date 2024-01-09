@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
 	"os"
@@ -49,7 +49,7 @@ type GitManagerImpl struct {
 	GitManager
 }
 
-func NewGitManagerImpl(configuration *internal.Configuration,
+func NewGitManagerImpl(configuration *internals.Configuration,
 	cliGitManager GitCliManager,
 	goGitManager GoGitSDKManager) GitManagerImpl {
 

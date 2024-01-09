@@ -23,9 +23,9 @@ import (
 	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/middleware"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -40,10 +40,10 @@ type GitWatcherImpl struct {
 	logger                       *zap.SugaredLogger
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
 	pubSubClient                 *pubsub.PubSubClientServiceImpl
-	locker                       *internal.RepositoryLocker
+	locker                       *internals.RepositoryLocker
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
-	configuration                *internal.Configuration
+	configuration                *internals.Configuration
 	gitManager                   GitManagerImpl
 }
 
@@ -60,8 +60,8 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	materialRepo sql.MaterialRepository,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
-	locker *internal.RepositoryLocker,
-	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration,
+	locker *internals.RepositoryLocker,
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internals.Configuration,
 	gitmanager GitManagerImpl,
 ) (*GitWatcherImpl, error) {
 

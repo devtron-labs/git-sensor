@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/internal/util"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
+	"github.com/devtron-labs/git-sensor/internals/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -59,14 +59,14 @@ type RepoManagerImpl struct {
 	repositoryManagerAnalytics                    git.RepositoryManagerAnalytics
 	gitProviderRepository                         sql.GitProviderRepository
 	ciPipelineMaterialRepository                  sql.CiPipelineMaterialRepository
-	locker                                        *internal.RepositoryLocker
+	locker                                        *internals.RepositoryLocker
 	gitWatcher                                    git.GitWatcher
 	webhookEventRepository                        sql.WebhookEventRepository
 	webhookEventParsedDataRepository              sql.WebhookEventParsedDataRepository
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
-	configuration                                 *internal.Configuration
+	configuration                                 *internals.Configuration
 	gitManager                                    git.GitManagerImpl
 }
 
@@ -77,13 +77,13 @@ func NewRepoManagerImpl(
 	repositoryManagerAnalytics git.RepositoryManagerAnalytics,
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
-	locker *internal.RepositoryLocker,
+	locker *internals.RepositoryLocker,
 	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
 	webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository,
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
-	configuration *internal.Configuration,
+	configuration *internals.Configuration,
 	gitManager git.GitManagerImpl,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{

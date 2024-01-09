@@ -31,7 +31,7 @@ const (
 	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
-//TODO: add support for submodule
+// TODO: add support for submodule
 type GitMaterial struct {
 	tableName        struct{} `sql:"git_material"`
 	Id               int      `sql:"id,pk"`
