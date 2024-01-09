@@ -23,5 +23,6 @@ type GitCommitFormat struct {
 	Refs     string    `json:"refs"`
 	Subject  string    `json:"subject"`
 	Commiter GitPerson `json:"commiter"`
+	Author   GitPerson `json:"author"`
 	Body     string    `json:"body"`
 }

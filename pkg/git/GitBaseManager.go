@@ -30,6 +30,8 @@ type GitManager interface {
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
 	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
+	// FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
+	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -42,6 +44,8 @@ type GitManagerBase interface {
 	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	// LogMergeBase get the commit diff between using a merge base strategy
+	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
@@ -118,6 +122,23 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
+	cmdArgs := []string{"-C", rootDir, "log", from + "^..." + to, "--date=iso-strict", GITFORMAT}
+	impl.logger.Debugw("git", cmdArgs)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
+	defer cancel()
+	output, errMsg, err := impl.runCommand(cmd)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	if err != nil {
+		return nil, err
+	}
+	commits, err := ProcessGitLogOutput(output)
+	if err != nil {
+		return nil, err
+	}
+	return commits, nil
 }
 
 func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {

@@ -1,40 +1,34 @@
 package git
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
-	"go.uber.org/zap"
+	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"io"
 	"log"
+	"strings"
 	"time"
 )
 
 type RepositoryManagerAnalytics interface {
-	RepositoryManager
-	ChangesSinceByRepositoryForAnalytics(gitCtx GitContext, checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
+	ChangesSinceByRepositoryForAnalytics(gitCtx GitContext, checkoutPath string, Old string, New string) (*GitChanges, error)
 }
 
 type RepositoryManagerAnalyticsImpl struct {
-	RepositoryManagerImpl
+	*RepositoryManagerImpl
 }
 
 func NewRepositoryManagerAnalyticsImpl(
-	logger *zap.SugaredLogger,
-	configuration *internal.Configuration,
-	manager GitManagerImpl,
+	repositoryManagerImpl *RepositoryManagerImpl,
 ) *RepositoryManagerAnalyticsImpl {
 	return &RepositoryManagerAnalyticsImpl{
-		RepositoryManagerImpl: RepositoryManagerImpl{
-			logger:        logger,
-			configuration: configuration,
-			gitManager:    manager,
-		}}
+		RepositoryManagerImpl: repositoryManagerImpl}
 }
 
-func computeDiff(r *GitRepository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
+func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
 	processed := make(map[string]*object.Commit, 0)
 	//t := time.Now()
 	h := newHash  //plumbing.NewHash(newHash)
@@ -183,7 +177,7 @@ func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(gitCtx GitContext, checkoutPath string, branch string, Old string, New string) (*GitChanges, error) {
+func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(gitCtx GitContext, checkoutPath string, Old string, New string) (*GitChanges, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -196,6 +190,91 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(gitCtx Gi
 	}
 	newHash := plumbing.NewHash(New)
 	oldHash := plumbing.NewHash(Old)
+
+	var fileStats FileStats
+	if strings.Contains(checkoutPath, "/.git") {
+		oldHashString := oldHash.String()
+		newHashString := newHash.String()
+		outputMsg, errorMsg, err := impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, newHashString, oldHashString, checkoutPath)
+		if err != nil {
+			impl.logger.Errorw("error in fetching fileStat diff between commits ", "errorMsg", errorMsg, "err", err)
+			return nil, err
+		}
+		fileStats, err = getFileStat(outputMsg)
+		if err != nil {
+			impl.logger.Errorw("can't convert git diff into fileStats ", "err", err)
+		}
+	} else {
+		patch, err := getPatchObject(repository.Repository, oldHash, newHash)
+		if err != nil {
+			impl.logger.Errorw("can't get patch: ", "err", err)
+			return nil, err
+		}
+		fileStats = transformFileStats(patch.Stats())
+	}
+	GitChanges.FileStats = fileStats
+	impl.logger.Debugw("computed files stats", "filestats", fileStats)
+
+	var commitsCli, commitsGoGit []*Commit
+	if impl.configuration.UseGitCli || impl.configuration.AnalyticsDebug {
+		commitsCli, err = impl.gitManager.LogMergeBase(gitCtx, checkoutPath, oldHash.String(), newHash.String())
+		if err != nil {
+			impl.logger.Errorw("error in fetching commits for analytics through CLI: ", "err", err)
+			return nil, err
+		}
+	} else if !impl.configuration.UseGitCli || impl.configuration.AnalyticsDebug {
+		commitsGoGit = impl.getCommitDiff(err, repository, newHash, oldHash)
+
+	}
+	if impl.configuration.AnalyticsDebug {
+		impl.logOldestCommitComparison(commitsGoGit, commitsCli, checkoutPath, Old, New)
+	}
+
+	if !impl.configuration.UseGitCli {
+		GitChanges.Commits = commitsGoGit
+	} else {
+		GitChanges.Commits = commitsCli
+	}
+	return GitChanges, nil
+}
+
+func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGit []*Commit, commitsCli []*Commit, checkoutPath string, old string, new string) {
+	if len(commitsGoGit) == 0 || len(commitsCli) == 0 {
+		return
+	}
+	if impl.getOldestCommit(commitsGoGit).Hash.Long != impl.getOldestCommit(commitsCli).Hash.Long {
+		impl.logger.Infow("oldest commit did not match for analytics flow", "checkoutPath", checkoutPath, "old", old, "new", new)
+	}
+}
+
+func (impl RepositoryManagerAnalyticsImpl) getOldestCommit(commits []*Commit) *Commit {
+	oldest := commits[0]
+	for _, commit := range commits {
+		if commit.Author.Date.After(oldest.Author.Date) {
+			oldest = commit
+		}
+	}
+	return oldest
+}
+
+func (impl RepositoryManagerAnalyticsImpl) getCommitDiff(err error, repository *GitRepository, newHash plumbing.Hash, oldHash plumbing.Hash) []*Commit {
+	commits, err := computeDiff(repository.Repository, &newHash, &oldHash)
+	if err != nil {
+		impl.logger.Errorw("can't get commits: ", "err", err)
+	}
+	var serializableCommits []*Commit
+	for _, c := range commits {
+		t, err := repository.TagObject(c.Hash)
+		if err != nil && err != plumbing.ErrObjectNotFound {
+			impl.logger.Errorw("can't get tag: ", "err", err)
+		}
+		serializableCommits = append(serializableCommits, transform(c, t))
+	}
+	return serializableCommits
+}
+
+func getPatchObject(repository *git.Repository, oldHash, newHash plumbing.Hash) (*object.Patch, error) {
+	patch := &object.Patch{}
 	old, err := repository.CommitObject(newHash)
 	if err != nil {
 		return nil, err
@@ -212,26 +291,49 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(gitCtx Gi
 	if err != nil {
 		return nil, err
 	}
-	patch, err := oldTree.Patch(newTree)
+
+	patch, err = oldTree.Patch(newTree)
+
+	return patch, nil
+}
+
+func ProcessGitLogOutput(out string) ([]*Commit, error) {
+	gitCommits := make([]*Commit, 0)
+	if len(out) == 0 {
+		return gitCommits, nil
+	}
+	logOut := out
+	logOut = logOut[:len(logOut)-1]      // Remove the last ","
+	logOut = fmt.Sprintf("[%s]", logOut) // Add []
+
+	var gitCommitFormattedList []GitCommitFormat
+	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
 	if err != nil {
-		impl.logger.Errorw("can't get patch: ", "err", err)
 		return nil, err
 	}
-	commits, err := computeDiff(repository, &newHash, &oldHash)
-	if err != nil {
-		impl.logger.Errorw("can't get commits: ", "err", err)
-	}
-	var serializableCommits []*Commit
-	for _, c := range commits {
-		t, err := repository.TagObject(c.Hash)
-		if err != nil && err != plumbing.ErrObjectNotFound {
-			impl.logger.Errorw("can't get tag: ", "err", err)
+
+	for _, formattedCommit := range gitCommitFormattedList {
+
+		cm := Commit{
+			Hash: &Hash{
+				Long: formattedCommit.Commit,
+			},
+			Author: &Author{
+				Name:  formattedCommit.Author.Name,
+				Email: formattedCommit.Author.Email,
+				Date:  formattedCommit.Author.Date,
+			},
+			Committer: &Committer{
+				Name:  formattedCommit.Commiter.Name,
+				Email: formattedCommit.Commiter.Email,
+				Date:  formattedCommit.Commiter.Date,
+			},
+			Tag:     &Tag{},
+			Tree:    &Tree{},
+			Subject: formattedCommit.Subject,
+			Body:    formattedCommit.Body,
 		}
-		serializableCommits = append(serializableCommits, transform(c, t))
+		gitCommits = append(gitCommits, &cm)
 	}
-	GitChanges.Commits = serializableCommits
-	fileStats := patch.Stats()
-	impl.logger.Debugw("computed files stats", "filestats", fileStats)
-	GitChanges.FileStats = transformFileStats(fileStats)
-	return GitChanges, nil
+	return gitCommits, nil
 }
