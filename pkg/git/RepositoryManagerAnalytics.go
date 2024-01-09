@@ -293,7 +293,9 @@ func getPatchObject(repository *git.Repository, oldHash, newHash plumbing.Hash) 
 	}
 
 	patch, err = oldTree.Patch(newTree)
-
+	if err != nil {
+		return nil, err
+	}
 	return patch, nil
 }
 

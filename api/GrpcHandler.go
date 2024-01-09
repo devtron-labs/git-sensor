@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
@@ -40,16 +39,14 @@ type GrpcHandlerImpl struct {
 	pb.GitSensorServiceServer
 	logger            *zap.SugaredLogger
 	repositoryManager pkg.RepoManager
-	configuration     *internal.Configuration
 }
 
 func NewGrpcHandlerImpl(
-	repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, configuration *internal.Configuration) *GrpcHandlerImpl {
+	repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *GrpcHandlerImpl {
 
 	return &GrpcHandlerImpl{
 		repositoryManager: repositoryManager,
 		logger:            logger,
-		configuration:     configuration,
 	}
 }
 

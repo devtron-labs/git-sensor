@@ -18,7 +18,6 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
@@ -49,14 +48,13 @@ type RestHandler interface {
 	GetWebhookPayloadFilterDataForPipelineMaterialId(w http.ResponseWriter, r *http.Request)
 }
 
-func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger, configuration *internal.Configuration) *RestHandlerImpl {
-	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger, configuration: configuration}
+func NewRestHandlerImpl(repositoryManager pkg.RepoManager, logger *zap.SugaredLogger) *RestHandlerImpl {
+	return &RestHandlerImpl{repositoryManager: repositoryManager, logger: logger}
 }
 
 type RestHandlerImpl struct {
 	repositoryManager pkg.RepoManager
 	logger            *zap.SugaredLogger
-	configuration     *internal.Configuration
 }
 
 type Response struct {
