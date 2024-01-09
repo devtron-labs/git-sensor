@@ -192,7 +192,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	oldHash := plumbing.NewHash(Old)
 
 	var fileStats FileStats
-	if strings.Contains(checkoutPath, "/.git") {
+	if strings.Contains(checkoutPath, "/.git") || impl.configuration.UseGitCli {
 		oldHashString := oldHash.String()
 		newHashString := newHash.String()
 		outputMsg, errorMsg, err := impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, newHashString, oldHashString, checkoutPath)
