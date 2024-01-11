@@ -240,6 +240,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 }
 
 func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGit []*Commit, commitsCli []*Commit, checkoutPath string, old string, new string) {
+	impl.logger.Infow("analysing CLI diff for analytics flow", "checkoutPath", checkoutPath, "old", old, "new", new)
 	if len(commitsGoGit) == 0 || len(commitsCli) == 0 {
 		return
 	}

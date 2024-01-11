@@ -2,15 +2,7 @@ package git
 
 import "time"
 
-var GITFORMAT = `--pretty=format:{
-  "commit": "%H",
-  "parent": "%P",
-  "refs": "%D",
-  "subject": "%s",
-  "body": "%b",
-  "author": { "name": "%aN", "email": "%aE", "date": "%ad" },
-  "commiter": { "name": "%cN", "email": "%cE", "date": "%cd" }
- },`
+var GITFORMAT = `--pretty=format:{"commit":"%H","parent":"%P","refs":"%D","subject":"%s","body":"%b","author":{"name":"%aN","email":"%aE","date":"%ad"},"commiter":{"name":"%cN","email":"%cE","date":"%cd"}},`
 
 type GitPerson struct {
 	Name  string    `json:"name"`

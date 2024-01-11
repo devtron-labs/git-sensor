@@ -136,6 +136,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	}
 	commits, err := ProcessGitLogOutput(output)
 	if err != nil {
+		impl.logger.Errorw("error in parsing log output", "err", err, "output", output)
 		return nil, err
 	}
 	return commits, nil
