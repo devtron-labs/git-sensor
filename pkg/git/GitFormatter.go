@@ -1,9 +1,36 @@
 package git
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+)
 
-// var GITFORMAT = `--pretty=format:{"commit":"%H","parent":"%P","refs":"%D","subject":"%s","body":"%b","author":{"name":"%aN","email":"%aE","date":"%ad"},"commiter":{"name":"%cN","email":"%cE","date":"%cd"}},`
-var GITFORMAT = "--pretty=format:{devtron_delimitercommitdevtron_delimiter:devtron_delimiter%Hdevtron_delimiter,devtron_delimiterparentdevtron_delimiter:devtron_delimiter%Pdevtron_delimiter,devtron_delimiterrefsdevtron_delimiter:devtron_delimiter%Ddevtron_delimiter,devtron_delimitersubjectdevtron_delimiter:devtron_delimiter%sdevtron_delimiter,devtron_delimiterbodydevtron_delimiter:devtron_delimiter%bdevtron_delimiter,devtron_delimiterauthordevtron_delimiter:{devtron_delimiternamedevtron_delimiter:devtron_delimiter%aNdevtron_delimiter,devtron_delimiteremaildevtron_delimiter:devtron_delimiter%aEdevtron_delimiter,devtron_delimiterdatedevtron_delimiter:devtron_delimiter%addevtron_delimiter},devtron_delimitercommiterdevtron_delimiter:{devtron_delimiternamedevtron_delimiter:devtron_delimiter%cNdevtron_delimiter,devtron_delimiteremaildevtron_delimiter:devtron_delimiter%cEdevtron_delimiter,devtron_delimiterdatedevtron_delimiter:devtron_delimiter%cddevtron_delimiter}},"
+const _dl_ = "devtron_delimiter"
+
+// GITFORMAT Refer git official doc for supported placeholders to add new fields
+// Need to make sure the output does not break the json structure which is ensured
+//by having the _dl_ delimiter which is later replaced by quotes
+var GITFORMAT = "--pretty=format:{" +
+	_dl_ + "commit" + _dl_ + ":" + _dl_ + "%H" + _dl_ + "," +
+	_dl_ + "parent" + _dl_ + ":" + _dl_ + "%P" + _dl_ + "," +
+	_dl_ + "refs" + _dl_ + ":" + _dl_ + "%D" + _dl_ + "," +
+	_dl_ + "subject" + _dl_ + ":" + _dl_ + "%s" + _dl_ + "," +
+	_dl_ + "body" + _dl_ + ":" + _dl_ + "%b" + _dl_ + "," +
+	_dl_ + "author" + _dl_ +
+	":{" +
+	_dl_ + "name" + _dl_ + ":" + _dl_ + "%aN" + _dl_ + "," +
+	_dl_ + "email" + _dl_ + ":" + _dl_ + "%aE" + _dl_ + "," +
+	_dl_ + "date" + _dl_ + ":" + _dl_ + "%ad" + _dl_ +
+	"}," +
+	_dl_ + "commiter" + _dl_ +
+	":{" +
+	_dl_ + "name" + _dl_ + ":" + _dl_ + "%cN" + _dl_ + "," +
+	_dl_ + "email" + _dl_ + ":" + _dl_ + "%cE" + _dl_ + "," +
+	_dl_ + "date" + _dl_ + ":" + _dl_ + "%cd" + _dl_ +
+	"}},"
 
 type GitPerson struct {
 	Name  string    `json:"name"`
@@ -18,4 +45,25 @@ type GitCommitFormat struct {
 	Commiter GitPerson `json:"commiter"`
 	Author   GitPerson `json:"author"`
 	Body     string    `json:"body"`
+}
+
+func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
+	//remove the new line character which is after each terminal comma
+	out = strings.ReplaceAll(out, "},\n", "},")
+
+	// to escape the special characters like quotes and newline characters in the commit data
+	logOut := strconv.Quote(out)
+
+	//replace the delimiter with quotes to make it parsable json
+	logOut = strings.ReplaceAll(logOut, _dl_, `"`)
+
+	logOut = logOut[1 : len(logOut)-2]   // trim surround characters (surrounding quotes and trailing com,a)
+	logOut = fmt.Sprintf("[%s]", logOut) // Add []
+
+	var gitCommitFormattedList []GitCommitFormat
+	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
+	if err != nil {
+		return nil, err
+	}
+	return gitCommitFormattedList, nil
 }

@@ -17,7 +17,6 @@
 package git
 
 import (
-	"context"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
@@ -309,31 +308,6 @@ type FileStat struct {
 
 // FileStats is a collection of FileStat.
 type FileStats []FileStat
-
-type GitContext struct {
-	context.Context // Embedding original Go context
-	Username        string
-	Password        string
-	CloningMode     string
-}
-
-func (gitCtx GitContext) WithCredentials(Username string, Password string) GitContext {
-	gitCtx.Username = Username
-	gitCtx.Password = Password
-	return gitCtx
-}
-
-func BuildGitContext(ctx context.Context) GitContext {
-	return GitContext{
-		Context: ctx,
-	}
-}
-
-func (gitCtx GitContext) WithTimeout(timeout int) (GitContext, context.CancelFunc) {
-	ctx, cancel := context.WithTimeout(gitCtx.Context, time.Duration(timeout))
-	gitCtx.Context = ctx
-	return gitCtx, cancel
-}
 
 type IteratorRequest struct {
 	BranchRef      string

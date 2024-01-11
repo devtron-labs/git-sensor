@@ -12,7 +12,7 @@ type Configuration struct {
 	UseGitCli               bool   `env:"USE_GIT_CLI" envDefault:"false"`
 	AnalyticsDebug          bool   `env:"ANALYTICS_DEBUG" envDefault:"false"`
 	CliCmdTimeoutGlobal     int    `env:"CLI_CMD_TIMEOUT_GLOBAL_SECONDS" envDefault:"0"`
-	CliCmdTimeoutJson       string `env:"CLI_CMD_TIMEOUT_JSON" envDefault:"0"`
+	CliCmdTimeoutJson       string `env:"CLI_CMD_TIMEOUT_JSON" envDefault:""`
 	GoGitTimeout            int    `env:"GOGIT_TIMEOUT_SECONDS" envDefault:"10"`
 }
 

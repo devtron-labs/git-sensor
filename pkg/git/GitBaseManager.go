@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	"time"
 )
 
 type GitManager interface {
@@ -50,7 +49,7 @@ type GitManagerBase interface {
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
 	conf              *internal.Configuration
-	commandTimeoutMap map[string]time.Duration
+	commandTimeoutMap map[string]int
 }
 
 func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitManagerBaseImpl {
@@ -63,8 +62,8 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configura
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
 }
 
-func parseCmdTimeoutJson(config *internal.Configuration) (map[string]time.Duration, error) {
-	commandTimeoutMap := make(map[string]time.Duration)
+func parseCmdTimeoutJson(config *internal.Configuration) (map[string]int, error) {
+	commandTimeoutMap := make(map[string]int)
 	var err error
 	if config.CliCmdTimeoutJson != "" {
 		err = json.Unmarshal([]byte(config.CliCmdTimeoutJson), &commandTimeoutMap)
@@ -125,7 +124,7 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 }
 
 func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
-	cmdArgs := []string{"-C", rootDir, "log", from + "^..." + to, "--date=iso-strict", GITFORMAT}
+	cmdArgs := []string{"-C", rootDir, "log", from + "..." + to, "--date=iso-strict", GITFORMAT}
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
@@ -280,7 +279,7 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 }
 
 func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
-	newCtx := context.Background()
+	newCtx := ctx
 	cancel := func() {}
 
 	//TODO: how to make it generic, currently works because the
@@ -288,14 +287,15 @@ func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string
 	timeout := impl.getCommandTimeout(arg[2])
 
 	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx.Context, timeout*time.Second)
+
+		newCtx, cancel = ctx.WithTimeout(timeout) //context.WithTimeout(ctx.Context, timeout*time.Second)
 	}
 	cmd := exec.CommandContext(newCtx, name, arg...)
 	return cmd, cancel
 }
 
-func (impl *GitManagerBaseImpl) getCommandTimeout(command string) time.Duration {
-	timeout := time.Duration(impl.conf.CliCmdTimeoutGlobal)
+func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
+	timeout := impl.conf.CliCmdTimeoutGlobal
 	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok && cmdTimeout > 0 {
 		timeout = cmdTimeout
 	}

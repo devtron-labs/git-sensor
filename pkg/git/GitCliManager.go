@@ -1,13 +1,10 @@
 package git
 
 import (
-	"encoding/json"
-	"fmt"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 type GitCliManager interface {
@@ -187,25 +184,4 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) (
 		})
 	}
 	return gitCommits, nil
-}
-
-func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
-	//remove the new line character which is after each terminal comma
-	out = strings.ReplaceAll(out, "},\n", "},")
-
-	// to escape the special characters like quotes and newline characters in the commit data
-	logOut := strconv.Quote(out)
-
-	//replace the delimiter with quotes to make it parsable json
-	logOut = strings.ReplaceAll(logOut, "devtron_delimiter", `"`)
-
-	logOut = logOut[1 : len(logOut)-2]   // trim surround characters (surrounding quotes and trailing com,a)
-	logOut = fmt.Sprintf("[%s]", logOut) // Add []
-
-	var gitCommitFormattedList []GitCommitFormat
-	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
-	if err != nil {
-		return nil, err
-	}
-	return gitCommitFormattedList, nil
 }

@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/util"
 	"gopkg.in/src-d/go-git.v4"
@@ -195,7 +194,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	if strings.Contains(checkoutPath, "/.git") || impl.configuration.UseGitCli {
 		oldHashString := oldHash.String()
 		newHashString := newHash.String()
-		outputMsg, errorMsg, err := impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, newHashString, oldHashString, checkoutPath)
+		outputMsg, errorMsg, err := impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, oldHashString, newHashString, checkoutPath)
 		if err != nil {
 			impl.logger.Errorw("error in fetching fileStat diff between commits ", "errorMsg", errorMsg, "err", err)
 			return nil, err
@@ -222,9 +221,17 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 			impl.logger.Errorw("error in fetching commits for analytics through CLI: ", "err", err)
 			return nil, err
 		}
-	} else if !impl.configuration.UseGitCli || impl.configuration.AnalyticsDebug {
-		commitsGoGit = impl.getCommitDiff(err, repository, newHash, oldHash)
-
+	}
+	if !impl.configuration.UseGitCli || impl.configuration.AnalyticsDebug {
+		ctx, cancel := gitCtx.WithTimeout(impl.configuration.GoGitTimeout)
+		defer cancel()
+		commitsGoGit, err = RunWithTimeout(ctx, func() ([]*Commit, error) {
+			return impl.getCommitDiff(repository, newHash, oldHash)
+		})
+		if err != nil {
+			impl.logger.Errorw("error in fetching commits for analytics through gogit: ", "err", err)
+			return nil, err
+		}
 	}
 	if impl.configuration.AnalyticsDebug {
 		impl.logOldestCommitComparison(commitsGoGit, commitsCli, checkoutPath, Old, New)
@@ -243,35 +250,41 @@ func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGi
 	if len(commitsGoGit) == 0 || len(commitsCli) == 0 {
 		return
 	}
-	if impl.getOldestCommit(commitsGoGit).Hash.Long != impl.getOldestCommit(commitsCli).Hash.Long {
-		impl.logger.Infow("oldest commit did not match for analytics flow", "checkoutPath", checkoutPath, "old", old, "new", new)
+	oldestHashGoGit := impl.getOldestCommit(commitsGoGit).Hash.Long
+	oldestHashCli := impl.getOldestCommit(commitsCli).Hash.Long
+	if oldestHashGoGit != oldestHashCli {
+		impl.logger.Infow("oldest commit did not match for analytics flow", "checkoutPath", checkoutPath, "old", oldestHashGoGit, "new", oldestHashCli)
+	} else {
+		impl.logger.Infow("oldest commit matched for analytics flow", "checkoutPath", checkoutPath, "old", oldestHashGoGit, "new", oldestHashCli)
 	}
 }
 
 func (impl RepositoryManagerAnalyticsImpl) getOldestCommit(commits []*Commit) *Commit {
 	oldest := commits[0]
 	for _, commit := range commits {
-		if commit.Author.Date.After(oldest.Author.Date) {
+		if oldest.Author.Date.After(commit.Author.Date) {
 			oldest = commit
 		}
 	}
 	return oldest
 }
 
-func (impl RepositoryManagerAnalyticsImpl) getCommitDiff(err error, repository *GitRepository, newHash plumbing.Hash, oldHash plumbing.Hash) []*Commit {
+func (impl RepositoryManagerAnalyticsImpl) getCommitDiff(repository *GitRepository, newHash plumbing.Hash, oldHash plumbing.Hash) ([]*Commit, error) {
 	commits, err := computeDiff(repository.Repository, &newHash, &oldHash)
 	if err != nil {
 		impl.logger.Errorw("can't get commits: ", "err", err)
+		return nil, err
 	}
 	var serializableCommits []*Commit
 	for _, c := range commits {
 		t, err := repository.TagObject(c.Hash)
 		if err != nil && err != plumbing.ErrObjectNotFound {
 			impl.logger.Errorw("can't get tag: ", "err", err)
+			return nil, err
 		}
 		serializableCommits = append(serializableCommits, transform(c, t))
 	}
-	return serializableCommits
+	return serializableCommits, nil
 }
 
 func (impl RepositoryManagerAnalyticsImpl) getPatchObject(gitCtx GitContext, repository *git.Repository, oldHash, newHash plumbing.Hash) (*object.Patch, error) {
@@ -293,7 +306,7 @@ func (impl RepositoryManagerAnalyticsImpl) getPatchObject(gitCtx GitContext, rep
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(gitCtx.Context, time.Duration(impl.configuration.GoGitTimeout)*time.Second)
+	ctx, cancel := gitCtx.WithTimeout(impl.configuration.GoGitTimeout)
 	defer cancel()
 	patch, err = oldTree.PatchContext(ctx, newTree)
 	if err != nil {
