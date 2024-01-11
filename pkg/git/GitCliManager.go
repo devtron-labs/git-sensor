@@ -6,8 +6,8 @@ import (
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
+	"strings"
 )
 
 type GitCliManager interface {
@@ -152,27 +152,27 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	return commits[0], nil
 }
 
-func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
-
-	if len(out) == 0 {
-		return make([]GitCommit, 0), nil
-	}
-
-	logOut := strconv.Quote(out)
-
-	m1 := regexp.MustCompile("devtron_delimiter")
-	logOut = m1.ReplaceAllString(logOut, `"`)
-
-	logOut = logOut[:len(logOut)-1]      // Remove the last ","
-	logOut = fmt.Sprintf("[%s]", logOut) // Add []
-
-	var gitCommitFormattedList []GitCommitFormat
-	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
+func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error) {
+	gitCommit := commit.GetCommit()
+	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", gitCommit.CheckoutPath)
 	if err != nil {
+		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", gitCommit.CheckoutPath, "errorMsg", errorMsg, "err", err)
 		return nil, err
 	}
+	return getFileStat(fileStat)
+}
+
+func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
 
 	gitCommits := make([]GitCommit, 0)
+	if len(out) == 0 {
+		return gitCommits, nil
+	}
+	gitCommitFormattedList, err := parseFormattedLogOutput(out)
+	if err != nil {
+		return gitCommits, err
+	}
+
 	for _, formattedCommit := range gitCommitFormattedList {
 
 		cm := GitCommitBase{
@@ -189,12 +189,23 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) (
 	return gitCommits, nil
 }
 
-func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error) {
-	gitCommit := commit.GetCommit()
-	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", gitCommit.CheckoutPath)
+func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
+	//remove the new line character which is after each terminal comma
+	out = strings.ReplaceAll(out, "},\n", "},")
+
+	// to escape the special characters like quotes and newline characters in the commit data
+	logOut := strconv.Quote(out)
+
+	//replace the delimiter with quotes to make it parsable json
+	logOut = strings.ReplaceAll(logOut, "devtron_delimiter", `"`)
+
+	logOut = logOut[1 : len(logOut)-2]   // trim surround characters (surrounding quotes and trailing com,a)
+	logOut = fmt.Sprintf("[%s]", logOut) // Add []
+
+	var gitCommitFormattedList []GitCommitFormat
+	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
 	if err != nil {
-		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", gitCommit.CheckoutPath, "errorMsg", errorMsg, "err", err)
 		return nil, err
 	}
-	return getFileStat(fileStat)
+	return gitCommitFormattedList, nil
 }

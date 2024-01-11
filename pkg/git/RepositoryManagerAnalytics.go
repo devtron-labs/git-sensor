@@ -2,7 +2,6 @@ package git
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/util"
 	"gopkg.in/src-d/go-git.v4"
@@ -303,19 +302,14 @@ func (impl RepositoryManagerAnalyticsImpl) getPatchObject(gitCtx GitContext, rep
 	return patch, nil
 }
 
-func ProcessGitLogOutput(out string) ([]*Commit, error) {
+func ProcessGitLogOutputForAnalytics(out string) ([]*Commit, error) {
 	gitCommits := make([]*Commit, 0)
 	if len(out) == 0 {
 		return gitCommits, nil
 	}
-	logOut := out
-	logOut = logOut[:len(logOut)-1]      // Remove the last ","
-	logOut = fmt.Sprintf("[%s]", logOut) // Add []
-
-	var gitCommitFormattedList []GitCommitFormat
-	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
+	gitCommitFormattedList, err := parseFormattedLogOutput(out)
 	if err != nil {
-		return nil, err
+		return gitCommits, err
 	}
 
 	for _, formattedCommit := range gitCommitFormattedList {

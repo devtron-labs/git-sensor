@@ -134,7 +134,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	if err != nil {
 		return nil, err
 	}
-	commits, err := ProcessGitLogOutput(output)
+	commits, err := ProcessGitLogOutputForAnalytics(output)
 	if err != nil {
 		impl.logger.Errorw("error in parsing log output", "err", err, "output", output)
 		return nil, err
@@ -280,7 +280,7 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 }
 
 func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
-	newCtx := ctx.Context
+	newCtx := context.Background()
 	cancel := func() {}
 
 	//TODO: how to make it generic, currently works because the
