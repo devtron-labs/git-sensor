@@ -57,7 +57,7 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configura
 
 	commandTimeoutMap, err := parseCmdTimeoutJson(config)
 	if err != nil {
-		logger.Errorw("error in parsing CLI_CMD_TIMEOUT_JSON", "value", config.CliCmdTimeoutJson, "err", err)
+		logger.Errorw("error in parsing config", "config", config, "err", err)
 	}
 
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
@@ -287,7 +287,7 @@ func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string
 	timeout := impl.getCommandTimeout(arg[2])
 
 	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx.Context, timeout)
+		newCtx, cancel = context.WithTimeout(ctx.Context, timeout*time.Second)
 	}
 	cmd := exec.CommandContext(newCtx, name, arg...)
 	return cmd, cancel
