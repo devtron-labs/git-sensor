@@ -11,8 +11,9 @@ type Configuration struct {
 	MinLimit                int    `env:"MIN_LIMIT_FOR_PVC" envDefault:"1"` // in MB
 	UseGitCli               bool   `env:"USE_GIT_CLI" envDefault:"false"`
 	AnalyticsDebug          bool   `env:"ANALYTICS_DEBUG" envDefault:"false"`
-	CliCmdTimeoutGlobal     int    `env:"CLI_CMD_TIMEOUT_GLOBAL" envDefault:"0"`
+	CliCmdTimeoutGlobal     int    `env:"CLI_CMD_TIMEOUT_GLOBAL_SECONDS" envDefault:"0"`
 	CliCmdTimeoutJson       string `env:"CLI_CMD_TIMEOUT_JSON" envDefault:"0"`
+	GoGitTimeout            int    `env:"GOGIT_TIMEOUT_SECONDS" envDefault:"10"`
 }
 
 func ParseConfiguration() (*Configuration, error) {

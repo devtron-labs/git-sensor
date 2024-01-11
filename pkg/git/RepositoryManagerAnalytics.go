@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/devtron-labs/git-sensor/util"
@@ -205,7 +206,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 			impl.logger.Errorw("can't convert git diff into fileStats ", "err", err)
 		}
 	} else {
-		patch, err := getPatchObject(repository.Repository, oldHash, newHash)
+		patch, err := impl.getPatchObject(gitCtx, repository.Repository, oldHash, newHash)
 		if err != nil {
 			impl.logger.Errorw("can't get patch: ", "err", err)
 			return nil, err
@@ -273,7 +274,7 @@ func (impl RepositoryManagerAnalyticsImpl) getCommitDiff(err error, repository *
 	return serializableCommits
 }
 
-func getPatchObject(repository *git.Repository, oldHash, newHash plumbing.Hash) (*object.Patch, error) {
+func (impl RepositoryManagerAnalyticsImpl) getPatchObject(gitCtx GitContext, repository *git.Repository, oldHash, newHash plumbing.Hash) (*object.Patch, error) {
 	patch := &object.Patch{}
 	old, err := repository.CommitObject(newHash)
 	if err != nil {
@@ -292,7 +293,9 @@ func getPatchObject(repository *git.Repository, oldHash, newHash plumbing.Hash) 
 		return nil, err
 	}
 
-	patch, err = oldTree.Patch(newTree)
+	ctx, cancel := context.WithTimeout(gitCtx.Context, time.Duration(impl.configuration.GoGitTimeout)*time.Second)
+	defer cancel()
+	patch, err = oldTree.PatchContext(ctx, newTree)
 	if err != nil {
 		return nil, err
 	}
