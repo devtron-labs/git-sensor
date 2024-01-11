@@ -6,6 +6,7 @@ import (
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 )
 
@@ -152,10 +153,16 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 }
 
 func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
+
 	if len(out) == 0 {
 		return make([]GitCommit, 0), nil
 	}
-	logOut := out
+
+	logOut := strconv.Quote(out)
+
+	m1 := regexp.MustCompile("devtron_delimiter")
+	logOut = m1.ReplaceAllString(logOut, `"`)
+
 	logOut = logOut[:len(logOut)-1]      // Remove the last ","
 	logOut = fmt.Sprintf("[%s]", logOut) // Add []
 
