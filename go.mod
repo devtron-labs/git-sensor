@@ -4,13 +4,13 @@ go 1.20
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.9-0.20240104080131-cbdf3e63ac1d
+	github.com/devtron-labs/common-lib v0.0.9-beta2
 	github.com/devtron-labs/protos v0.0.2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
 	github.com/google/wire v0.4.0
 	github.com/gorilla/handlers v1.4.2
-	github.com/gorilla/mux v1.7.4
+	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron/v3 v3.0.0
