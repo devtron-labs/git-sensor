@@ -124,3 +124,34 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 
 	return nil
 }
+
+// sample commitDiff :=4\t3\tModels/models.go\n2\t2\tRepository/Repository.go\n0\t2\main.go
+func getFileStat(commitDiff string) (FileStats, error) {
+	filestat := FileStats{}
+	lines := strings.Split(strings.TrimSpace(commitDiff), "\n")
+
+	for _, line := range lines {
+		parts := strings.Fields(line)
+
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid git diff --numstat output")
+		}
+
+		added, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse number of lines added: %w", err)
+		}
+
+		deleted, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse number of lines deleted: %w", err)
+		}
+		filestat = append(filestat, FileStat{
+			Name:     parts[2],
+			Addition: added,
+			Deletion: deleted,
+		})
+	}
+
+	return filestat, nil
+}

@@ -20,18 +20,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/caarlos0/env"
+	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/middleware"
 	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"regexp"
-	"strings"
+	"runtime/debug"
 	"time"
 )
 
@@ -46,11 +44,11 @@ type GitWatcherImpl struct {
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
 	configuration                *internal.Configuration
+	gitManager                   GitManagerImpl
 }
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
-	PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool
 }
 
 type PollConfig struct {
@@ -63,7 +61,9 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internal.RepositoryLocker,
-	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration) (*GitWatcherImpl, error) {
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration,
+	gitmanager GitManagerImpl,
+) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
 	err := env.Parse(cfg)
@@ -87,7 +87,9 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 		pollConfig:                   cfg,
 		webhookHandler:               webhookHandler,
 		configuration:                configuration,
+		gitManager:                   gitmanager,
 	}
+
 	logger.Info()
 	_, err = cron.AddFunc(fmt.Sprintf("@every %dm", cfg.PollDuration), watcher.Watch)
 	if err != nil {
@@ -118,6 +120,14 @@ func (impl GitWatcherImpl) Watch() {
 
 func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 	wp := workerpool.New(impl.pollConfig.PollWorker)
+
+	handlePanic := func() {
+		if err := recover(); err != nil {
+			impl.logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", err, "stack", string(debug.Stack()))
+
+		}
+	}
+
 	for _, material := range materials {
 		if len(material.CiPipelineMaterials) == 0 {
 			impl.logger.Infow("no ci pipeline, skipping", "id", material.Id, "url", material.Url)
@@ -125,6 +135,7 @@ func (impl *GitWatcherImpl) RunOnWorker(materials []*sql.GitMaterial) {
 		}
 		materialMsg := &sql.GitMaterial{Id: material.Id, Url: material.Url}
 		wp.Submit(func() {
+			defer handlePanic()
 			_, err := impl.pollAndUpdateGitMaterial(materialMsg)
 			if err != nil {
 				impl.logger.Errorw("error in polling git material", "material", materialMsg, "err", err)
@@ -180,7 +191,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		Username: userName,
 		Password: password,
 	}
-	updated, repo, err := impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+	updated, repo, err := impl.FetchAndUpdateMaterial(material, gitContext, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
@@ -191,7 +202,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				return err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				updated, repo, err = impl.repositoryManager.Fetch(gitContext, material.Url, location, material)
+				updated, repo, err = impl.FetchAndUpdateMaterial(material, gitContext, location)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
 					return err
@@ -226,7 +237,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			erroredMaterialsModels = append(erroredMaterialsModels, material)
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
-			if latestCommit.Commit != material.LastSeenHash {
+			if latestCommit.GetCommit().Commit != material.LastSeenHash {
 				// new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
@@ -272,11 +283,20 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	return nil
 }
 
+func (impl GitWatcherImpl) FetchAndUpdateMaterial(material *sql.GitMaterial, gitContext *GitContext, location string) (bool, *GitRepository, error) {
+	updated, repo, err := impl.repositoryManager.Fetch(gitContext, material.Url, location)
+	if err == nil {
+		material.CheckoutLocation = location
+		material.CheckoutStatus = true
+	}
+	return updated, repo, err
+}
+
 func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMaterialBean, gitMaterial *sql.GitMaterial) error {
 
 	impl.logger.Warnw("material notification", "materials", materials)
 	for _, material := range materials {
-		excluded := impl.PathMatcher(material.GitCommit.FileStats, gitMaterial)
+		excluded := impl.gitManager.PathMatcher(material.GitCommit.FileStats, gitMaterial)
 		if excluded {
 			impl.logger.Infow("skip this auto trigger", "exclude", excluded)
 			continue
@@ -309,79 +329,6 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 	}
 	err := impl.pubSubClient.Subscribe(pubsub.WEBHOOK_EVENT_TOPIC, callback)
 	return err
-}
-
-func (impl GitWatcherImpl) PathMatcher(fileStats *object.FileStats, gitMaterial *sql.GitMaterial) bool {
-	excluded := false
-	var changesInPath []string
-	var pathsForFilter []string
-	if len(gitMaterial.FilterPattern) == 0 {
-		impl.logger.Debugw("no filter configured for this git material", "gitMaterial", gitMaterial)
-		return excluded
-	}
-	for _, path := range gitMaterial.FilterPattern {
-		regex := util.GetPathRegex(path)
-		pathsForFilter = append(pathsForFilter, regex)
-	}
-	pathsForFilter = util.ReverseSlice(pathsForFilter)
-	impl.logger.Debugw("pathMatcher............", "pathsForFilter", pathsForFilter)
-	fileStatBytes, err := json.Marshal(fileStats)
-	if err != nil {
-		impl.logger.Errorw("marshal error ............", "err", err)
-		return false
-	}
-	var fileChanges []map[string]interface{}
-	if err := json.Unmarshal(fileStatBytes, &fileChanges); err != nil {
-		impl.logger.Errorw("unmarshal error ............", "err", err)
-		return false
-	}
-	for _, fileChange := range fileChanges {
-		path := fileChange["Name"].(string)
-		changesInPath = append(changesInPath, path)
-	}
-	len := len(pathsForFilter)
-	for i, filter := range pathsForFilter {
-		isExcludeFilter := false
-		isMatched := false
-		// TODO - handle ! in file name with /!
-		const ExcludePathIdentifier = "!"
-		if strings.Contains(filter, ExcludePathIdentifier) {
-			filter = strings.Replace(filter, ExcludePathIdentifier, "", 1)
-			isExcludeFilter = true
-		}
-		for _, path := range changesInPath {
-			match, err := regexp.MatchString(filter, path)
-			if err != nil {
-				continue
-			}
-			if match {
-				isMatched = true
-				break
-			}
-		}
-		if isMatched {
-			if isExcludeFilter {
-				// if matched for exclude filter
-				excluded = true
-			} else {
-				// if matched for include filter
-				excluded = false
-			}
-			return excluded
-		} else if i == len-1 {
-			// if it's a last item
-			if isExcludeFilter {
-				excluded = false
-			} else {
-				excluded = true
-			}
-			return excluded
-		} else {
-			// GO TO THE NEXT FILTER
-		}
-	}
-
-	return excluded
 }
 
 type CronLoggerImpl struct {

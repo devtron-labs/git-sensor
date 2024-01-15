@@ -5,8 +5,6 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"os"
 	"reflect"
 	"testing"
@@ -29,12 +27,13 @@ var sshPrivateKey = ``
 func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	logger, err := utils.NewSugardLogger()
 	assert.Nil(t, err)
-	gitCliImpl := NewGitUtil(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, gitCliImpl, &internal.Configuration{
+	gitCliImpl := NewCliGitManagerImpl(logger)
+	gogitImpl := NewGoGitManagerImpl(logger)
+	repositoryManagerImpl := NewRepositoryManagerImpl(logger, &internal.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,
-	})
+	}, gitCliImpl, gogitImpl)
 	return repositoryManagerImpl
 }
 
@@ -206,7 +205,7 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload args
-		want    *GitCommit
+		want    *GitCommitBase
 		wantErr bool
 	}{
 		{
@@ -214,7 +213,7 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 				checkoutPath: location2,
 				commitHash:   commitHash,
 			},
-			want: &GitCommit{
+			want: &GitCommitBase{
 				Commit:      "dfde5ecae5cd1ae6a7e3471a63a8277177898a7d",
 				FileStats:   nil,
 				WebhookData: nil,
@@ -272,7 +271,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload args
-		want    []*GitCommit
+		want    []*GitCommitBase
 		wantErr bool
 	}{
 		{
@@ -283,10 +282,10 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 				to:           "",
 				count:        2,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 0,
@@ -296,7 +295,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 				},
 				{
 					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -333,10 +332,10 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 				to:           "",
 				count:        0,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 0,
@@ -346,7 +345,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 				},
 				{
 					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -405,7 +404,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload args
-		want    []*GitCommit
+		want    []*GitCommitBase
 		wantErr bool
 	}{
 		{
@@ -416,10 +415,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				to:           "",
 				count:        2,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 0,
@@ -429,7 +428,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				},
 				{
 					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -448,10 +447,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				to:           "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
 				count:        2,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -461,7 +460,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				},
 				{
 					Commit: "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -480,10 +479,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				to:           "",
 				count:        2,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "2a1683d1c95dd260b311cf59b274792c7b0478ce",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 0,
@@ -493,7 +492,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				},
 				{
 					Commit: "66054005ca83d6e0f3daff2a93f4f30bc70d9aff",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -512,10 +511,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				to:           "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
 				count:        3,
 			},
-			want: []*GitCommit{
+			want: []*GitCommitBase{
 				{
 					Commit: "1afbce41f37ce71d0973be2b4a972c6475abc3a7",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -525,7 +524,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				},
 				{
 					Commit: "daa4872b903b0b47c2136d4e6fe50356a6b01d33",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -535,7 +534,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 				},
 				{
 					Commit: "7ffe9bcd668835e9de8d87582c42f8642efb6012",
-					FileStats: &object.FileStats{object.FileStat{
+					FileStats: &FileStats{FileStat{
 						Name:     "README.md",
 						Addition: 1,
 						Deletion: 1,
@@ -561,10 +560,11 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
-		r, err := git.PlainOpen(tt.payload.checkoutPath)
+		//r, err := git.PlainOpen(tt.payload.checkoutPath)
+		r, err := repositoryManagerImpl.gitUtil.OpenRepoPlain(tt.payload.checkoutPath)
 		assert.Nil(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
+			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, "")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -600,7 +600,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload args
-		want    *GitCommit
+		want    *GitCommitBase
 		wantErr bool
 	}{
 		{
@@ -608,7 +608,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 				checkoutPath: location2,
 				tag:          tag,
 			},
-			want: &GitCommit{
+			want: &GitCommitBase{
 				Commit:      "6e0d605a1c9fbf2717b7fe8a3d4ae23ab006e5c0",
 				FileStats:   nil,
 				WebhookData: nil,
@@ -721,13 +721,13 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 						Body:    "",
 					},
 				},
-				FileStats: object.FileStats{
-					object.FileStat{
+				FileStats: FileStats{
+					FileStat{
 						Name:     "Dockerfile",
 						Addition: 1,
 						Deletion: 1,
 					},
-					object.FileStat{
+					FileStat{
 						Name:     "app.js",
 						Addition: 1,
 						Deletion: 2,
@@ -831,13 +831,13 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 						Body:    "",
 					},
 				},
-				FileStats: object.FileStats{
-					object.FileStat{
+				FileStats: FileStats{
+					FileStat{
 						Name:     "Dockerfile",
 						Addition: 1,
 						Deletion: 1,
 					},
-					object.FileStat{
+					FileStat{
 						Name:     "app.js",
 						Addition: 2,
 						Deletion: 1,

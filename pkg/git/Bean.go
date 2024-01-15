@@ -17,8 +17,11 @@
 package git
 
 import (
+	"context"
 	"github.com/devtron-labs/git-sensor/internal/sql"
+	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"io"
 	"time"
 	"unicode/utf8"
 )
@@ -41,31 +44,110 @@ type CiPipelineMaterialBean struct {
 	Type                      sql.SourceType
 	Value                     string
 	Active                    bool
-	GitCommit                 *GitCommit
+	GitCommit                 *GitCommitBase
 	ExtraEnvironmentVariables map[string]string // extra env variables which will be used for CI
 }
 
+type GitRepository struct {
+	*git.Repository
+	rootDir string
+}
+
+type CommitIterator interface {
+	Next() (GitCommit, error)
+}
+
+type CommitCliIterator struct {
+	commits []GitCommit
+	index   int
+}
+
+type CommitGoGitIterator struct {
+	object.CommitIter
+}
+
+func transformFileStats(stats object.FileStats) FileStats {
+	fileStatList := make([]FileStat, 0)
+	for _, stat := range stats {
+		fileStatList = append(fileStatList, FileStat{
+			Name:     stat.Name,
+			Addition: stat.Addition,
+			Deletion: stat.Deletion,
+		})
+	}
+	return fileStatList
+}
+
+func (itr *CommitGoGitIterator) Next() (GitCommit, error) {
+	commit, err := itr.CommitIter.Next()
+	if err != nil {
+		return nil, err
+	}
+	gitCommit := GitCommitBase{
+		Author:  commit.Author.String(),
+		Commit:  commit.Hash.String(),
+		Date:    commit.Author.When,
+		Message: commit.Message,
+	}
+	return &GitCommitGoGit{
+		GitCommitBase: gitCommit,
+		Cm:            commit,
+	}, err
+}
+
+func (itr *CommitCliIterator) Next() (GitCommit, error) {
+
+	if itr.index < len(itr.commits) {
+		commit := itr.commits[itr.index]
+		itr.index++
+		return commit, nil
+	}
+	return nil, io.EOF
+}
+
 type MaterialChangeResp struct {
-	Commits        []*GitCommit `json:"commits"`
-	LastFetchTime  time.Time    `json:"lastFetchTime"`
-	IsRepoError    bool         `json:"isRepoError"`
-	RepoErrorMsg   string       `json:"repoErrorMsg"`
-	IsBranchError  bool         `json:"isBranchError"`
-	BranchErrorMsg string       `json:"branchErrorMsg"`
+	Commits        []*GitCommitBase `json:"commits"`
+	LastFetchTime  time.Time        `json:"lastFetchTime"`
+	IsRepoError    bool             `json:"isRepoError"`
+	RepoErrorMsg   string           `json:"repoErrorMsg"`
+	IsBranchError  bool             `json:"isBranchError"`
+	BranchErrorMsg string           `json:"branchErrorMsg"`
 }
 
-type GitCommit struct {
-	Commit      string
-	Author      string
-	Date        time.Time
-	Message     string
-	Changes     []string          `json:",omitempty"`
-	FileStats   *object.FileStats `json:",omitempty"`
-	WebhookData *WebhookData      `json:"webhookData"`
-	Excluded    bool              `json:",omitempty"`
+type GitCommit interface {
+	GetCommit() *GitCommitBase
 }
 
-func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
+type GitCommitCli struct {
+	GitCommitBase
+}
+
+type GitCommitGoGit struct {
+	GitCommitBase
+	Cm *object.Commit
+}
+
+func (gitCommit *GitCommitBase) GetCommit() *GitCommitBase {
+	return gitCommit
+}
+
+type GitCommitBase struct {
+	Commit       string
+	Author       string
+	Date         time.Time
+	Message      string
+	Changes      []string     `json:",omitempty"`
+	FileStats    *FileStats   `json:",omitempty"`
+	WebhookData  *WebhookData `json:"webhookData"`
+	Excluded     bool         `json:",omitempty"`
+	CheckoutPath string
+}
+
+func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
+	gitCommit.FileStats = stats
+}
+
+func (gitCommit *GitCommitBase) TruncateMessageIfExceedsMaxLength() {
 	maxLength := 1024
 	if len(gitCommit.Message) > maxLength {
 		gitCommit.Message = gitCommit.Message[:maxLength-3] + "..."
@@ -73,12 +155,12 @@ func (gitCommit *GitCommit) TruncateMessageIfExceedsMaxLength() {
 }
 
 // IsMessageValidUTF8 checks if a string is valid UTF-8.
-func (gitCommit *GitCommit) IsMessageValidUTF8() bool {
+func (gitCommit *GitCommitBase) IsMessageValidUTF8() bool {
 	return utf8.ValidString(gitCommit.Message)
 }
 
 // FixInvalidUTF8Message replaces invalid UTF-8 sequences with the replacement character (U+FFFD).
-func (gitCommit *GitCommit) FixInvalidUTF8Message() {
+func (gitCommit *GitCommitBase) FixInvalidUTF8Message() {
 	invalidUTF8 := []rune(gitCommit.Message)
 	for i, r := range invalidUTF8 {
 		if !utf8.ValidRune(r) {
@@ -206,4 +288,39 @@ type WebhookPayloadFilterDataSelectorResponse struct {
 	SelectorCondition string `json:"selectorCondition"`
 	SelectorValue     string `json:"selectorValue"`
 	Match             bool   `json:"match"`
+}
+
+type GitChanges struct {
+	Commits   []*Commit
+	FileStats FileStats
+}
+
+type FileStatsResult struct {
+	FileStats FileStats
+	Error     error
+}
+
+// FileStat stores the status of changes in content of a file.
+type FileStat struct {
+	Name     string
+	Addition int
+	Deletion int
+}
+
+// FileStats is a collection of FileStat.
+type FileStats []FileStat
+
+type GitContext struct {
+	context.Context // Embedding original Go context
+	Username        string
+	Password        string
+	CloningMode     string
+}
+
+type IteratorRequest struct {
+	BranchRef      string
+	Branch         string
+	CommitCount    int
+	FromCommitHash string
+	ToCommitHash   string
 }

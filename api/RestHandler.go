@@ -192,7 +192,7 @@ func (handler RestHandlerImpl) ReloadMaterial(w http.ResponseWriter, r *http.Req
 	}
 }
 
-//-------------
+// -------------
 func (handler RestHandlerImpl) FetchChanges(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	material := &git.FetchScmChangesRequest{}
@@ -239,7 +239,7 @@ func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.
 		return
 	}
 	handler.logger.Infow("commit detail request", "req", material)
-	var commits *git.GitCommit
+	var commits *git.GitCommitBase
 	if len(material.GitTag) > 0 {
 		commits, err = handler.repositoryManager.GetCommitInfoForTag(material)
 	} else if len(material.BranchName) > 0 {

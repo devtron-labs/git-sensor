@@ -20,6 +20,7 @@
 package main
 
 import (
+	"github.com/devtron-labs/common-lib/monitoring"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/internal"
@@ -52,12 +53,18 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(sql.GitProviderRepository), new(*sql.GitProviderRepositoryImpl)),
 		git.NewRepositoryManagerImpl,
 		wire.Bind(new(git.RepositoryManager), new(*git.RepositoryManagerImpl)),
+		git.NewRepositoryManagerAnalyticsImpl,
+		wire.Bind(new(git.RepositoryManagerAnalytics), new(*git.RepositoryManagerAnalyticsImpl)),
+		git.NewGoGitSDKManagerImpl,
+		wire.Bind(new(git.GoGitSDKManager), new(*git.GoGitSDKManagerImpl)),
+		git.NewGitCliManagerImpl,
+		wire.Bind(new(git.GitCliManager), new(*git.GitCliManagerImpl)),
+		git.NewGitManagerImpl,
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
 		internal.NewRepositoryLocker,
 		//internal.NewNatsConnection,
 		pubsub.NewPubSubClientServiceImpl,
-		git.NewGitUtil,
 		sql.NewWebhookEventRepositoryImpl,
 		wire.Bind(new(sql.WebhookEventRepository), new(*sql.WebhookEventRepositoryImpl)),
 		sql.NewWebhookEventParsedDataRepositoryImpl,
@@ -74,6 +81,7 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.WebhookEventParser), new(*git.WebhookEventParserImpl)),
 		git.NewWebhookHandlerImpl,
 		wire.Bind(new(git.WebhookHandler), new(*git.WebhookHandlerImpl)),
+		monitoring.NewMonitoringRouter,
 	)
 	return &App{}, nil
 }

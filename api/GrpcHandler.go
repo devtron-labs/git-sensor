@@ -290,7 +290,7 @@ func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.Comm
 		BranchName:         req.BranchName,
 	}
 
-	var gitCommit *git.GitCommit
+	var gitCommit *git.GitCommitBase
 	var err error
 
 	if len(req.GitTag) > 0 {
@@ -772,7 +772,7 @@ func (impl *GrpcHandlerImpl) mapGitChanges(gitChanges *git.GitChanges) *pb.GitCh
 	}
 }
 
-func (impl *GrpcHandlerImpl) mapGitCommit(commit *git.GitCommit) (*pb.GitCommit, error) {
+func (impl *GrpcHandlerImpl) mapGitCommit(commit *git.GitCommitBase) (*pb.GitCommit, error) {
 
 	// mapping FileStats
 	var mappedFileStats []*pb.FileStat

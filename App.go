@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/caarlos0/env"
+	constants "github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
@@ -28,14 +29,18 @@ import (
 	pb "github.com/devtron-labs/protos/gitSensor"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 )
 
@@ -121,12 +126,21 @@ func (app *App) initGrpcServer(port int) error {
 		return err
 	}
 
+	grpcPanicRecoveryHandler := func(p any) (err error) {
+		app.Logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", p, "stack", string(debug.Stack()))
+		return status.Errorf(codes.Internal, "%s", p)
+	}
+	recoveryOption := recovery.WithRecoveryHandler(grpcPanicRecoveryHandler)
 	opts := []grpc.ServerOption{
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionAge: 10 * time.Second,
 		}),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		grpc.ChainStreamInterceptor(
+			grpc_prometheus.StreamServerInterceptor,
+			recovery.StreamServerInterceptor(recoveryOption)), // panic interceptor, should be at last
+		grpc.ChainUnaryInterceptor(
+			grpc_prometheus.UnaryServerInterceptor,
+			recovery.UnaryServerInterceptor(recoveryOption)), // panic interceptor, should be at last
 	}
 	// create a new gRPC grpcServer
 	app.grpcServer = grpc.NewServer(opts...)
