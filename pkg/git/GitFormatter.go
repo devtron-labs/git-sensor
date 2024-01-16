@@ -12,7 +12,7 @@ const _dl_ = "devtron_delimiter"
 
 // GITFORMAT Refer git official doc for supported placeholders to add new fields
 // Need to make sure the output does not break the json structure which is ensured
-//by having the _dl_ delimiter which is later replaced by quotes
+// by having the _dl_ delimiter which is later replaced by quotes
 var GITFORMAT = "--pretty=format:{" +
 	_dl_ + "commit" + _dl_ + ":" + _dl_ + "%H" + _dl_ + "," +
 	_dl_ + "parent" + _dl_ + ":" + _dl_ + "%P" + _dl_ + "," +
@@ -57,7 +57,7 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 	//replace the delimiter with quotes to make it parsable json
 	logOut = strings.ReplaceAll(logOut, _dl_, `"`)
 
-	logOut = logOut[1 : len(logOut)-2]   // trim surround characters (surrounding quotes and trailing com,a)
+	logOut = logOut[1 : len(logOut)-2]   // trim surround characters (surrounding quotes and trailing comma)
 	logOut = fmt.Sprintf("[%s]", logOut) // Add []
 
 	var gitCommitFormattedList []GitCommitFormat
@@ -66,4 +66,26 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 		return nil, err
 	}
 	return gitCommitFormattedList, nil
+}
+
+func (formattedCommit GitCommitFormat) transformToCommit() *Commit {
+	return &Commit{
+		Hash: &Hash{
+			Long: formattedCommit.Commit,
+		},
+		Author: &Author{
+			Name:  formattedCommit.Author.Name,
+			Email: formattedCommit.Author.Email,
+			Date:  formattedCommit.Author.Date,
+		},
+		Committer: &Committer{
+			Name:  formattedCommit.Commiter.Name,
+			Email: formattedCommit.Commiter.Email,
+			Date:  formattedCommit.Commiter.Date,
+		},
+		Tag:     &Tag{},
+		Tree:    &Tree{},
+		Subject: formattedCommit.Subject,
+		Body:    formattedCommit.Body,
+	}
 }

@@ -214,7 +214,17 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	GitChanges.FileStats = fileStats
 	impl.logger.Debugw("computed files stats", "filestats", fileStats)
 
+	commits, err := impl.computeCommitDiff(gitCtx, checkoutPath, oldHash, newHash, repository)
+	if err != nil {
+		return nil, err
+	}
+	GitChanges.Commits = commits
+	return GitChanges, nil
+}
+
+func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, checkoutPath string, oldHash plumbing.Hash, newHash plumbing.Hash, repository *GitRepository) ([]*Commit, error) {
 	var commitsCli, commitsGoGit []*Commit
+	var err error
 	if impl.configuration.UseGitCli || impl.configuration.AnalyticsDebug {
 		commitsCli, err = impl.gitManager.LogMergeBase(gitCtx, checkoutPath, oldHash.String(), newHash.String())
 		if err != nil {
@@ -234,15 +244,13 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 		}
 	}
 	if impl.configuration.AnalyticsDebug {
-		impl.logOldestCommitComparison(commitsGoGit, commitsCli, checkoutPath, Old, New)
+		impl.logOldestCommitComparison(commitsGoGit, commitsCli, checkoutPath, oldHash.String(), newHash.String())
 	}
 
 	if !impl.configuration.UseGitCli {
-		GitChanges.Commits = commitsGoGit
-	} else {
-		GitChanges.Commits = commitsCli
+		return commitsGoGit, nil
 	}
-	return GitChanges, nil
+	return commitsCli, nil
 }
 
 func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGit []*Commit, commitsCli []*Commit, checkoutPath string, old string, new string) {
@@ -324,29 +332,8 @@ func processGitLogOutputForAnalytics(out string) ([]*Commit, error) {
 	if err != nil {
 		return gitCommits, err
 	}
-
 	for _, formattedCommit := range gitCommitFormattedList {
-
-		cm := Commit{
-			Hash: &Hash{
-				Long: formattedCommit.Commit,
-			},
-			Author: &Author{
-				Name:  formattedCommit.Author.Name,
-				Email: formattedCommit.Author.Email,
-				Date:  formattedCommit.Author.Date,
-			},
-			Committer: &Committer{
-				Name:  formattedCommit.Commiter.Name,
-				Email: formattedCommit.Commiter.Email,
-				Date:  formattedCommit.Commiter.Date,
-			},
-			Tag:     &Tag{},
-			Tree:    &Tree{},
-			Subject: formattedCommit.Subject,
-			Body:    formattedCommit.Body,
-		}
-		gitCommits = append(gitCommits, &cm)
+		gitCommits = append(gitCommits, formattedCommit.transformToCommit())
 	}
 	return gitCommits, nil
 }
