@@ -18,7 +18,7 @@ import (
 type GitManager interface {
 	GitManagerBase
 	// GetCommitStats retrieves the stats for the given commit vs its parent
-	GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error)
+	GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error)
 	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
 	GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
 	// GetCommitForHash retrieves the commit reference for given tag
@@ -133,7 +133,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	if err != nil {
 		return nil, err
 	}
-	commits, err := ProcessGitLogOutputForAnalytics(output)
+	commits, err := processGitLogOutputForAnalytics(output)
 	if err != nil {
 		impl.logger.Errorw("error in parsing log output", "err", err, "output", output)
 		return nil, err

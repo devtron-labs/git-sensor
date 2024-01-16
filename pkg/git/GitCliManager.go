@@ -117,7 +117,7 @@ func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, b
 	if err != nil {
 		return nil, err
 	}
-	commits, err := impl.processGitLogOutput(output, rootDir)
+	commits, err := impl.processGitLogOutput(output)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	commits, err := impl.processGitLogOutput(output, rootDir)
+	commits, err := impl.processGitLogOutput(output)
 	if err != nil || len(commits) == 0 {
 		return nil, err
 	}
@@ -149,17 +149,17 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	return commits[0], nil
 }
 
-func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error) {
+func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
 	gitCommit := commit.GetCommit()
-	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", gitCommit.CheckoutPath)
+	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", checkoutPath)
 	if err != nil {
-		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", gitCommit.CheckoutPath, "errorMsg", errorMsg, "err", err)
+		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", checkoutPath, "errorMsg", errorMsg, "err", err)
 		return nil, err
 	}
 	return getFileStat(fileStat)
 }
 
-func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
+func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, error) {
 
 	gitCommits := make([]GitCommit, 0)
 	if len(out) == 0 {
@@ -173,11 +173,10 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) (
 	for _, formattedCommit := range gitCommitFormattedList {
 
 		cm := GitCommitBase{
-			Commit:       formattedCommit.Commit,
-			Author:       formattedCommit.Commiter.Name + " <" + formattedCommit.Commiter.Email + ">",
-			Date:         formattedCommit.Commiter.Date,
-			Message:      formattedCommit.Subject + "\n" + formattedCommit.Body,
-			CheckoutPath: rootDir,
+			Commit:  formattedCommit.Commit,
+			Author:  formattedCommit.Commiter.Name + " <" + formattedCommit.Commiter.Email + ">",
+			Date:    formattedCommit.Commiter.Date,
+			Message: formattedCommit.Subject + "\n" + formattedCommit.Body,
 		}
 		gitCommits = append(gitCommits, &GitCommitCli{
 			GitCommitBase: cm,

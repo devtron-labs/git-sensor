@@ -122,7 +122,7 @@ func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteU
 	return err
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit) (FileStats, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
 	gitCommit := commit.(*GitCommitGoGit)
 
 	stats, err := gitCommit.Cm.Stats()

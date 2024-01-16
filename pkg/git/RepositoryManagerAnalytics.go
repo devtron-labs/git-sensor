@@ -315,7 +315,7 @@ func (impl RepositoryManagerAnalyticsImpl) getPatchObject(gitCtx GitContext, rep
 	return patch, nil
 }
 
-func ProcessGitLogOutputForAnalytics(out string) ([]*Commit, error) {
+func processGitLogOutputForAnalytics(out string) ([]*Commit, error) {
 	gitCommits := make([]*Commit, 0)
 	if len(out) == 0 {
 		return gitCommits, nil

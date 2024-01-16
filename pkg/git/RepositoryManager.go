@@ -260,7 +260,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
 
-				stats, err := impl.gitManager.GetCommitStats(gitCtx, commit)
+				stats, err := impl.gitManager.GetCommitStats(gitCtx, commit, repository.rootDir)
 				if err != nil {
 					impl.logger.Errorw("error in  fetching stats", "err", err)
 				}
