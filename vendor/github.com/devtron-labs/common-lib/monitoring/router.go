@@ -12,9 +12,9 @@ type MonitoringRouter struct {
 	statsVizRouter statsViz.StatsVizRouter
 }
 
-func (r MonitoringRouter) InitMonitoringRouter(pprofSubRouter *mux.Router, statvizSubRouter *mux.Router) {
+func (r MonitoringRouter) InitMonitoringRouter(pprofSubRouter *mux.Router, statvizSubRouter *mux.Router, servicePrefix string) {
 	r.pprofRouter.InitPProfRouter(pprofSubRouter)
-	r.statsVizRouter.InitStatsVizRouter(statvizSubRouter)
+	r.statsVizRouter.InitStatsVizRouter(statvizSubRouter, servicePrefix)
 }
 
 func NewMonitoringRouter(logger *zap.SugaredLogger) *MonitoringRouter {
