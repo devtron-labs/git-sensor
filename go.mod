@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.9
+	github.com/devtron-labs/common-lib v0.0.9-0.20240117134052-0f6ff045d480
 	github.com/devtron-labs/protos v0.0.2
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-pg/pg v6.15.1+incompatible
@@ -15,11 +15,9 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron/v3 v3.0.0
-	github.com/samber/lo v1.39.0
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/gjson v1.9.3
 	go.uber.org/zap v1.21.0
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17
 	golang.org/x/sys v0.15.0
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.31.0
