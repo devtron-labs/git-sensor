@@ -41,7 +41,7 @@ func (r MuxRouter) Init() {
 	pProfListenerRouter := r.Router.PathPrefix("/gitsensor/debug/pprof/").Subrouter()
 	statsVizRouter := r.Router.PathPrefix("/gitsensor").Subrouter()
 
-	r.monitoringRouter.InitMonitoringRouter(pProfListenerRouter, statsVizRouter)
+	r.monitoringRouter.InitMonitoringRouter(pProfListenerRouter, statsVizRouter, "/gitsensor")
 	r.Router.StrictSlash(true)
 	r.Router.Handle("/metrics", promhttp.Handler())
 	r.Router.Path("/health").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

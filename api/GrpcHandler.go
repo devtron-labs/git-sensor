@@ -349,7 +349,8 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		return nil, err
 	}
 	if res == nil {
-		return nil, nil
+		res1 := &pb.GitCommit{}
+		return res1, nil
 	}
 
 	// Mapping GitCommit
