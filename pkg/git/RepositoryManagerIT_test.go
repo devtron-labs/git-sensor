@@ -2,8 +2,8 @@ package git
 
 import (
 	"github.com/devtron-labs/common-lib/utils"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
@@ -29,7 +29,7 @@ func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	assert.Nil(t, err)
 	gitCliImpl := NewCliGitManagerImpl(logger)
 	gogitImpl := NewGoGitManagerImpl(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, &internal.Configuration{
+	repositoryManagerImpl := NewRepositoryManagerImpl(logger, &internals.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,

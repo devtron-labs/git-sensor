@@ -18,7 +18,7 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/gorilla/mux"

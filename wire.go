@@ -23,9 +23,9 @@ import (
 	"github.com/devtron-labs/common-lib/monitoring"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/logger"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/logger"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/google/wire"
@@ -36,7 +36,7 @@ func InitializeApp() (*App, error) {
 	wire.Build(
 		NewApp,
 		api.NewMuxRouter,
-		internal.ParseConfiguration,
+		internals.ParseConfiguration,
 		logger.NewSugaredLogger,
 		api.NewRestHandlerImpl,
 		wire.Bind(new(api.RestHandler), new(*api.RestHandlerImpl)),
@@ -62,7 +62,7 @@ func InitializeApp() (*App, error) {
 		git.NewGitManagerImpl,
 		git.NewGitWatcherImpl,
 		wire.Bind(new(git.GitWatcher), new(*git.GitWatcherImpl)),
-		internal.NewRepositoryLocker,
+		internals.NewRepositoryLocker,
 		//internal.NewNatsConnection,
 		pubsub.NewPubSubClientServiceImpl,
 		sql.NewWebhookEventRepositoryImpl,

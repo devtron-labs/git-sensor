@@ -2,7 +2,7 @@ package git
 
 import (
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
+	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -23,7 +23,7 @@ type RepositoryManagerAnalyticsImpl struct {
 
 func NewRepositoryManagerAnalyticsImpl(
 	logger *zap.SugaredLogger,
-	configuration *internal.Configuration,
+	configuration *internals.Configuration,
 	manager GitManagerImpl,
 ) *RepositoryManagerAnalyticsImpl {
 	return &RepositoryManagerAnalyticsImpl{

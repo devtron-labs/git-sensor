@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	pb "github.com/devtron-labs/protos/gitSensor"
