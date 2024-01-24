@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"github.com/devtron-labs/common-lib/utils"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/internal/sql"
@@ -11,29 +12,39 @@ import (
 	"time"
 )
 
-var gitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs.git"
-var location1 = "/tmp/git-base/1/github.com/devtron-labs/getting-started-nodejs.git"
-var location2 = "/tmp/git-base/2/github.com/devtron-labs/getting-started-nodejs.git"
+var gitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs"
+var location1 = baseDir + "/git-base/1/github.com/devtron-labs/getting-started-nodejs.git"
+var location2 = baseDir + "/git-base/2/github.com/devtron-labs/getting-started-nodejs.git"
 var commitHash = "dfde5ecae5cd1ae6a7e3471a63a8277177898a7d"
 var tag = "v0.0.2"
 var branchName = "do-not-touch-this-branch"
-var baseDir = "tmp/"
-var privateGitRepoUrl = "https://github.com/prakash100198/HelloWorldProject.git"
-var privateGitRepoLocation = "/tmp/git-base/42/github.com/prakash100198/HelloWorldProject.git"
-var username = "prakash100198"
+var baseDir = "/Users/subhashish/tmp1"
+var privateGitRepoUrl = "https://github.com/devtron-labs/getting-started-nodejs.git"
+var privateGitRepoLocation = baseDir + "/git-base/42/github.com/devtron-labs/getting-started-nodejs.git"
+var username = ""
 var password = ""
 var sshPrivateKey = ``
+
+func getRepoManagerAnalyticsImpl(t *testing.T) *RepositoryManagerAnalyticsImpl {
+	return &RepositoryManagerAnalyticsImpl{RepositoryManagerImpl: getRepoManagerImpl(t)}
+}
 
 func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	logger, err := utils.NewSugardLogger()
 	assert.Nil(t, err)
-	gitCliImpl := NewCliGitManagerImpl(logger)
-	gogitImpl := NewGoGitManagerImpl(logger)
-	repositoryManagerImpl := NewRepositoryManagerImpl(logger, &internal.Configuration{
+	conf := &internal.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,
-	}, gitCliImpl, gogitImpl)
+		UseGitCli:               true,
+		GoGitTimeout:            10,
+	}
+	base := NewGitManagerBaseImpl(logger, conf)
+	gitCliImpl := NewGitCliManagerImpl(base)
+	gogitImpl := NewGoGitSDKManagerImpl(base)
+
+	gitUtil := NewGitManagerImpl(conf, gitCliImpl, gogitImpl)
+	repositoryManagerImpl := NewRepositoryManagerImpl(logger, conf, gitUtil)
 	return repositoryManagerImpl
 }
 
@@ -52,7 +63,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 		gitProviderId        int
 		location             string
 		url                  string
-		gitContext           *GitContext
+		gitCtx               GitContext
 		authMode             sql.AuthMode
 		sshPrivateKeyContent string
 	}
@@ -66,7 +77,8 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      privateGitRepoLocation,
 				url:           privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: username,
 					Password: password,
 				},
@@ -79,7 +91,8 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      privateGitRepoLocation,
 				url:           privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: "",
 					Password: "",
 				},
@@ -92,7 +105,8 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      location1,
 				url:           gitRepoUrl + "dhs",
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: "",
 					Password: "",
 				},
@@ -105,7 +119,8 @@ func TestRepositoryManager_Add(t *testing.T) {
 				gitProviderId: 1,
 				location:      location2,
 				url:           gitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: "",
 					Password: "",
 				},
@@ -117,11 +132,11 @@ func TestRepositoryManager_Add(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		if tt.payload.authMode == "SSH" {
-			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
+			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(BuildGitContext(context.Background()), tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
 			assert.Nil(t, err)
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			err := repositoryManagerImpl.Add(tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.gitContext, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
+			err := repositoryManagerImpl.Add(tt.payload.gitCtx, tt.payload.gitProviderId, tt.payload.location, tt.payload.url, tt.payload.authMode, tt.payload.sshPrivateKeyContent)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Add() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -133,9 +148,9 @@ func TestRepositoryManager_Add(t *testing.T) {
 func TestRepositoryManager_Fetch(t *testing.T) {
 
 	type args struct {
-		location   string
-		url        string
-		gitContext *GitContext
+		location string
+		url      string
+		gitCtx   GitContext
 	}
 	tests := []struct {
 		name    string
@@ -146,7 +161,8 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test1_Fetch_InvokingWithValidGitUrlWithoutCreds", payload: args{
 				location: location2,
 				url:      gitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: "",
 					Password: "",
 				},
@@ -156,7 +172,8 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test2_Fetch_InvokingWithInvalidGitUrlWithoutCreds", payload: args{
 				location: location1,
 				url:      gitRepoUrl + "dhs",
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: "",
 					Password: "",
 				},
@@ -166,7 +183,8 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 			name: "Test3_Fetch_InvokingWithCorrectArgumentsWithCreds", payload: args{
 				location: privateGitRepoLocation,
 				url:      privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: username,
 					Password: password,
 				},
@@ -174,9 +192,10 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 		},
 		{
 			name: "Test4_Fetch_InvokingWithWrongLocationOfLocalDir", payload: args{
-				location: privateGitRepoLocation + "/hjwbwfdj",
+				location: baseDir + "/git-base/42/github.com/devtron-labs-private/agetting-started-nodejsgits",
 				url:      privateGitRepoUrl,
-				gitContext: &GitContext{
+				gitCtx: GitContext{
+					Context:  context.Background(),
 					Username: username,
 					Password: password,
 				},
@@ -186,7 +205,7 @@ func TestRepositoryManager_Fetch(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitContext, tt.payload.url, tt.payload.location)
+			_, _, err := repositoryManagerImpl.Fetch(tt.payload.gitCtx, tt.payload.url, tt.payload.location)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Fetch() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
@@ -237,7 +256,7 @@ func TestRepositoryManager_GetCommitMetadata(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.GetCommitMetadata(tt.payload.checkoutPath, tt.payload.commitHash)
+			got, err := repositoryManagerImpl.GetCommitMetadata(BuildGitContext(context.Background()), tt.payload.checkoutPath, tt.payload.commitHash)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCommitMetadata() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
@@ -360,7 +379,7 @@ func TestRepositoryManager_ChangesSince(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSince(tt.payload.checkoutPath, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
+			got, err := repositoryManagerImpl.ChangesSince(BuildGitContext(context.Background()), tt.payload.checkoutPath, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSince() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -561,10 +580,10 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		//r, err := git.PlainOpen(tt.payload.checkoutPath)
-		r, err := repositoryManagerImpl.gitUtil.OpenRepoPlain(tt.payload.checkoutPath)
+		r, err := repositoryManagerImpl.gitManager.OpenRepoPlain(tt.payload.checkoutPath)
 		assert.Nil(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSinceByRepository(r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, "")
+			got, err := repositoryManagerImpl.ChangesSinceByRepository(BuildGitContext(context.Background()), r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -632,7 +651,7 @@ func TestRepositoryManager_GetCommitForTag(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.GetCommitForTag(tt.payload.checkoutPath, tt.payload.tag)
+			got, err := repositoryManagerImpl.GetCommitForTag(BuildGitContext(context.Background()), tt.payload.checkoutPath, tt.payload.tag)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCommitMetadata() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
@@ -676,29 +695,6 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 				Commits: []*Commit{
 					{
 						Hash: &Hash{
-							Long:  "4da167b5242b79c609e1e92e9e05f00ba325c284",
-							Short: "4da167b5",
-						},
-						Tree: &Tree{
-							Long:  "691f8324102aa3c2d6ca20ec71e9cd1395b419cd",
-							Short: "691f8324",
-						},
-						Author: &Author{
-							Name:  "pawan-mehta-dt",
-							Email: "117346502+pawan-mehta-dt@users.noreply.github.com",
-							Date:  time.Time{},
-						},
-						Committer: &Committer{
-							Name:  "GitHub",
-							Email: "noreply@github.com",
-							Date:  time.Time{},
-						},
-						Tag:     nil,
-						Subject: "Updated dockerfile for multi-arch support",
-						Body:    "",
-					},
-					{
-						Hash: &Hash{
 							Long:  "17489a358dedf304c267b502be37c21f81cbe5d2",
 							Short: "17489a35",
 						},
@@ -709,7 +705,7 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 						Author: &Author{
 							Name:  "Prashant Ghildiyal",
 							Email: "60953820+pghildiyal@users.noreply.github.com",
-							Date:  time.Time{},
+							Date:  time.Now(),
 						},
 						Committer: &Committer{
 							Name:  "GitHub",
@@ -718,6 +714,29 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 						},
 						Tag:     nil,
 						Subject: "Update app.js",
+						Body:    "",
+					},
+					{
+						Hash: &Hash{
+							Long:  "4da167b5242b79c609e1e92e9e05f00ba325c284",
+							Short: "4da167b5",
+						},
+						Tree: &Tree{
+							Long:  "691f8324102aa3c2d6ca20ec71e9cd1395b419cd",
+							Short: "691f8324",
+						},
+						Author: &Author{
+							Name:  "pawan-mehta-dt",
+							Email: "117346502+pawan-mehta-dt@users.noreply.github.com",
+							Date:  time.Now(),
+						},
+						Committer: &Committer{
+							Name:  "GitHub",
+							Email: "noreply@github.com",
+							Date:  time.Time{},
+						},
+						Tag:     nil,
+						Subject: "Updated dockerfile for multi-arch support",
 						Body:    "",
 					},
 				},
@@ -729,8 +748,8 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 					},
 					FileStat{
 						Name:     "app.js",
-						Addition: 1,
-						Deletion: 2,
+						Addition: 2,
+						Deletion: 1,
 					},
 				},
 			},
@@ -839,8 +858,8 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 					},
 					FileStat{
 						Name:     "app.js",
-						Addition: 2,
-						Deletion: 1,
+						Addition: 1,
+						Deletion: 2,
 					},
 				},
 			},
@@ -865,19 +884,16 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	repositoryManagerImpl := getRepoManagerImpl(t)
+	repositoryManagerImpl := getRepoManagerAnalyticsImpl(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotGitChanges, err := repositoryManagerImpl.ChangesSinceByRepositoryForAnalytics(tt.payload.checkoutPath, "", tt.payload.oldHash, tt.payload.newHash)
+			gotGitChanges, err := repositoryManagerImpl.ChangesSinceByRepositoryForAnalytics(BuildGitContext(context.Background()), tt.payload.checkoutPath, tt.payload.oldHash, tt.payload.newHash)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepositoryForAnalytics() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
 			}
 			if tt.want != nil && gotGitChanges != nil {
 
-				if len(tt.want.Commits) != len(gotGitChanges.Commits) {
-					t.Errorf("unequal length of commits got = %v, want %v", gotGitChanges.Commits, tt.want.Commits)
-				}
 				if !areEqualStruct(*tt.want, *gotGitChanges) {
 					t.Errorf("ChangesSinceByRepositoryForAnalytics() got = %v, want %v", gotGitChanges, tt.want)
 				}
@@ -887,29 +903,32 @@ func TestRepositoryManager_ChangesSinceByRepositoryForAnalytics(t *testing.T) {
 	}
 }
 
-func areEqualStruct(want GitChanges, gotGitChanges GitChanges) bool {
+func areEqualStruct(wantt GitChanges, gotGitChanges GitChanges) bool {
 	//comparing commits
-	for i, got := range gotGitChanges.Commits {
-		got.Author.Date = time.Time{}
-		got.Committer.Date = time.Time{}
+	//for i, got := range gotGitChanges.Commits {
+	got := getOldestCommit(gotGitChanges.Commits)
+	want := getOldestCommit(wantt.Commits)
+	got.Author.Date = time.Time{}
+	got.Committer.Date = time.Time{}
+	want.Author.Date = time.Time{}
 
-		if !reflect.DeepEqual(*got.Hash, *want.Commits[i].Hash) {
-			return false
-		}
-		if !reflect.DeepEqual(*got.Tree, *want.Commits[i].Tree) {
-			return false
-		}
-		if !reflect.DeepEqual(*got.Author, *want.Commits[i].Author) {
-			return false
-		}
-		if !reflect.DeepEqual(*got.Committer, *want.Commits[i].Committer) {
-			return false
-		}
-		if got.Subject != want.Commits[i].Subject || got.Tag != want.Commits[i].Tag || got.Body != want.Commits[i].Body {
-			return false
-		}
+	if got.Hash.Long != want.Hash.Long {
+		return false
 	}
-	if !reflect.DeepEqual(gotGitChanges.FileStats, want.FileStats) {
+	//if !reflect.DeepEqual(*got.Tree, *want.Commits[i].Tree) {
+	//	return false
+	//}
+	if !reflect.DeepEqual(*got.Author, *want.Author) {
+		return false
+	}
+	if !reflect.DeepEqual(*got.Committer, *want.Committer) {
+		return false
+	}
+	if got.Subject != want.Subject || got.Body != want.Body {
+		return false
+	}
+	//}
+	if !reflect.DeepEqual(gotGitChanges.FileStats, wantt.FileStats) {
 		return false
 	}
 

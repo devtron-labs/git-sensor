@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,17 +18,19 @@ import (
 type GitManager interface {
 	GitManagerBase
 	// GetCommitStats retrieves the stats for the given commit vs its parent
-	GetCommitStats(commit GitCommit) (FileStats, error)
+	GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error)
 	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
-	GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
+	GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
 	// GetCommitForHash retrieves the commit reference for given tag
-	GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error)
+	GetCommitForHash(gitCtx GitContext, checkoutPath, commitHash string) (GitCommit, error)
 	// GetCommitsForTag retrieves the commit reference for given tag
-	GetCommitsForTag(checkoutPath, tag string) (GitCommit, error)
+	GetCommitsForTag(gitCtx GitContext, checkoutPath, tag string) (GitCommit, error)
 	// OpenRepoPlain opens a new git repo at the given path
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
-	Init(rootDir string, remoteUrl string, isBare bool) error
+	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
+	// FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
+	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -35,14 +38,37 @@ type GitManagerBase interface {
 	// PathMatcher matches paths of files changes with defined regex expression
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
 	// Fetch executes git fetch
-	Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error)
+	Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error)
 	// Checkout executes git checkout
-	Checkout(rootDir string, branch string) (response, errMsg string, err error)
+	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
-	ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	// LogMergeBase get the commit diff between using a merge base strategy
+	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 }
 type GitManagerBaseImpl struct {
-	logger *zap.SugaredLogger
+	logger            *zap.SugaredLogger
+	conf              *internal.Configuration
+	commandTimeoutMap map[string]int
+}
+
+func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitManagerBaseImpl {
+
+	commandTimeoutMap, err := parseCmdTimeoutJson(config)
+	if err != nil {
+		logger.Errorw("error in parsing config", "config", config, "err", err)
+	}
+
+	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
+}
+
+func parseCmdTimeoutJson(config *internal.Configuration) (map[string]int, error) {
+	commandTimeoutMap := make(map[string]int)
+	var err error
+	if config.CliCmdTimeoutJson != "" {
+		err = json.Unmarshal([]byte(config.CliCmdTimeoutJson), &commandTimeoutMap)
+	}
+	return commandTimeoutMap, err
 }
 
 type GitManagerImpl struct {
@@ -59,7 +85,7 @@ func NewGitManagerImpl(configuration *internal.Configuration,
 	return GitManagerImpl{goGitManager}
 }
 
-func (impl *GitManagerImpl) OpenNewRepo(location string, url string) (*GitRepository, error) {
+func (impl *GitManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
 
 	r, err := impl.OpenRepoPlain(location)
 	if err != nil {
@@ -67,7 +93,7 @@ func (impl *GitManagerImpl) OpenNewRepo(location string, url string) (*GitReposi
 		if err != nil {
 			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
 		}
-		err = impl.Init(location, url, true)
+		err = impl.Init(gitCtx, location, url, true)
 		if err != nil {
 			return r, fmt.Errorf("err in git init: %s", err)
 		}
@@ -79,20 +105,47 @@ func (impl *GitManagerImpl) OpenNewRepo(location string, url string) (*GitReposi
 	return r, nil
 }
 
-func (impl *GitManagerBaseImpl) Fetch(gitContext *GitContext, rootDir string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	defer cancel()
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
-func (impl *GitManagerBaseImpl) Checkout(rootDir string, branch string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git checkout ", "location", rootDir)
-	cmd := exec.Command("git", "-C", rootDir, "checkout", branch, "--force")
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
+	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
+
+	//this is a safe check to handle empty `to` hash given to request
+	// go-git implementation breaks for invalid `to` hashes
+	var toCommitHash string
+	if len(to) != 0 {
+		toCommitHash = to + "^"
+	}
+	cmdArgs := []string{"-C", rootDir, "log", from + "..." + toCommitHash, "--date=iso-strict", GITFORMAT}
+	impl.logger.Debugw("git", cmdArgs)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
+	defer cancel()
+	output, errMsg, err := impl.runCommand(cmd)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	if err != nil {
+		return nil, err
+	}
+	commits, err := processGitLogOutputForAnalytics(output)
+	if err != nil {
+		impl.logger.Errorw("error in parsing log output", "err", err, "output", output)
+		return nil, err
+	}
+	return commits, nil
 }
 
 func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
@@ -125,10 +178,11 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 	return output, "", nil
 }
 
-func (impl *GitManagerBaseImpl) ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
 	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
-	cmd := exec.Command("git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -214,4 +268,43 @@ func GetBranchReference(branch string) (string, string) {
 
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 	return branch, branchRef
+}
+
+func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+
+	if newHash == "" {
+		newHash = oldHash
+		oldHash = oldHash + "^"
+	}
+	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	defer cancel()
+
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
+	newCtx := ctx
+	cancel := func() {}
+
+	//TODO: how to make it generic, currently works because the
+	// git command is placed at index 2 for current implementations
+	timeout := impl.getCommandTimeout(arg[2])
+
+	if timeout > 0 {
+
+		newCtx, cancel = ctx.WithTimeout(timeout) //context.WithTimeout(ctx.Context, timeout*time.Second)
+	}
+	cmd := exec.CommandContext(newCtx, name, arg...)
+	return cmd, cancel
+}
+
+func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
+	timeout := impl.conf.CliCmdTimeoutGlobal
+	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok {
+		timeout = cmdTimeout
+	}
+	return timeout
 }

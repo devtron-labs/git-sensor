@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -13,16 +12,16 @@ type GoGitSDKManager interface {
 	GitManager
 }
 type GoGitSDKManagerImpl struct {
-	GitManagerBaseImpl
+	*GitManagerBaseImpl
 }
 
-func NewGoGitSDKManagerImpl(logger *zap.SugaredLogger) *GoGitSDKManagerImpl {
+func NewGoGitSDKManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GoGitSDKManagerImpl {
 	return &GoGitSDKManagerImpl{
-		GitManagerBaseImpl: GitManagerBaseImpl{logger: logger},
+		GitManagerBaseImpl: baseManagerImpl,
 	}
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitsForTag(checkoutPath, tag string) (GitCommit, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitsForTag(gitCtx GitContext, checkoutPath, tag string) (GitCommit, error) {
 
 	r, err := impl.OpenRepoPlain(checkoutPath)
 	if err != nil {
@@ -54,7 +53,7 @@ func (impl *GoGitSDKManagerImpl) GetCommitsForTag(checkoutPath, tag string) (Git
 	return gitCommit, nil
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitForHash(checkoutPath, commitHash string) (GitCommit, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitForHash(gitCtx GitContext, checkoutPath, commitHash string) (GitCommit, error) {
 	r, err := impl.OpenRepoPlain(checkoutPath)
 	if err != nil {
 		return nil, err
@@ -79,7 +78,7 @@ func (impl *GoGitSDKManagerImpl) GetCommitForHash(checkoutPath, commitHash strin
 	return gitCommit, nil
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitIterator(repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
 
 	ref, err := repository.Reference(plumbing.ReferenceName(iteratorRequest.BranchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
@@ -104,7 +103,7 @@ func (impl *GoGitSDKManagerImpl) OpenRepoPlain(checkoutPath string) (*GitReposit
 	return &GitRepository{Repository: r}, err
 }
 
-func (impl *GoGitSDKManagerImpl) Init(rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
@@ -123,7 +122,7 @@ func (impl *GoGitSDKManagerImpl) Init(rootDir string, remoteUrl string, isBare b
 	return err
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitStats(commit GitCommit) (FileStats, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
 	gitCommit := commit.(*GitCommitGoGit)
 
 	stats, err := gitCommit.Cm.Stats()

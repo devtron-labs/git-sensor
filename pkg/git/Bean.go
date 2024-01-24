@@ -17,7 +17,6 @@
 package git
 
 import (
-	"context"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
@@ -132,15 +131,14 @@ func (gitCommit *GitCommitBase) GetCommit() *GitCommitBase {
 }
 
 type GitCommitBase struct {
-	Commit       string
-	Author       string
-	Date         time.Time
-	Message      string
-	Changes      []string     `json:",omitempty"`
-	FileStats    *FileStats   `json:",omitempty"`
-	WebhookData  *WebhookData `json:"webhookData"`
-	Excluded     bool         `json:",omitempty"`
-	CheckoutPath string
+	Commit      string
+	Author      string
+	Date        time.Time
+	Message     string
+	Changes     []string     `json:",omitempty"`
+	FileStats   *FileStats   `json:",omitempty"`
+	WebhookData *WebhookData `json:"webhookData"`
+	Excluded    bool         `json:",omitempty"`
 }
 
 func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
@@ -309,13 +307,6 @@ type FileStat struct {
 
 // FileStats is a collection of FileStat.
 type FileStats []FileStat
-
-type GitContext struct {
-	context.Context // Embedding original Go context
-	Username        string
-	Password        string
-	CloningMode     string
-}
 
 type IteratorRequest struct {
 	BranchRef      string

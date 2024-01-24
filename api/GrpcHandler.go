@@ -103,7 +103,9 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 		}
 	}
 
-	_, err := impl.repositoryManager.AddRepo(gitMaterials)
+	gitCtx := git.BuildGitContext(ctx)
+
+	_, err := impl.repositoryManager.AddRepo(gitCtx, gitMaterials)
 	if err != nil {
 		impl.logger.Errorw("error while adding repo",
 			"err", err)
@@ -115,6 +117,7 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 // UpdateRepo updates GitMaterial
 func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
 	*pb.Empty, error) {
+	gitCtx := git.BuildGitContext(ctx)
 
 	// Mapping
 	mappedGitMaterial := &sql.GitMaterial{
@@ -131,7 +134,7 @@ func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial
 	}
 
 	// Update repo
-	_, err := impl.repositoryManager.UpdateRepo(mappedGitMaterial)
+	_, err := impl.repositoryManager.UpdateRepo(gitCtx, mappedGitMaterial)
 	if err != nil {
 		impl.logger.Errorw("error while updating repo",
 			"name", mappedGitMaterial.Name,
@@ -168,8 +171,9 @@ func (impl *GrpcHandlerImpl) SavePipelineMaterial(ctx context.Context, req *pb.S
 		}
 	}
 
+	gitCtx := git.BuildGitContext(ctx)
 	// TODO: Check if we can change the argument type for the below method to avoid mapping
-	_, err := impl.repositoryManager.SavePipelineMaterial(ciPipelineMaterials)
+	_, err := impl.repositoryManager.SavePipelineMaterial(gitCtx, ciPipelineMaterials)
 	if err != nil {
 		impl.logger.Errorw("error while adding repo",
 			"err", err)
@@ -281,6 +285,8 @@ func (impl *GrpcHandlerImpl) GetHeadForPipelineMaterials(ctx context.Context, re
 func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.CommitMetadataRequest) (
 	*pb.GitCommit, error) {
 
+	gitCtx := git.BuildGitContext(ctx)
+
 	// Mapping req body
 	mappedReq := &git.CommitMetadataRequest{
 		PipelineMaterialId: int(req.PipelineMaterialId),
@@ -293,14 +299,14 @@ func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.Comm
 	var err error
 
 	if len(req.GitTag) > 0 {
-		gitCommit, err = impl.repositoryManager.GetCommitInfoForTag(mappedReq)
+		gitCommit, err = impl.repositoryManager.GetCommitInfoForTag(gitCtx, mappedReq)
 
 	} else if len(req.BranchName) > 0 {
-		gitCommit, err = impl.repositoryManager.GetLatestCommitForBranch(mappedReq.PipelineMaterialId,
+		gitCommit, err = impl.repositoryManager.GetLatestCommitForBranch(gitCtx, mappedReq.PipelineMaterialId,
 			mappedReq.BranchName)
 
 	} else {
-		gitCommit, err = impl.repositoryManager.GetCommitMetadata(mappedReq.PipelineMaterialId,
+		gitCommit, err = impl.repositoryManager.GetCommitMetadata(gitCtx, mappedReq.PipelineMaterialId,
 			mappedReq.GitHash)
 	}
 
@@ -338,7 +344,8 @@ func (impl *GrpcHandlerImpl) GetCommitMetadataForPipelineMaterial(ctx context.Co
 		BranchName:         req.BranchName,
 	}
 
-	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(mappedReq.PipelineMaterialId,
+	gitCtx := git.BuildGitContext(ctx)
+	res, err := impl.repositoryManager.GetCommitMetadataForPipelineMaterial(gitCtx, mappedReq.PipelineMaterialId,
 		mappedReq.GitHash)
 
 	if err != nil {
@@ -375,8 +382,8 @@ func (impl *GrpcHandlerImpl) GetCommitInfoForTag(ctx context.Context, req *pb.Co
 		GitTag:             req.GitTag,
 		BranchName:         req.BranchName,
 	}
-
-	res, err := impl.repositoryManager.GetCommitInfoForTag(mappedReq)
+	gitCtx := git.BuildGitContext(ctx)
+	res, err := impl.repositoryManager.GetCommitInfoForTag(gitCtx, mappedReq)
 
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info for tag",
@@ -435,14 +442,15 @@ func (impl *GrpcHandlerImpl) RefreshGitMaterial(ctx context.Context, req *pb.Ref
 }
 
 func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	impl.repositoryManager.ReloadAllRepo()
+	gitCtx := git.BuildGitContext(ctx)
+	impl.repositoryManager.ReloadAllRepo(gitCtx)
 	return &pb.Empty{}, nil
 }
 
 func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (
 	*pb.GenericResponse, error) {
-
-	err := impl.repositoryManager.ResetRepo(int(req.MaterialId))
+	gitCtx := git.BuildGitContext(ctx)
+	err := impl.repositoryManager.ResetRepo(gitCtx, int(req.MaterialId))
 	if err != nil {
 		impl.logger.Errorw("error while reloading material",
 			"materialId", req.MaterialId,
@@ -465,7 +473,9 @@ func (impl *GrpcHandlerImpl) GetChangesInRelease(ctx context.Context, req *pb.Re
 		NewCommit:          req.NewCommit,
 	}
 
-	res, err := impl.repositoryManager.GetReleaseChanges(mappedReq)
+	gitCtx := git.BuildGitContext(ctx)
+
+	res, err := impl.repositoryManager.GetReleaseChanges(gitCtx, mappedReq)
 	if err != nil {
 		impl.logger.Errorw("error while fetching release changes",
 			"pipelineMaterialId", mappedReq.PipelineMaterialId,

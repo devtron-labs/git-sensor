@@ -31,18 +31,17 @@ import (
 type RepoManager interface {
 	GetHeadForPipelineMaterials(ids []int) ([]*git.CiPipelineMaterialBean, error)
 	FetchChanges(pipelineMaterialId int, from string, to string, count int, showAll bool) (*git.MaterialChangeResp, error) //limit
-	GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
-	GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error)
-	GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
-
+	GetCommitMetadata(gitCtx git.GitContext, pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
+	GetLatestCommitForBranch(gitCtx git.GitContext, pipelineMaterialId int, branchName string) (*git.GitCommitBase, error)
+	GetCommitMetadataForPipelineMaterial(gitCtx git.GitContext, pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error)
 	SaveGitProvider(provider *sql.GitProvider) (*sql.GitProvider, error)
-	AddRepo(material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
-	UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error)
-	SavePipelineMaterial(material []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error)
-	ReloadAllRepo()
-	ResetRepo(materialId int) error
-	GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error)
-	GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
+	AddRepo(gitCtx git.GitContext, material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
+	UpdateRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error)
+	SavePipelineMaterial(gitCtx git.GitContext, material []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error)
+	ReloadAllRepo(gitCtx git.GitContext)
+	ResetRepo(gitCtx git.GitContext, materialId int) error
+	GetReleaseChanges(gitCtx git.GitContext, request *ReleaseChangesRequest) (*git.GitChanges, error)
+	GetCommitInfoForTag(gitCtx git.GitContext, request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
@@ -105,7 +104,7 @@ func NewRepoManagerImpl(
 	}
 }
 
-func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error) {
+func (impl RepoManagerImpl) SavePipelineMaterial(gitCtx git.GitContext, materials []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error) {
 	var old []*sql.CiPipelineMaterial
 	var newMaterial []*sql.CiPipelineMaterial
 	for _, material := range materials {
@@ -142,7 +141,7 @@ func (impl RepoManagerImpl) SavePipelineMaterial(materials []*sql.CiPipelineMate
 			oldNotDeleted = append(oldNotDeleted, material)
 		}
 	}
-	err := impl.updatePipelineMaterialCommit(append(newMaterial, oldNotDeleted...))
+	err := impl.updatePipelineMaterialCommit(gitCtx, append(newMaterial, oldNotDeleted...))
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +178,7 @@ func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(old
 	return nil
 }
 
-func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipelineMaterial) error {
+func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
 	for _, pipelineMaterial := range materials {
 
@@ -196,7 +195,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(materials []*sql.CiPipe
 			continue
 		}
 
-		commits, err := impl.repositoryManager.ChangesSince(material.CheckoutLocation, pipelineMaterial.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSince(gitCtx, material.CheckoutLocation, pipelineMaterial.Value, "", "", impl.configuration.GitHistoryCount)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
@@ -250,9 +249,9 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 }
 
 // handle update
-func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
+func (impl RepoManagerImpl) AddRepo(gitCtx git.GitContext, materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
-		_, err := impl.addRepo(material)
+		_, err := impl.addRepo(gitCtx, material)
 		if err != nil {
 			impl.logger.Errorw("error in saving material ", "material", material, "err", err)
 			return materials, err
@@ -261,7 +260,7 @@ func (impl RepoManagerImpl) AddRepo(materials []*sql.GitMaterial) ([]*sql.GitMat
 	return materials, nil
 }
 
-func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
+func (impl RepoManagerImpl) UpdateRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	existingMaterial, err := impl.materialRepository.FindById(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", err)
@@ -294,7 +293,7 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	}
 
 	if !existingMaterial.Deleted {
-		err = impl.checkoutUpdatedRepo(material.Id)
+		err = impl.checkoutUpdatedRepo(gitCtx, material.Id)
 		if err != nil {
 			impl.logger.Errorw("error in checking out updated repo", "err", err)
 			return nil, err
@@ -303,13 +302,13 @@ func (impl RepoManagerImpl) UpdateRepo(material *sql.GitMaterial) (*sql.GitMater
 	return existingMaterial, nil
 }
 
-func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
+func (impl RepoManagerImpl) checkoutUpdatedRepo(gitCtx git.GitContext, materialId int) error {
 	material, err := impl.materialRepository.FindById(materialId)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", "id", materialId, "err", err)
 		return err
 	}
-	_, err = impl.checkoutMaterial(material)
+	_, err = impl.checkoutMaterial(gitCtx, material)
 	if err != nil {
 		impl.logger.Errorw("error in repo refresh", "id", material, "err", err)
 		return err
@@ -317,26 +316,26 @@ func (impl RepoManagerImpl) checkoutUpdatedRepo(materialId int) error {
 	return nil
 }
 
-func (impl RepoManagerImpl) addRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
+func (impl RepoManagerImpl) addRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	err := impl.materialRepository.Save(material)
 	if err != nil {
 		impl.logger.Errorw("error in saving material ", "material", material, "err", err)
 		return material, err
 	}
-	return impl.checkoutRepo(material)
+	return impl.checkoutRepo(gitCtx, material)
 }
 
-func (impl RepoManagerImpl) checkoutRepo(material *sql.GitMaterial) (*sql.GitMaterial, error) {
+func (impl RepoManagerImpl) checkoutRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	repoLock := impl.locker.LeaseLocker(material.Id)
 	repoLock.Mutex.Lock()
 	defer func() {
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(material.Id)
 	}()
-	return impl.checkoutMaterial(material)
+	return impl.checkoutMaterial(gitCtx, material)
 }
 
-func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error) {
+func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error) {
 	impl.logger.Infow("checking out material", "id", material.Id)
 	gitProvider, err := impl.gitProviderRepository.GetById(material.GitProviderId)
 	if err != nil {
@@ -350,11 +349,9 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 	if err != nil {
 		return material, err
 	}
-	gitContext := &git.GitContext{
-		Username: userName,
-		Password: password,
-	}
-	err = impl.repositoryManager.Add(material.GitProviderId, checkoutPath, material.Url, gitContext, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	gitCtx = gitCtx.WithCredentials(userName, password)
+
+	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
 		material.CheckoutLocation = checkoutPath
 		material.CheckoutStatus = true
@@ -373,32 +370,32 @@ func (impl RepoManagerImpl) checkoutMaterial(material *sql.GitMaterial) (*sql.Gi
 		impl.logger.Errorw("unable to load material", "err", err)
 		return nil, err
 	}
-	err = impl.updatePipelineMaterialCommit(ciPipelineMaterial)
+	err = impl.updatePipelineMaterialCommit(gitCtx, ciPipelineMaterial)
 	if err != nil {
 		impl.logger.Errorw("error in updating pipeline material", "err", err)
 	}
 	return material, nil
 }
 
-func (impl RepoManagerImpl) ReloadAllRepo() {
+func (impl RepoManagerImpl) ReloadAllRepo(gitCtx git.GitContext) {
 	materials, err := impl.materialRepository.FindAll()
 	if err != nil {
 		impl.logger.Errorw("error in reloading materials")
 	}
 	for _, material := range materials {
-		if _, err := impl.checkoutRepo(material); err != nil {
+		if _, err := impl.checkoutRepo(gitCtx, material); err != nil {
 			impl.logger.Errorw("error in checkout", "material", material, "err", err)
 		}
 
 	}
 }
-func (impl RepoManagerImpl) ResetRepo(materialId int) error {
+func (impl RepoManagerImpl) ResetRepo(gitCtx git.GitContext, materialId int) error {
 	material, err := impl.materialRepository.FindById(materialId)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", "id", materialId, "err", err)
 		return err
 	}
-	_, err = impl.checkoutRepo(material)
+	_, err = impl.checkoutRepo(gitCtx, material)
 	if err != nil {
 		impl.logger.Errorw("error in repo refresh", "id", material, "err", err)
 		return err
@@ -552,7 +549,7 @@ func (impl RepoManagerImpl) FetchGitCommitsForWebhookTypePipeline(pipelineMateri
 	return response, nil
 }
 
-func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataRequest) (*git.GitCommitBase, error) {
+func (impl RepoManagerImpl) GetCommitInfoForTag(gitCtx git.GitContext, request *git.CommitMetadataRequest) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.PipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -578,11 +575,11 @@ func (impl RepoManagerImpl) GetCommitInfoForTag(request *git.CommitMetadataReque
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	commit, err := impl.repositoryManager.GetCommitForTag(gitMaterial.CheckoutLocation, request.GitTag)
+	commit, err := impl.repositoryManager.GetCommitForTag(gitCtx, gitMaterial.CheckoutLocation, request.GitTag)
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
+func (impl RepoManagerImpl) GetCommitMetadata(gitCtx git.GitContext, pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -600,11 +597,11 @@ func (impl RepoManagerImpl) GetCommitMetadata(pipelineMaterialId int, gitHash st
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	commit, err := impl.repositoryManager.GetCommitMetadata(gitMaterial.CheckoutLocation, gitHash)
+	commit, err := impl.repositoryManager.GetCommitMetadata(gitCtx, gitMaterial.CheckoutLocation, gitHash)
 	return commit, err
 }
 
-func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, branchName string) (*git.GitCommitBase, error) {
+func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipelineMaterialId int, branchName string) (*git.GitCommitBase, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 
 	if err != nil {
@@ -630,11 +627,8 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}()
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	gitContext := &git.GitContext{
-		Username: userName,
-		Password: password,
-	}
-	updated, repo, err := impl.repositoryManager.Fetch(gitContext, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	gitCtx = gitCtx.WithCredentials(userName, password)
+	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
 	}
@@ -659,13 +653,13 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 		impl.logger.Errorw("unable to load material", "err", err, "ciPipelineMaterial", ciPipelineMaterial)
 		return nil, err
 	}
-	err = impl.updatePipelineMaterialCommit(ciPipelineMaterial)
+	err = impl.updatePipelineMaterialCommit(gitCtx, ciPipelineMaterial)
 	if err != nil {
 		impl.logger.Errorw("error in updating pipeline material", "err", err)
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, branchName, "", "", 1)
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1)
 
 	if commits == nil {
 		return nil, err
@@ -674,7 +668,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(pipelineMaterialId int, bra
 	}
 }
 
-func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
+func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitContext, pipelineMaterialId int, gitHash string) (*git.GitCommitBase, error) {
 	// fetch ciPipelineMaterial
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterialId)
 	if err != nil {
@@ -714,7 +708,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 
-	commits, err := impl.repositoryManager.ChangesSince(gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
+	commits, err := impl.repositoryManager.ChangesSince(gitCtx, gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
@@ -735,7 +729,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(pipelineMateria
 	return commits[0], err
 }
 
-func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*git.GitChanges, error) {
+func (impl RepoManagerImpl) GetReleaseChanges(gitCtx git.GitContext, request *ReleaseChangesRequest) (*git.GitChanges, error) {
 	pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(request.PipelineMaterialId)
 	if err != nil {
 		return nil, err
@@ -753,7 +747,7 @@ func (impl RepoManagerImpl) GetReleaseChanges(request *ReleaseChangesRequest) (*
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitMaterial.CheckoutLocation, pipelineMaterial.Value, request.OldCommit, request.NewCommit)
+	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitCtx, gitMaterial.CheckoutLocation, request.OldCommit, request.NewCommit)
 	if err != nil {
 		impl.logger.Errorw("error in computing changes", "req", request, "err", err)
 	} else {

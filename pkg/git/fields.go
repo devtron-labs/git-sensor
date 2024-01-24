@@ -60,4 +60,3 @@ type Commit struct {
 	Subject   string
 	Body      string
 }
-
