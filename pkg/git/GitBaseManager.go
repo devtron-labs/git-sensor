@@ -296,7 +296,7 @@ func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string
 
 func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 	timeout := impl.conf.CliCmdTimeoutGlobal
-	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok && cmdTimeout > 0 {
+	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok {
 		timeout = cmdTimeout
 	}
 	return timeout
