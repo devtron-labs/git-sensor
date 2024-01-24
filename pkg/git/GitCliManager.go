@@ -1,8 +1,6 @@
 package git
 
 import (
-	"encoding/json"
-	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -149,20 +147,16 @@ func (impl *GitCliManagerImpl) GitShow(rootDir string, hash string) (GitCommit, 
 }
 
 func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) ([]GitCommit, error) {
-	if len(out) == 0 {
-		return make([]GitCommit, 0), nil
-	}
-	logOut := out
-	logOut = logOut[:len(logOut)-1]      // Remove the last ","
-	logOut = fmt.Sprintf("[%s]", logOut) // Add []
-
-	var gitCommitFormattedList []GitCommitFormat
-	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
-	if err != nil {
-		return nil, err
-	}
 
 	gitCommits := make([]GitCommit, 0)
+	if len(out) == 0 {
+		return gitCommits, nil
+	}
+	gitCommitFormattedList, err := parseFormattedLogOutput(out)
+	if err != nil {
+		return gitCommits, err
+	}
+
 	for _, formattedCommit := range gitCommitFormattedList {
 
 		cm := GitCommitBase{
