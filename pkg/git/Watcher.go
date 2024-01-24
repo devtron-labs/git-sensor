@@ -232,7 +232,12 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		lastSeenHash := ""
+		if len(material.LastSeenHash) > 0 {
+			// this might misbehave is the hash stored in table is corrupted somehow
+			lastSeenHash = material.LastSeenHash
+		}
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, lastSeenHash, "", impl.configuration.GitHistoryCount)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
