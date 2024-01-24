@@ -17,7 +17,7 @@
 package git
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"io"

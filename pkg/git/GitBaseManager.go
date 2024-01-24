@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
 	"os"
@@ -48,11 +48,11 @@ type GitManagerBase interface {
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
-	conf              *internal.Configuration
+	conf              *internals.Configuration
 	commandTimeoutMap map[string]int
 }
 
-func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitManagerBaseImpl {
+func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internals.Configuration) *GitManagerBaseImpl {
 
 	commandTimeoutMap, err := parseCmdTimeoutJson(config)
 	if err != nil {
@@ -62,7 +62,7 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configura
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
 }
 
-func parseCmdTimeoutJson(config *internal.Configuration) (map[string]int, error) {
+func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
 	commandTimeoutMap := make(map[string]int)
 	var err error
 	if config.CliCmdTimeoutJson != "" {
@@ -75,7 +75,7 @@ type GitManagerImpl struct {
 	GitManager
 }
 
-func NewGitManagerImpl(configuration *internal.Configuration,
+func NewGitManagerImpl(configuration *internals.Configuration,
 	cliGitManager GitCliManager,
 	goGitManager GoGitSDKManager) GitManagerImpl {
 

@@ -3,8 +3,8 @@ package git
 import (
 	"context"
 	"github.com/devtron-labs/common-lib/utils"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
@@ -32,7 +32,7 @@ func getRepoManagerAnalyticsImpl(t *testing.T) *RepositoryManagerAnalyticsImpl {
 func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	logger, err := utils.NewSugardLogger()
 	assert.Nil(t, err)
-	conf := &internal.Configuration{
+	conf := &internals.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,

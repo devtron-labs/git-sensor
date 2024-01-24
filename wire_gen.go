@@ -10,9 +10,9 @@ import (
 	"github.com/devtron-labs/common-lib/monitoring"
 	"github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/logger"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/logger"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 )
@@ -30,7 +30,7 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	materialRepositoryImpl := sql.NewMaterialRepositoryImpl(db)
-	configuration, err := internal.ParseConfiguration()
+	configuration, err := internals.ParseConfiguration()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func InitializeApp() (*App, error) {
 	repositoryManagerAnalyticsImpl := git.NewRepositoryManagerAnalyticsImpl(repositoryManagerImpl)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
-	repositoryLocker := internal.NewRepositoryLocker(sugaredLogger)
+	repositoryLocker := internals.NewRepositoryLocker(sugaredLogger)
 	pubSubClientServiceImpl := pubsub_lib.NewPubSubClientServiceImpl(sugaredLogger)
 	webhookEventRepositoryImpl := sql.NewWebhookEventRepositoryImpl(db)
 	webhookEventParsedDataRepositoryImpl := sql.NewWebhookEventParsedDataRepositoryImpl(db)
