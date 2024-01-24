@@ -179,7 +179,7 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string, rootDir string) (
 	return gitCommits, nil
 }
 
-func (impl *GitCliManagerImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	if newHash == "" {

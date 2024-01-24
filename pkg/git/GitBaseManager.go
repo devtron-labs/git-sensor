@@ -40,6 +40,8 @@ type GitManagerBase interface {
 	Checkout(rootDir string, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	//  returns the file stats reponse on executing git action
+	FetchDiffStatBetweenCommits(gitContext *GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger *zap.SugaredLogger
@@ -215,3 +217,5 @@ func GetBranchReference(branch string) (string, string) {
 	branchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
 	return branch, branchRef
 }
+
+// todo - extract out

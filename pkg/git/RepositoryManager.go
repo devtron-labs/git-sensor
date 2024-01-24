@@ -32,23 +32,23 @@ import (
 )
 
 type RepositoryManager interface {
-	// Fetch Fetches latest commit for  repo. Creates a new repo if it doesn't already exist
+	// Fetch Fetches the latest commit for  repo. Creates a new repo if it doesn't already exist
 	// and returns the reference to the repo
 	Fetch(gitContext *GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
-	Add(gitProviderId int, location, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	Add(gitContext *GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
-	ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	ChangesSince(gitContext *GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
-	// GetCommitMetadata retrieves the commit metadata for given hash
+	ChangesSinceByRepository(gitContext *GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error)
+	//// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(checkoutPath, commitHash string) (*GitCommitBase, error)
-	// GetCommitForTag retrieves the commit metadata for given tag
+	//// GetCommitForTag retrieves the commit metadata for given tag
 	GetCommitForTag(checkoutPath, tag string) (*GitCommitBase, error)
-	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
-	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error
+	//// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
+	CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
 }
 
 type RepositoryManagerImpl struct {
@@ -75,7 +75,7 @@ func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
 	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
 }
 
-func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url string, gitContext *GitContext, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) Add(gitContext *GitContext, gitProviderId int, location string, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -95,18 +95,20 @@ func (impl RepositoryManagerImpl) Add(gitProviderId int, location string, url st
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
 	}
-
+	var sshPrivateKeyPath string
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
+		//create ssh file before shallow cloning
+		sshPrivateKeyPath, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
+			impl.logger.Errorw("error while creating ssh file for shallow clone", "checkoutPath", location, "err", err)
 			return err
 		}
 	}
 
 	opt, errorMsg, err := impl.gitManager.Fetch(gitContext, location)
 	if err != nil {
-		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
+		impl.logger.Errorw("error in fetching repo", "errorMsg", errorMsg, "err", err)
 		return err
 	}
 	impl.logger.Debugw("opt msg", "opt", opt)
@@ -184,9 +186,11 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(checkoutPath, commitHash str
 	return gitCommit.GetCommit(), nil
 }
 
+// Todo - different
+
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitContext *GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -205,8 +209,10 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 		ToCommitHash:   to,
 	})
 	if err != nil {
+		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
 		return nil, err
 	}
+	// Todo - make the whole function common
 	var gitCommits []*GitCommitBase
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
@@ -255,7 +261,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 			if impl.configuration.EnableFileStats {
 				defer func() {
 					if err := recover(); err != nil {
-						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit, "count", count)
 					}
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
@@ -271,7 +277,14 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(repository *GitReposi
 	return gitCommits, err
 }
 
-func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func trimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
+	if len(gitCommits) > count {
+		gitCommits = gitCommits[:len(gitCommits)-1]
+	}
+	return gitCommits
+}
+
+func (impl RepositoryManagerImpl) ChangesSince(gitContext *GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -285,30 +298,31 @@ func (impl RepositoryManagerImpl) ChangesSince(checkoutPath string, branch strin
 		return nil, err
 	}
 	///---------------------
-	return impl.ChangesSinceByRepository(r, branch, from, to, count)
+	return impl.ChangesSinceByRepository(gitContext, r, branch, from, to, count, checkoutPath)
 	///----------------------
 
 }
 
-func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
 	// add private key
 	var err error
+	var sshPrivateKeyPath string
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("createSshFileIfNotExistsAndConfigureSshCommand", start, err)
 	}()
-	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
+	sshPrivateKeyPath, err = GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
 		impl.logger.Errorw("error in creating ssh private key", "err", err)
-		return err
+		return sshPrivateKeyPath, err
 	}
 
 	//git config core.sshCommand
 	_, errorMsg, err := impl.gitManager.ConfigureSshCommand(location, sshPrivateKeyPath)
 	if err != nil {
 		impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
-		return err
+		return sshPrivateKeyPath, err
 	}
 
-	return nil
+	return sshPrivateKeyPath, nil
 }

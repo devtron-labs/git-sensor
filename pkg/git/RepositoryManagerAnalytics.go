@@ -5,6 +5,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
+	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 	"io"
@@ -14,7 +15,7 @@ import (
 
 type RepositoryManagerAnalytics interface {
 	RepositoryManager
-	ChangesSinceByRepositoryForAnalytics(checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
+	ChangesSinceByRepositoryForAnalytics(gitContext *GitContext, checkoutPath string, branch string, Old string, New string) (*GitChanges, error)
 }
 
 type RepositoryManagerAnalyticsImpl struct {
@@ -34,7 +35,7 @@ func NewRepositoryManagerAnalyticsImpl(
 		}}
 }
 
-func computeDiff(r *GitRepository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
+func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
 	processed := make(map[string]*object.Commit, 0)
 	//t := time.Now()
 	h := newHash  //plumbing.NewHash(newHash)
@@ -235,3 +236,5 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepositoryForAnalytics(checkoutP
 	GitChanges.FileStats = transformFileStats(fileStats)
 	return GitChanges, nil
 }
+
+// todo - same

@@ -179,6 +179,7 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 	return material, err
 }
 
+// todo : check briefly
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
@@ -196,7 +197,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
-			err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProvider.Id, gitProvider.SshPrivateKey)
+			_, err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(location, gitProvider.Id, gitProvider.SshPrivateKey)
 			if err != nil {
 				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
 				return err
@@ -230,7 +231,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitContext, repo, material.Value, "", "", impl.configuration.GitHistoryCount, checkoutLocation)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
