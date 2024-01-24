@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type GitCliManager interface {
@@ -172,11 +173,18 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, err
 
 	for _, formattedCommit := range gitCommitFormattedList {
 
+		subject := strings.TrimSpace(formattedCommit.Subject)
+		body := strings.TrimSpace(formattedCommit.Body)
+		message := subject
+		if len(body) > 0 {
+			message = strings.Join([]string{subject, body}, "\n")
+		}
+
 		cm := GitCommitBase{
 			Commit:  formattedCommit.Commit,
 			Author:  formattedCommit.Commiter.Name + " <" + formattedCommit.Commiter.Email + ">",
 			Date:    formattedCommit.Commiter.Date,
-			Message: formattedCommit.Subject + "\n" + formattedCommit.Body,
+			Message: message,
 		}
 		gitCommits = append(gitCommits, &GitCommitCli{
 			GitCommitBase: cm,
