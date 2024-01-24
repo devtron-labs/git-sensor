@@ -54,7 +54,7 @@ type GitManagerBaseImpl struct {
 
 func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internals.Configuration) *GitManagerBaseImpl {
 
-	commandTimeoutMap, err := parseCmdTimeoutJson(config)
+	commandTimeoutMap, err := ParseCmdTimeoutJson(config)
 	if err != nil {
 		logger.Errorw("error in parsing config", "config", config, "err", err)
 	}
@@ -62,7 +62,7 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internals.Configur
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
 }
 
-func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
+func ParseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
 	commandTimeoutMap := make(map[string]int)
 	var err error
 	if config.CliCmdTimeoutJson != "" {
