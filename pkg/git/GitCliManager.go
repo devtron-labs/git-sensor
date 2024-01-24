@@ -141,6 +141,9 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	if err != nil {
+		return nil, err
+	}
 	commits, err := impl.processGitLogOutput(output)
 	if err != nil || len(commits) == 0 {
 		return nil, err

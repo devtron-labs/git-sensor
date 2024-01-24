@@ -258,8 +258,8 @@ func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGi
 	if len(commitsGoGit) == 0 || len(commitsCli) == 0 {
 		return
 	}
-	oldestHashGoGit := impl.getOldestCommit(commitsGoGit).Hash.Long
-	oldestHashCli := impl.getOldestCommit(commitsCli).Hash.Long
+	oldestHashGoGit := getOldestCommit(commitsGoGit).Hash.Long
+	oldestHashCli := getOldestCommit(commitsCli).Hash.Long
 	if oldestHashGoGit != oldestHashCli {
 		impl.logger.Infow("oldest commit did not match for analytics flow", "checkoutPath", checkoutPath, "old", oldestHashGoGit, "new", oldestHashCli)
 	} else {
@@ -267,7 +267,7 @@ func (impl RepositoryManagerAnalyticsImpl) logOldestCommitComparison(commitsGoGi
 	}
 }
 
-func (impl RepositoryManagerAnalyticsImpl) getOldestCommit(commits []*Commit) *Commit {
+func getOldestCommit(commits []*Commit) *Commit {
 	oldest := commits[0]
 	for _, commit := range commits {
 		if oldest.Author.Date.After(commit.Author.Date) {

@@ -124,7 +124,7 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 }
 
 func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
-	cmdArgs := []string{"-C", rootDir, "log", from + "..." + to, "--date=iso-strict", GITFORMAT}
+	cmdArgs := []string{"-C", rootDir, "log", from + "..." + to + "^", "--date=iso-strict", GITFORMAT}
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
