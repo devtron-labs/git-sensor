@@ -125,6 +125,8 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 
 func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
 
+	//this is a safe check to handle empty `to` hash given to request
+	// go-git implementation breaks for invalid `to` hashes
 	var toCommitHash string
 	if len(to) != 0 {
 		toCommitHash = to + "^"
