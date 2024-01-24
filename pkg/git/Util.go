@@ -33,6 +33,10 @@ const (
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
 	CLONE_TIMEOUT_SEC         = 600
 	FETCH_TIMEOUT_SEC         = 30
+	GITHUB_PROVIDER           = "github.com"
+	GITLAB_PROVIDER           = "gitlab.com"
+	CloningModeShallow        = "SHALLOW"
+	CloningModeFull           = "FULL"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -59,6 +63,20 @@ func GetLocationForMaterial(material *sql.GitMaterial) (location string, err err
 	}
 
 	return "", fmt.Errorf("unsupported format url %s", material.Url)
+}
+
+func GetProjectName(url string) string {
+	//if url = https://github.com/devtron-labs/git-sensor.git then it will return git-sensor
+	projName := strings.Split(url, ".")[1]
+	projectName := projName[strings.LastIndex(projName, "/")+1:]
+	return projectName
+}
+func GetCheckoutPath(url string, cloneLocation string) string {
+	//url= https://github.com/devtron-labs/git-sensor.git cloneLocation= git-base/1/github.com/prakash100198
+	//then this function returns git-base/1/github.com/prakash100198/SampleGoLangProject/.git
+	projectName := GetProjectName(url)
+	projRootDir := cloneLocation + "/" + projectName + "/.git"
+	return projRootDir
 }
 
 func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password string, err error) {
@@ -124,6 +142,8 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 
 	return nil
 }
+
+// todo : make a different utility file in enterprise and move this function there
 
 // sample commitDiff :=4\t3\tModels/models.go\n2\t2\tRepository/Repository.go\n0\t2\main.go
 func getFileStat(commitDiff string) (FileStats, error) {

@@ -183,22 +183,19 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
-
-	gitCtx := BuildGitContext(context.Background()).
-		WithCredentials(userName, password)
-
 	location, err := GetLocationForMaterial(material)
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
-
+	gitCtx := BuildGitContext(context.Background()).
+		WithCredentials(userName, password)
 	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
-			err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
+			_, err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
 			if err != nil {
 				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
 				return err
@@ -225,6 +222,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	var updatedMaterials []*CiPipelineMaterialBean
 	var updatedMaterialsModel []*sql.CiPipelineMaterial
 	var erroredMaterialsModels []*sql.CiPipelineMaterial
+	checkoutLocation := material.CheckoutLocation
 	for _, material := range materials {
 		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
 			continue
@@ -232,7 +230,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount, checkoutLocation)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()

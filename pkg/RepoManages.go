@@ -350,6 +350,14 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 		return material, err
 	}
 	gitCtx = gitCtx.WithCredentials(userName, password)
+	// git-sensor-oss case (break Add func into 2 parts here)
+	//init func call
+	// fetch func call
+
+	// git-sensor-ent (2 parts above can be reused + one shallow cloning func)
+	// init func call
+	// check for shallow clone, if yes do it and return new location
+	// call fetch func with new location from shallow clone if wnabled else location same as from init func call.
 
 	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
@@ -659,7 +667,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1)
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation)
 
 	if commits == nil {
 		return nil, err
@@ -707,7 +715,6 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-
 	commits, err := impl.repositoryManager.ChangesSince(gitCtx, gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
@@ -721,7 +728,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 
 	if len(commits) == 0 {
 		impl.logger.Errorw("no commits found", "commitHash", gitHash, "pipelineMaterialId", pipelineMaterialId, "branch", branchName)
-		return nil, nil
+		return nil, fmt.Errorf("no commit found for commit hash %s in branch %s", gitHash, branchName)
 	}
 	commit := commits[0]
 	excluded := impl.gitManager.PathMatcher(commit.FileStats, gitMaterial)

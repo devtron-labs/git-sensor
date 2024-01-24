@@ -20,11 +20,8 @@ type RepositoryManagerAnalyticsImpl struct {
 	*RepositoryManagerImpl
 }
 
-func NewRepositoryManagerAnalyticsImpl(
-	repositoryManagerImpl *RepositoryManagerImpl,
-) *RepositoryManagerAnalyticsImpl {
-	return &RepositoryManagerAnalyticsImpl{
-		RepositoryManagerImpl: repositoryManagerImpl}
+func NewRepositoryManagerAnalyticsImpl(repositoryManagerImpl *RepositoryManagerImpl) *RepositoryManagerAnalyticsImpl {
+	return &RepositoryManagerAnalyticsImpl{RepositoryManagerImpl: repositoryManagerImpl}
 }
 
 func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {
