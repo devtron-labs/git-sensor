@@ -124,7 +124,14 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 }
 
 func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error) {
-	cmdArgs := []string{"-C", rootDir, "log", from + "..." + to, "--date=iso-strict", GITFORMAT}
+
+	//this is a safe check to handle empty `to` hash given to request
+	// go-git implementation breaks for invalid `to` hashes
+	var toCommitHash string
+	if len(to) != 0 {
+		toCommitHash = to + "^"
+	}
+	cmdArgs := []string{"-C", rootDir, "log", from + "..." + toCommitHash, "--date=iso-strict", GITFORMAT}
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
@@ -296,7 +303,7 @@ func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string
 
 func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 	timeout := impl.conf.CliCmdTimeoutGlobal
-	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok && cmdTimeout > 0 {
+	if cmdTimeout, ok := impl.commandTimeoutMap[command]; ok {
 		timeout = cmdTimeout
 	}
 	return timeout
