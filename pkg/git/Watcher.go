@@ -199,7 +199,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		// there might be the case if ssh priclvate key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
 			if strings.Contains(material.CheckoutLocation, "/.git") {
-				location, err = impl.repositoryManager.GetLocationForMaterial(material)
+				location, _, _, err = impl.repositoryManager.GetLocationForMaterial(material, gitCtx.CloningMode)
 				if err != nil {
 					impl.logger.Errorw("error in getting clone location ", "material", material, "err", err)
 					return err
