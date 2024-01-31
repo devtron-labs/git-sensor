@@ -43,6 +43,7 @@ type RepositoryManager interface {
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error)
+	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
@@ -322,7 +323,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 	return gitCommits, err
 }
 
-func trimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
+func (impl RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
 	if len(gitCommits) > count {
 		gitCommits = gitCommits[:len(gitCommits)-1]
 	}
