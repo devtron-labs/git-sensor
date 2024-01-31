@@ -113,14 +113,14 @@ func (impl RepositoryManagerImpl) GetCheckoutPathAndLocation(gitCtx GitContext, 
 }
 
 func (impl RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
-	err := impl.Add1(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
+	_, err := impl.Add1(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
 	if err != nil {
 		return err
 	}
 	return impl.Add2(gitCtx, location)
 }
 
-func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -129,16 +129,16 @@ func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, loc
 	err = os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
-		return err
+		return "", err
 	}
 	if !impl.IsSpaceAvailableOnDisk() {
 		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return err
+		return "", err
 	}
 	err = impl.gitManager.Init(gitCtx, location, url, true)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
-		return err
+		return "", err
 	}
 	var sshPrivateKeyPath string
 	// check ssh
@@ -146,11 +146,11 @@ func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, loc
 		sshPrivateKeyPath, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
 			impl.logger.Errorw("error while creating ssh file for shallow clone", "checkoutPath", location, "sshPrivateKeyPath", sshPrivateKeyPath, "err", err)
-			return err
+			return "", err
 		}
 	}
 
-	return nil
+	return sshPrivateKeyPath, nil
 }
 
 func (impl RepositoryManagerImpl) Add2(gitCtx GitContext, location string) error {
