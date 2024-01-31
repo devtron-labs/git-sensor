@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -33,6 +32,10 @@ const (
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
 	CLONE_TIMEOUT_SEC         = 600
 	FETCH_TIMEOUT_SEC         = 30
+	GITHUB_PROVIDER           = "github.com"
+	GITLAB_PROVIDER           = "gitlab.com"
+	CloningModeShallow        = "SHALLOW"
+	CloningModeFull           = "FULL"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -41,24 +44,18 @@ const (
 //git@bitbucket.org:DelhiveryTech/kafka-consumer-config.git
 //https://prashant-delhivery@bitbucket.org/DelhiveryTech/kafka-consumer-config.git
 
-func GetLocationForMaterial(material *sql.GitMaterial) (location string, err error) {
-	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
-	httpsRegex := `^https.*`
-	httpsMatched, err := regexp.MatchString(httpsRegex, material.Url)
-	if httpsMatched {
-		locationWithoutProtocol := strings.ReplaceAll(material.Url, "https://", "")
-		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), locationWithoutProtocol)
-		return checkoutPath, nil
-	}
-
-	sshRegex := `^git@.*`
-	sshMatched, err := regexp.MatchString(sshRegex, material.Url)
-	if sshMatched {
-		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), material.Url)
-		return checkoutPath, nil
-	}
-
-	return "", fmt.Errorf("unsupported format url %s", material.Url)
+func GetProjectName(url string) string {
+	//if url = https://github.com/devtron-labs/git-sensor.git then it will return git-sensor
+	projName := strings.Split(url, ".")[1]
+	projectName := projName[strings.LastIndex(projName, "/")+1:]
+	return projectName
+}
+func GetCheckoutPath(url string, cloneLocation string) string {
+	//url= https://github.com/devtron-labs/git-sensor.git cloneLocation= git-base/1/github.com/prakash100198
+	//then this function returns git-base/1/github.com/prakash100198/SampleGoLangProject/.git
+	projectName := GetProjectName(url)
+	projRootDir := cloneLocation + "/" + projectName + "/.git"
+	return projRootDir
 }
 
 func GetUserNamePassword(gitProvider *sql.GitProvider) (userName, password string, err error) {

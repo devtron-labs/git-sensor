@@ -18,11 +18,15 @@ package git
 
 import (
 	"errors"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internal"
 	"github.com/devtron-labs/git-sensor/util"
 	"golang.org/x/sys/unix"
 	"io"
 	"os"
+	"path"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,18 +41,19 @@ type RepositoryManager interface {
 	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	GetLocationForMaterial(material *sql.GitMaterial) (location string, err error)
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
 	ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error)
 	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error)
 	// GetCommitForTag retrieves the commit metadata for given tag
 	GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error)
 	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
-	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) error
+	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
 }
 
 type RepositoryManagerImpl struct {
@@ -75,7 +80,35 @@ func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
 	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
 }
 
+func (impl RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMaterial) (location string, err error) {
+	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
+	httpsRegex := `^https.*`
+	httpsMatched, err := regexp.MatchString(httpsRegex, material.Url)
+	if httpsMatched {
+		locationWithoutProtocol := strings.ReplaceAll(material.Url, "https://", "")
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), locationWithoutProtocol)
+		return checkoutPath, nil
+	}
+
+	sshRegex := `^git@.*`
+	sshMatched, err := regexp.MatchString(sshRegex, material.Url)
+	if sshMatched {
+		checkoutPath := path.Join(GIT_BASE_DIR, strconv.Itoa(material.Id), material.Url)
+		return checkoutPath, nil
+	}
+
+	return "", fmt.Errorf("unsupported format url %s", material.Url)
+}
+
 func (impl RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+	err := impl.Add1(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
+	if err != nil {
+		return err
+	}
+	return impl.Add2(gitCtx, location)
+}
+
+func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -95,18 +128,23 @@ func (impl RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, loca
 		impl.logger.Errorw("err in git init", "err", err)
 		return err
 	}
-
+	var sshPrivateKeyPath string
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
+		sshPrivateKeyPath, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
+			impl.logger.Errorw("error while creating ssh file for shallow clone", "checkoutPath", location, "sshPrivateKeyPath", sshPrivateKeyPath, "err", err)
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (impl RepositoryManagerImpl) Add2(gitCtx GitContext, location string) error {
 	opt, errorMsg, err := impl.gitManager.Fetch(gitCtx, location)
 	if err != nil {
-		impl.logger.Errorw("error in cloning repo", "errorMsg", errorMsg, "err", err)
+		impl.logger.Errorw("error in fetching repo", "errorMsg", errorMsg, "err", err)
 		return err
 	}
 	impl.logger.Debugw("opt msg", "opt", opt)
@@ -186,7 +224,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkoutP
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -205,6 +243,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 		ToCommitHash:   to,
 	})
 	if err != nil {
+		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
 		return nil, err
 	}
 	var gitCommits []*GitCommitBase
@@ -255,7 +294,7 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 			if impl.configuration.EnableFileStats {
 				defer func() {
 					if err := recover(); err != nil {
-						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit)
+						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit, "count", count)
 					}
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
@@ -269,6 +308,13 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 		}()
 	}
 	return gitCommits, err
+}
+
+func trimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
+	if len(gitCommits) > count {
+		gitCommits = gitCommits[:len(gitCommits)-1]
+	}
+	return gitCommits
 }
 
 func (impl RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
@@ -285,30 +331,31 @@ func (impl RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath s
 		return nil, err
 	}
 	///---------------------
-	return impl.ChangesSinceByRepository(gitCtx, r, branch, from, to, count)
+	return impl.ChangesSinceByRepository(gitCtx, r, branch, from, to, count, checkoutPath)
 	///----------------------
 
 }
 
-func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) error {
+func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
 	// add private key
 	var err error
+	var sshPrivateKeyPath string
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("createSshFileIfNotExistsAndConfigureSshCommand", start, err)
 	}()
-	sshPrivateKeyPath, err := GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
+	sshPrivateKeyPath, err = GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
 		impl.logger.Errorw("error in creating ssh private key", "err", err)
-		return err
+		return sshPrivateKeyPath, err
 	}
 
 	//git config core.sshCommand
 	_, errorMsg, err := impl.gitManager.ConfigureSshCommand(gitCtx, location, sshPrivateKeyPath)
 	if err != nil {
 		impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
-		return err
+		return sshPrivateKeyPath, err
 	}
 
-	return nil
+	return sshPrivateKeyPath, nil
 }

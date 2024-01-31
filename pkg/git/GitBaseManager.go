@@ -29,8 +29,6 @@ type GitManager interface {
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
 	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
-	// FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
-	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -43,6 +41,8 @@ type GitManagerBase interface {
 	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	//  FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
+	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 }
