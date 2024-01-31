@@ -41,6 +41,8 @@ type RepositoryManager interface {
 	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
+	Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
+	Add2(gitCtx GitContext, location string) error
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error)
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
