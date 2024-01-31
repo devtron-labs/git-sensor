@@ -45,6 +45,8 @@ type GitManagerBase interface {
 	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
+	CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc)
+	RunCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
@@ -109,7 +111,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	impl.logger.Debugw("git fetch ", "location", rootDir)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	output, errMsg, err := impl.RunCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
@@ -148,7 +150,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	return commits, nil
 }
 
-func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) RunCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
@@ -280,7 +282,7 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 	defer cancel()
 
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	output, errMsg, err := impl.RunCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
