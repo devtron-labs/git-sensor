@@ -19,7 +19,7 @@ package git
 import (
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
+	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/util"
 	"golang.org/x/sys/unix"
 	"io"
@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devtron-labs/git-sensor/internal/middleware"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"go.uber.org/zap"
 )
 
@@ -59,12 +59,12 @@ type RepositoryManager interface {
 type RepositoryManagerImpl struct {
 	logger        *zap.SugaredLogger
 	gitManager    GitManagerImpl
-	configuration *internal.Configuration
+	configuration *internals.Configuration
 }
 
 func NewRepositoryManagerImpl(
 	logger *zap.SugaredLogger,
-	configuration *internal.Configuration,
+	configuration *internals.Configuration,
 	gitManager GitManagerImpl,
 ) *RepositoryManagerImpl {
 	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitManager: gitManager}
