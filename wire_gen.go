@@ -35,11 +35,11 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	gitManagerBaseImpl := git.NewGitManagerBaseImpl(sugaredLogger, configuration)
-	gitCliManagerImpl := git.NewGitCliManagerImpl(gitManagerBaseImpl)
-	goGitSDKManagerImpl := git.NewGoGitSDKManagerImpl(gitManagerBaseImpl)
+	gitCliManagerImpl := git.NewGitCliManagerImpl(gitManagerBaseImpl, sugaredLogger)
+	goGitSDKManagerImpl := git.NewGoGitSDKManagerImpl(gitManagerBaseImpl, sugaredLogger)
 	gitManagerImpl := git.NewGitManagerImpl(configuration, gitCliManagerImpl, goGitSDKManagerImpl)
 	repositoryManagerImpl := git.NewRepositoryManagerImpl(sugaredLogger, configuration, gitManagerImpl)
-	repositoryManagerAnalyticsImpl := git.NewRepositoryManagerAnalyticsImpl(repositoryManagerImpl)
+	repositoryManagerAnalyticsImpl := git.NewRepositoryManagerAnalyticsImpl(repositoryManagerImpl, gitManagerImpl, configuration, sugaredLogger)
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internals.NewRepositoryLocker(sugaredLogger)

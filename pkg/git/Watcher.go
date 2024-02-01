@@ -46,7 +46,7 @@ type GitWatcherImpl struct {
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
 	configuration                *internals.Configuration
-	gitManager                   GitManagerImpl
+	gitManager                   GitManager
 }
 
 type GitWatcher interface {
@@ -64,7 +64,7 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
 	locker *internals.RepositoryLocker,
 	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internals.Configuration,
-	gitmanager GitManagerImpl,
+	gitmanager GitManager,
 ) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}

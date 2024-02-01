@@ -58,18 +58,19 @@ type RepositoryManager interface {
 	GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error)
 	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
 	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
+	OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error)
 }
 
 type RepositoryManagerImpl struct {
 	logger        *zap.SugaredLogger
-	gitManager    GitManagerImpl
+	gitManager    GitManager
 	configuration *internals.Configuration
 }
 
 func NewRepositoryManagerImpl(
 	logger *zap.SugaredLogger,
 	configuration *internals.Configuration,
-	gitManager GitManagerImpl,
+	gitManager GitManager,
 ) *RepositoryManagerImpl {
 	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitManager: gitManager}
 }
@@ -186,7 +187,7 @@ func (impl RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location 
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	r, err := impl.gitManager.OpenNewRepo(gitCtx, location, url)
+	r, err := impl.OpenNewRepo(gitCtx, location, url)
 	if err != nil {
 		return false, r, err
 	}
@@ -373,4 +374,27 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	}
 
 	return sshPrivateKeyPath, nil
+}
+
+func (impl RepositoryManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
+
+	r, err := impl.gitManager.OpenRepoPlain(location)
+	if err != nil {
+		err = os.RemoveAll(location)
+		if err != nil {
+			impl.logger.Errorw("error in cleaning checkout path: %s", err)
+			return r, err
+		}
+		err = impl.gitManager.Init(gitCtx, location, url, true)
+		if err != nil {
+			impl.logger.Errorw("err in git init: %s", err)
+			return r, err
+		}
+		r, err = impl.gitManager.OpenRepoPlain(location)
+		if err != nil {
+			impl.logger.Errorw("err in git init: %s", err)
+			return r, err
+		}
+	}
+	return r, nil
 }

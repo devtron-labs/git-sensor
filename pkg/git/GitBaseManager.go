@@ -47,6 +47,7 @@ type GitManagerBase interface {
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 	CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc)
 	RunCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error)
+	RunCommand(cmd *exec.Cmd) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
@@ -79,32 +80,16 @@ type GitManagerImpl struct {
 
 func NewGitManagerImpl(configuration *internals.Configuration,
 	cliGitManager GitCliManager,
-	goGitManager GoGitSDKManager) GitManagerImpl {
+	goGitManager GoGitSDKManager) *GitManagerImpl {
 
 	if configuration.UseGitCli {
-		return GitManagerImpl{cliGitManager}
-	}
-	return GitManagerImpl{goGitManager}
-}
-
-func (impl *GitManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
-
-	r, err := impl.OpenRepoPlain(location)
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.Init(gitCtx, location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
+		return &GitManagerImpl{
+			cliGitManager,
 		}
 	}
-	return r, nil
+	return &GitManagerImpl{
+		goGitManager,
+	}
 }
 
 func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
@@ -120,7 +105,7 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 	impl.logger.Debugw("git checkout ", "location", rootDir)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
@@ -137,7 +122,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -156,10 +141,10 @@ func (impl *GitManagerBaseImpl) RunCommandWithCred(cmd *exec.Cmd, userName, pass
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
-	return impl.runCommand(cmd)
+	return impl.RunCommand(cmd)
 }
 
-func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) RunCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
@@ -185,7 +170,7 @@ func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir s
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }

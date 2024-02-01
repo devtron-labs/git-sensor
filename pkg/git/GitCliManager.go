@@ -1,6 +1,8 @@
 package git
 
 import (
+	"fmt"
+	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
@@ -12,13 +14,15 @@ type GitCliManager interface {
 }
 
 type GitCliManagerImpl struct {
-	*GitManagerBaseImpl
+	GitManagerBase
+	logger *zap.SugaredLogger
 }
 
-func NewGitCliManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GitCliManagerImpl {
+func NewGitCliManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger) *GitCliManagerImpl {
 
 	return &GitCliManagerImpl{
-		GitManagerBaseImpl: baseManagerImpl,
+		GitManagerBase: baseManager,
+		logger:         logger,
 	}
 }
 
@@ -89,7 +93,7 @@ func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) error 
 	impl.logger.Debugw("git", "-C", rootDir, "init")
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "init")
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
@@ -98,7 +102,7 @@ func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
@@ -112,7 +116,7 @@ func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, b
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -139,7 +143,7 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -186,4 +190,24 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, err
 		})
 	}
 	return gitCommits, nil
+}
+
+func (impl *GitCliManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
+
+	r, err := impl.OpenRepoPlain(location)
+	if err != nil {
+		err = os.RemoveAll(location)
+		if err != nil {
+			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
+		}
+		err = impl.Init(gitCtx, location, url, true)
+		if err != nil {
+			return r, fmt.Errorf("err in git init: %s", err)
+		}
+		r, err = impl.OpenRepoPlain(location)
+		if err != nil {
+			return r, fmt.Errorf("err in git init: %s", err)
+		}
+	}
+	return r, nil
 }
