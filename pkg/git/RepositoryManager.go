@@ -41,8 +41,8 @@ type RepositoryManager interface {
 	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
-	Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
-	Add2(gitCtx GitContext, location string) error
+	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
+	FetchRepo(gitCtx GitContext, location string) error
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error)
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
@@ -75,7 +75,7 @@ func NewRepositoryManagerImpl(
 	return &RepositoryManagerImpl{logger: logger, configuration: configuration, gitManager: gitManager}
 }
 
-func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
+func (impl *RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
 	var statFs unix.Statfs_t
 	err := unix.Statfs(GIT_BASE_DIR, &statFs)
 	if err != nil {
@@ -85,7 +85,7 @@ func (impl RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
 	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
 }
 
-func (impl RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error) {
+func (impl *RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error) {
 	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
 	httpsRegex := `^https.*`
 	httpsMatched, err := regexp.MatchString(httpsRegex, material.Url)
@@ -105,7 +105,7 @@ func (impl RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMateri
 	return "", httpsMatched, sshMatched, fmt.Errorf("unsupported format url %s", material.Url)
 }
 
-func (impl RepositoryManagerImpl) GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error) {
+func (impl *RepositoryManagerImpl) GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error) {
 	var checkoutPath string
 	var checkoutLocationForFetching string
 	checkoutPath, _, _, err := impl.GetLocationForMaterial(material, gitCtx.CloningMode)
@@ -116,15 +116,15 @@ func (impl RepositoryManagerImpl) GetCheckoutPathAndLocation(gitCtx GitContext, 
 	return checkoutPath, checkoutLocationForFetching, nil
 }
 
-func (impl RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
-	_, err := impl.Add1(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
+func (impl *RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
+	_, err := impl.GetSshPrivateKeyPath(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
 	if err != nil {
 		return err
 	}
-	return impl.Add2(gitCtx, location)
+	return impl.FetchRepo(gitCtx, location)
 }
 
-func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
+func (impl *RepositoryManagerImpl) GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -157,7 +157,7 @@ func (impl RepositoryManagerImpl) Add1(gitCtx GitContext, gitProviderId int, loc
 	return sshPrivateKeyPath, nil
 }
 
-func (impl RepositoryManagerImpl) Add2(gitCtx GitContext, location string) error {
+func (impl *RepositoryManagerImpl) FetchRepo(gitCtx GitContext, location string) error {
 	opt, errorMsg, err := impl.gitManager.Fetch(gitCtx, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching repo", "errorMsg", errorMsg, "err", err)
@@ -167,7 +167,7 @@ func (impl RepositoryManagerImpl) Add2(gitCtx GitContext, location string) error
 	return nil
 }
 
-func (impl RepositoryManagerImpl) Clean(dir string) error {
+func (impl *RepositoryManagerImpl) Clean(dir string) error {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -177,7 +177,7 @@ func (impl RepositoryManagerImpl) Clean(dir string) error {
 	return err
 }
 
-func (impl RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error) {
+func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -210,7 +210,7 @@ func (impl RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location 
 
 }
 
-func (impl RepositoryManagerImpl) GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -224,7 +224,7 @@ func (impl RepositoryManagerImpl) GetCommitForTag(gitCtx GitContext, checkoutPat
 	return commit.GetCommit(), nil
 }
 
-func (impl RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -240,7 +240,7 @@ func (impl RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkoutP
 
 // from -> old commit
 // to -> new commit
-func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -326,14 +326,14 @@ func (impl RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, re
 	return gitCommits, err
 }
 
-func (impl RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
+func (impl *RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {
 	if len(gitCommits) > count {
 		gitCommits = gitCommits[:len(gitCommits)-1]
 	}
 	return gitCommits
 }
 
-func (impl RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
 	var err error
 	start := time.Now()
 	defer func() {
@@ -352,7 +352,7 @@ func (impl RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath s
 
 }
 
-func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
+func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
 	// add private key
 	var err error
 	var sshPrivateKeyPath string
@@ -376,7 +376,7 @@ func (impl RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand
 	return sshPrivateKeyPath, nil
 }
 
-func (impl RepositoryManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
+func (impl *RepositoryManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
 
 	r, err := impl.gitManager.OpenRepoPlain(location)
 	if err != nil {
