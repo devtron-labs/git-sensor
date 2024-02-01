@@ -1,7 +1,6 @@
 package git
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -190,24 +189,4 @@ func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, err
 		})
 	}
 	return gitCommits, nil
-}
-
-func (impl *GitCliManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
-
-	r, err := impl.OpenRepoPlain(location)
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.Init(gitCtx, location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-	}
-	return r, nil
 }

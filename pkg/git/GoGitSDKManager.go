@@ -134,23 +134,3 @@ func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCom
 	}
 	return transformFileStats(stats), err
 }
-
-func (impl *GoGitSDKManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
-
-	r, err := impl.OpenRepoPlain(location)
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.Init(gitCtx, location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-	}
-	return r, nil
-}
