@@ -69,13 +69,18 @@ type GitManagerImpl struct {
 	GitManager
 }
 
-func NewGitManager(logger *zap.SugaredLogger, configuration *internals.Configuration) GitManager {
+func NewGitManagerImpl(logger *zap.SugaredLogger, configuration *internals.Configuration) *GitManagerImpl {
 
 	baseImpl := NewGitManagerBaseImpl(logger, configuration)
 	if configuration.UseGitCli {
-		return NewGitCliManagerImpl(baseImpl, logger)
+		return &GitManagerImpl{
+			GitManager: NewGitCliManagerImpl(baseImpl, logger),
+		}
+
 	}
-	return NewGoGitSDKManagerImpl(baseImpl, logger)
+	return &GitManagerImpl{
+		GitManager: NewGoGitSDKManagerImpl(baseImpl, logger),
+	}
 }
 
 func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
