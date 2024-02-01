@@ -65,13 +65,8 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internals.Configur
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
 }
 
-func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
-	commandTimeoutMap := make(map[string]int)
-	var err error
-	if config.CliCmdTimeoutJson != "" {
-		err = json.Unmarshal([]byte(config.CliCmdTimeoutJson), &commandTimeoutMap)
-	}
-	return commandTimeoutMap, err
+type GitManagerImpl struct {
+	GitManager
 }
 
 func NewGitManager(logger *zap.SugaredLogger, configuration *internals.Configuration) GitManager {
@@ -81,6 +76,15 @@ func NewGitManager(logger *zap.SugaredLogger, configuration *internals.Configura
 		return NewGitCliManagerImpl(baseImpl, logger)
 	}
 	return NewGoGitSDKManagerImpl(baseImpl, logger)
+}
+
+func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
+	commandTimeoutMap := make(map[string]int)
+	var err error
+	if config.CliCmdTimeoutJson != "" {
+		err = json.Unmarshal([]byte(config.CliCmdTimeoutJson), &commandTimeoutMap)
+	}
+	return commandTimeoutMap, err
 }
 
 func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
