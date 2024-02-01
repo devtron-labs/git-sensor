@@ -43,7 +43,7 @@ func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	gitCliImpl := NewGitCliManagerImpl(base)
 	gogitImpl := NewGoGitSDKManagerImpl(base)
 
-	gitUtil := NewGitManagerImpl(conf, gitCliImpl, gogitImpl)
+	gitUtil := NewGitManager(conf, gitCliImpl, gogitImpl)
 	repositoryManagerImpl := NewRepositoryManagerImpl(logger, conf, gitUtil)
 	return repositoryManagerImpl
 }

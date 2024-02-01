@@ -8,20 +8,20 @@ import (
 	"strconv"
 )
 
-type GitCliManager interface {
-	GitManager
-}
+//type GitCliManager interface {
+//	//GitManager
+//}
 
 type GitCliManagerImpl struct {
-	GitManagerBase
+	*GitManagerBaseImpl
 	logger *zap.SugaredLogger
 }
 
-func NewGitCliManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger) *GitCliManagerImpl {
+func NewGitCliManagerImpl(baseManager *GitManagerBaseImpl, logger *zap.SugaredLogger) *GitCliManagerImpl {
 
 	return &GitCliManagerImpl{
-		GitManagerBase: baseManager,
-		logger:         logger,
+		GitManagerBaseImpl: baseManager,
+		logger:             logger,
 	}
 }
 

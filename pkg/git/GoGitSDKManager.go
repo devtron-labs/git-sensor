@@ -9,9 +9,9 @@ import (
 	"os"
 )
 
-type GoGitSDKManager interface {
-	GitManager
-}
+//	type GoGitSDKManager interface {
+//		GitManager
+//	}
 type GoGitSDKManagerImpl struct {
 	GitManagerBase
 	logger *zap.SugaredLogger
