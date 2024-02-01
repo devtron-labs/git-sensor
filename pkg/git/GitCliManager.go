@@ -101,7 +101,7 @@ func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
 	defer cancel()
-	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
@@ -115,7 +115,7 @@ func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, b
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
-	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	defer cancel()
-	output, errMsg, err := impl.GitManagerBase.RunCommand(cmd)
+	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
