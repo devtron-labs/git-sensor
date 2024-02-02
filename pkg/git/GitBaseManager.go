@@ -45,9 +45,7 @@ type GitManagerBase interface {
 	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
-	CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc)
-	RunCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error)
-	RunCommand(cmd *exec.Cmd) (response, errMsg string, err error)
+	ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
@@ -294,4 +292,11 @@ func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 		timeout = cmdTimeout
 	}
 	return timeout
+}
+
+func (impl *GitManagerBaseImpl) ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error) {
+	cmd, cancel := impl.CreateCmdWithContext(gitContext, name, arg...)
+	defer cancel()
+	output, errMsg, err := impl.RunCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	return output, errMsg, err
 }
