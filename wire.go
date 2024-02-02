@@ -23,6 +23,7 @@ import (
 	"github.com/devtron-labs/common-lib/monitoring"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
+	"github.com/devtron-labs/git-sensor/app"
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/logger"
 	"github.com/devtron-labs/git-sensor/internals/sql"
@@ -31,10 +32,10 @@ import (
 	"github.com/google/wire"
 )
 
-func InitializeApp() (*App, error) {
+func InitializeApp() (*app.App, error) {
 
 	wire.Build(
-		NewApp,
+		app.NewApp,
 		api.NewMuxRouter,
 		internals.ParseConfiguration,
 		logger.NewSugaredLogger,
@@ -80,5 +81,5 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(git.WebhookHandler), new(*git.WebhookHandlerImpl)),
 		monitoring.NewMonitoringRouter,
 	)
-	return &App{}, nil
+	return &app.App{}, nil
 }

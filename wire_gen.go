@@ -10,6 +10,7 @@ import (
 	"github.com/devtron-labs/common-lib/monitoring"
 	"github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
+	"github.com/devtron-labs/git-sensor/app"
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/logger"
 	"github.com/devtron-labs/git-sensor/internals/sql"
@@ -19,7 +20,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitializeApp() (*App, error) {
+func InitializeApp() (*app.App, error) {
 	sugaredLogger := logger.NewSugaredLogger()
 	config, err := sql.GetConfig()
 	if err != nil {
@@ -58,6 +59,6 @@ func InitializeApp() (*App, error) {
 	monitoringRouter := monitoring.NewMonitoringRouter(sugaredLogger)
 	muxRouter := api.NewMuxRouter(sugaredLogger, restHandlerImpl, monitoringRouter)
 	grpcHandlerImpl := api.NewGrpcHandlerImpl(repoManagerImpl, sugaredLogger)
-	app := NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcHandlerImpl)
-	return app, nil
+	appApp := app.NewApp(muxRouter, sugaredLogger, gitWatcherImpl, db, pubSubClientServiceImpl, grpcHandlerImpl)
+	return appApp, nil
 }
