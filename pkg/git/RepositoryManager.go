@@ -58,7 +58,6 @@ type RepositoryManager interface {
 	GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error)
 	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
 	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
-	OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error)
 }
 
 type RepositoryManagerImpl struct {
@@ -187,7 +186,7 @@ func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location
 		err = errors.New("git-sensor PVC - disk full, please increase space")
 		return false, nil, err
 	}
-	r, err := impl.OpenNewRepo(gitCtx, location, url)
+	r, err := impl.openNewRepo(gitCtx, location, url)
 	if err != nil {
 		return false, r, err
 	}
@@ -376,7 +375,7 @@ func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshComman
 	return sshPrivateKeyPath, nil
 }
 
-func (impl *RepositoryManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
+func (impl *RepositoryManagerImpl) openNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
 
 	r, err := impl.gitManager.OpenRepoPlain(location)
 	if err != nil {
