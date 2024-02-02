@@ -8,10 +8,6 @@ import (
 	"strconv"
 )
 
-//type GitCliManager interface {
-//	//GitManager
-//}
-
 type GitCliManagerImpl struct {
 	GitManagerBase
 	logger *zap.SugaredLogger
