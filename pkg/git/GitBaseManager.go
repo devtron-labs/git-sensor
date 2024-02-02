@@ -92,16 +92,16 @@ func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error
 
 func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
-	output, errMsg, err := impl.RunCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
 func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git checkout ", "location", rootDir)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
 	defer cancel()
 	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -118,7 +118,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	}
 	cmdArgs := []string{"-C", rootDir, "log", from + "..." + toCommitHash, "--date=iso-strict", GITFORMAT}
 	impl.logger.Debugw("git", cmdArgs)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
 	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -133,7 +133,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	return commits, nil
 }
 
-func (impl *GitManagerBaseImpl) RunCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
@@ -166,7 +166,7 @@ func (impl *GitManagerBaseImpl) RunCommand(cmd *exec.Cmd) (response, errMsg stri
 func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
 	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	defer cancel()
 	output, errMsg, err := impl.RunCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -262,15 +262,15 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 	defer cancel()
 
-	output, errMsg, err := impl.RunCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
-func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
+func (impl *GitManagerBaseImpl) createCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
 	newCtx := ctx
 	cancel := func() {}
 
@@ -295,8 +295,8 @@ func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 }
 
 func (impl *GitManagerBaseImpl) ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error) {
-	cmd, cancel := impl.CreateCmdWithContext(gitContext, name, arg...)
+	cmd, cancel := impl.createCmdWithContext(gitContext, name, arg...)
 	defer cancel()
-	output, errMsg, err := impl.RunCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
 	return output, errMsg, err
 }
