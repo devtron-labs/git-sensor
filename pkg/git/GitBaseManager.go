@@ -103,7 +103,7 @@ func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch stri
 	impl.logger.Debugw("git checkout ", "location", rootDir)
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
 	defer cancel()
-	output, errMsg, err := impl.RunCommand(cmd)
+	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
@@ -120,7 +120,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	impl.logger.Debugw("git", cmdArgs)
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
-	output, errMsg, err := impl.RunCommand(cmd)
+	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -139,10 +139,10 @@ func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, pass
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
-	return impl.RunCommand(cmd)
+	return impl.runCommand(cmd)
 }
 
-func (impl *GitManagerBaseImpl) RunCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
@@ -168,7 +168,7 @@ func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir s
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	defer cancel()
-	output, errMsg, err := impl.RunCommand(cmd)
+	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
