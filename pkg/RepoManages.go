@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
-	"github.com/devtron-labs/git-sensor/internal/util"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
+	"github.com/devtron-labs/git-sensor/internals/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -58,15 +58,15 @@ type RepoManagerImpl struct {
 	repositoryManagerAnalytics                    git.RepositoryManagerAnalytics
 	gitProviderRepository                         sql.GitProviderRepository
 	ciPipelineMaterialRepository                  sql.CiPipelineMaterialRepository
-	locker                                        *internal.RepositoryLocker
+	locker                                        *internals.RepositoryLocker
 	gitWatcher                                    git.GitWatcher
 	webhookEventRepository                        sql.WebhookEventRepository
 	webhookEventParsedDataRepository              sql.WebhookEventParsedDataRepository
 	webhookEventDataMappingRepository             sql.WebhookEventDataMappingRepository
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository
 	webhookEventBeanConverter                     git.WebhookEventBeanConverter
-	configuration                                 *internal.Configuration
-	gitManager                                    git.GitManagerImpl
+	configuration                                 *internals.Configuration
+	gitManager                                    git.GitManager
 }
 
 func NewRepoManagerImpl(
@@ -76,14 +76,14 @@ func NewRepoManagerImpl(
 	repositoryManagerAnalytics git.RepositoryManagerAnalytics,
 	gitProviderRepository sql.GitProviderRepository,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
-	locker *internal.RepositoryLocker,
+	locker *internals.RepositoryLocker,
 	gitWatcher git.GitWatcher, webhookEventRepository sql.WebhookEventRepository,
 	webhookEventParsedDataRepository sql.WebhookEventParsedDataRepository,
 	webhookEventDataMappingRepository sql.WebhookEventDataMappingRepository,
 	webhookEventDataMappingFilterResultRepository sql.WebhookEventDataMappingFilterResultRepository,
 	webhookEventBeanConverter git.WebhookEventBeanConverter,
-	configuration *internal.Configuration,
-	gitManager git.GitManagerImpl,
+	configuration *internals.Configuration,
+	gitManager git.GitManager,
 ) *RepoManagerImpl {
 	return &RepoManagerImpl{
 		logger:                            logger,
@@ -194,6 +194,9 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			impl.logger.Errorw("error in fetching material", "err", err)
 			continue
 		}
+
+		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password).
+			WithCloningMode(impl.configuration.CloningMode)
 
 		commits, err := impl.repositoryManager.ChangesSince(gitCtx, material.CheckoutLocation, pipelineMaterial.Value, "", "", impl.configuration.GitHistoryCount)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
@@ -345,15 +348,18 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	if err != nil {
 		return material, nil
 	}
-	checkoutPath, err := git.GetLocationForMaterial(material)
+
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithCloningMode(impl.configuration.CloningMode)
+
+	checkoutPath, checkoutLocationForFetching, err := impl.repositoryManager.GetCheckoutPathAndLocation(gitCtx, material, gitProvider.Url)
 	if err != nil {
 		return material, err
 	}
-	gitCtx = gitCtx.WithCredentials(userName, password)
 
 	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
-		material.CheckoutLocation = checkoutPath
+		material.CheckoutLocation = checkoutLocationForFetching
 		material.CheckoutStatus = true
 	} else {
 		material.CheckoutStatus = false
@@ -627,7 +633,10 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 	}()
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
-	gitCtx = gitCtx.WithCredentials(userName, password)
+
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithCloningMode(impl.configuration.CloningMode)
+
 	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
@@ -659,7 +668,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1)
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation)
 
 	if commits == nil {
 		return nil, err
@@ -694,6 +703,8 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		return nil, err
 	}
 
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithCloningMode(impl.configuration.CloningMode)
 	// validate checkout status of gitMaterial
 	if !gitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
@@ -707,7 +718,6 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-
 	commits, err := impl.repositoryManager.ChangesSince(gitCtx, gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
@@ -747,6 +757,10 @@ func (impl RepoManagerImpl) GetReleaseChanges(gitCtx git.GitContext, request *Re
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
+
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithCloningMode(impl.configuration.CloningMode)
+
 	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitCtx, gitMaterial.CheckoutLocation, request.OldCommit, request.NewCommit)
 	if err != nil {
 		impl.logger.Errorw("error in computing changes", "req", request, "err", err)

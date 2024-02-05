@@ -30,6 +30,11 @@ func (gitCtx GitContext) WithTimeout(timeoutSeconds int) (GitContext, context.Ca
 	return gitCtx, cancel
 }
 
+func (gitCtx GitContext) WithCloningMode(CloningMode string) GitContext {
+	gitCtx.CloningMode = CloningMode
+	return gitCtx
+}
+
 func RunWithTimeout[T any](ctx context.Context, f func() ([]*T, error)) ([]*T, error) {
 	resultCh := make(chan []*T)
 	errCh := make(chan error)

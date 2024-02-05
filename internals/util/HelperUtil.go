@@ -1,7 +1,7 @@
 package util
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"strings"
 )
 

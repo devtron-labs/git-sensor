@@ -3,7 +3,7 @@ package git
 import (
 	"context"
 	"github.com/devtron-labs/common-lib/utils"
-	"github.com/devtron-labs/git-sensor/internal"
+	"github.com/devtron-labs/git-sensor/internals"
 	"testing"
 )
 
@@ -12,7 +12,7 @@ func TestGitCliManagerImpl_processGitLogOutput(t *testing.T) {
 	t.Run("tt.name", func(t *testing.T) {
 		logger, _ := utils.NewSugardLogger()
 		impl := &GitCliManagerImpl{
-			GitManagerBaseImpl: NewGitManagerBaseImpl(logger, &internal.Configuration{}),
+			GitManagerBase: NewGitManagerBaseImpl(logger, &internals.Configuration{}),
 		}
 		got, err := impl.GetCommits(BuildGitContext(context.Background()), "main", "", "/Users/subhashish/workspace/lens", 15, "", "")
 		print("err", got, err)
@@ -20,15 +20,14 @@ func TestGitCliManagerImpl_processGitLogOutput(t *testing.T) {
 
 	t.Run("analytics", func(t *testing.T) {
 		logger, _ := utils.NewSugardLogger()
-		conf := &internal.Configuration{UseGitCli: false, AnalyticsDebug: true, GoGitTimeout: 10, CliCmdTimeoutGlobal: 8, CliCmdTimeoutJson: `{"log":4}`}
-		impl := &GoGitSDKManagerImpl{
-			GitManagerBaseImpl: NewGitManagerBaseImpl(logger, conf),
+		conf := &internals.Configuration{UseGitCli: false, AnalyticsDebug: true, GoGitTimeout: 10, CliCmdTimeoutGlobal: 8, CliCmdTimeoutJson: `{"log":4}`}
+		impl := &GitManagerImpl{
+			GitManager: NewGitManagerImpl(logger, conf),
 		}
-		analyticsImpl := &RepositoryManagerAnalyticsImpl{&RepositoryManagerImpl{
-			logger:        logger,
-			gitManager:    GitManagerImpl{impl},
-			configuration: conf,
-		}}
+		analyticsImpl := &RepositoryManagerAnalyticsImpl{
+			repoManager: NewRepositoryManagerImpl(logger, conf, impl),
+			gitManager:  impl,
+		}
 		//got, err := impl.GetCommits(GitContext{}, "main", "", "/Users/subhashish/workspace/lens", 15, "", "")
 		got, err := analyticsImpl.ChangesSinceByRepositoryForAnalytics(BuildGitContext(context.Background()), "/Users/subhashish/workspace/lens", "e2d5f17556130e37a9e941a71ffc83a9a2085ec5", "dfb352083ed3131bb2f69cfa2e18c614e5e08700")
 		print("err", got, err)

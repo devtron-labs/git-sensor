@@ -17,7 +17,7 @@
 package util
 
 import (
-	"github.com/devtron-labs/git-sensor/internal/middleware"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
 	"math/rand"
 	"strings"
 	"time"

@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package main
+package app
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
-	"github.com/devtron-labs/git-sensor/internal/middleware"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	pb "github.com/devtron-labs/protos/gitSensor"
 	"github.com/go-pg/pg"

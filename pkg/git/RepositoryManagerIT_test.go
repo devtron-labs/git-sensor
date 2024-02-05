@@ -3,8 +3,8 @@ package git
 import (
 	"context"
 	"github.com/devtron-labs/common-lib/utils"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"reflect"
@@ -26,24 +26,24 @@ var password = ""
 var sshPrivateKey = ``
 
 func getRepoManagerAnalyticsImpl(t *testing.T) *RepositoryManagerAnalyticsImpl {
-	return &RepositoryManagerAnalyticsImpl{RepositoryManagerImpl: getRepoManagerImpl(t)}
+	return &RepositoryManagerAnalyticsImpl{repoManager: getRepoManagerImpl(t)}
 }
 
 func getRepoManagerImpl(t *testing.T) *RepositoryManagerImpl {
 	logger, err := utils.NewSugardLogger()
 	assert.Nil(t, err)
-	conf := &internal.Configuration{
+	conf := &internals.Configuration{
 		CommitStatsTimeoutInSec: 0,
 		EnableFileStats:         true,
 		GitHistoryCount:         2,
-		UseGitCli:               true,
+		UseGitCli:               false,
 		GoGitTimeout:            10,
 	}
 	base := NewGitManagerBaseImpl(logger, conf)
-	gitCliImpl := NewGitCliManagerImpl(base)
-	gogitImpl := NewGoGitSDKManagerImpl(base)
+	_ = NewGitCliManagerImpl(base, logger)
+	_ = NewGoGitSDKManagerImpl(base, logger)
 
-	gitUtil := NewGitManagerImpl(conf, gitCliImpl, gogitImpl)
+	gitUtil := NewGitManagerImpl(logger, conf)
 	repositoryManagerImpl := NewRepositoryManagerImpl(logger, conf, gitUtil)
 	return repositoryManagerImpl
 }
@@ -132,7 +132,7 @@ func TestRepositoryManager_Add(t *testing.T) {
 	repositoryManagerImpl := getRepoManagerImpl(t)
 	for _, tt := range tests {
 		if tt.payload.authMode == "SSH" {
-			err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(BuildGitContext(context.Background()), tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
+			_, err := repositoryManagerImpl.CreateSshFileIfNotExistsAndConfigureSshCommand(BuildGitContext(context.Background()), tt.payload.location, tt.payload.gitProviderId, tt.payload.sshPrivateKeyContent)
 			assert.Nil(t, err)
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -583,7 +583,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 		r, err := repositoryManagerImpl.gitManager.OpenRepoPlain(tt.payload.checkoutPath)
 		assert.Nil(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSinceByRepository(BuildGitContext(context.Background()), r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count)
+			got, err := repositoryManagerImpl.ChangesSinceByRepository(BuildGitContext(context.Background()), r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, tt.payload.checkoutPath)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return

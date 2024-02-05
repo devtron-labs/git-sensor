@@ -2,22 +2,22 @@ package git
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"os"
 )
 
-type GoGitSDKManager interface {
-	GitManager
-}
 type GoGitSDKManagerImpl struct {
-	*GitManagerBaseImpl
+	GitManagerBase
+	logger *zap.SugaredLogger
 }
 
-func NewGoGitSDKManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GoGitSDKManagerImpl {
+func NewGoGitSDKManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger) *GoGitSDKManagerImpl {
 	return &GoGitSDKManagerImpl{
-		GitManagerBaseImpl: baseManagerImpl,
+		GitManagerBase: baseManager,
+		logger:         logger,
 	}
 }
 

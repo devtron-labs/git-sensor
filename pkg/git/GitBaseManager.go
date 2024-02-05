@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
 	"os"
@@ -29,8 +29,6 @@ type GitManager interface {
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
 	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
-	// FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
-	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -43,16 +41,19 @@ type GitManagerBase interface {
 	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
+	//  FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
+	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
+	ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error)
 }
 type GitManagerBaseImpl struct {
 	logger            *zap.SugaredLogger
-	conf              *internal.Configuration
+	conf              *internals.Configuration
 	commandTimeoutMap map[string]int
 }
 
-func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configuration) *GitManagerBaseImpl {
+func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internals.Configuration) *GitManagerBaseImpl {
 
 	commandTimeoutMap, err := parseCmdTimeoutJson(config)
 	if err != nil {
@@ -62,7 +63,25 @@ func NewGitManagerBaseImpl(logger *zap.SugaredLogger, config *internal.Configura
 	return &GitManagerBaseImpl{logger: logger, conf: config, commandTimeoutMap: commandTimeoutMap}
 }
 
-func parseCmdTimeoutJson(config *internal.Configuration) (map[string]int, error) {
+type GitManagerImpl struct {
+	GitManager
+}
+
+func NewGitManagerImpl(logger *zap.SugaredLogger, configuration *internals.Configuration) *GitManagerImpl {
+
+	baseImpl := NewGitManagerBaseImpl(logger, configuration)
+	if configuration.UseGitCli {
+		return &GitManagerImpl{
+			GitManager: NewGitCliManagerImpl(baseImpl, logger),
+		}
+
+	}
+	return &GitManagerImpl{
+		GitManager: NewGoGitSDKManagerImpl(baseImpl, logger),
+	}
+}
+
+func parseCmdTimeoutJson(config *internals.Configuration) (map[string]int, error) {
 	commandTimeoutMap := make(map[string]int)
 	var err error
 	if config.CliCmdTimeoutJson != "" {
@@ -71,43 +90,9 @@ func parseCmdTimeoutJson(config *internal.Configuration) (map[string]int, error)
 	return commandTimeoutMap, err
 }
 
-type GitManagerImpl struct {
-	GitManager
-}
-
-func NewGitManagerImpl(configuration *internal.Configuration,
-	cliGitManager GitCliManager,
-	goGitManager GoGitSDKManager) GitManagerImpl {
-
-	if configuration.UseGitCli {
-		return GitManagerImpl{cliGitManager}
-	}
-	return GitManagerImpl{goGitManager}
-}
-
-func (impl *GitManagerImpl) OpenNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
-
-	r, err := impl.OpenRepoPlain(location)
-	if err != nil {
-		err = os.RemoveAll(location)
-		if err != nil {
-			return r, fmt.Errorf("error in cleaning checkout path: %s", err)
-		}
-		err = impl.Init(gitCtx, location, url, true)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-		r, err = impl.OpenRepoPlain(location)
-		if err != nil {
-			return r, fmt.Errorf("err in git init: %s", err)
-		}
-	}
-	return r, nil
-}
-
 func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git fetch ", "location", rootDir)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -116,7 +101,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 
 func (impl *GitManagerBaseImpl) Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error) {
 	impl.logger.Debugw("git checkout ", "location", rootDir)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "checkout", branch, "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -133,7 +118,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	}
 	cmdArgs := []string{"-C", rootDir, "log", from + "..." + toCommitHash, "--date=iso-strict", GITFORMAT}
 	impl.logger.Debugw("git", cmdArgs)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", cmdArgs...)
 	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -181,7 +166,7 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 func (impl *GitManagerBaseImpl) ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error) {
 	impl.logger.Debugw("configuring ssh command on ", "location", rootDir)
 	coreSshCommand := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no", sshPrivateKeyPath)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "core.sshCommand", coreSshCommand)
 	defer cancel()
 	output, errMsg, err := impl.runCommand(cmd)
 	impl.logger.Debugw("configure ssh command output ", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -277,7 +262,7 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 	defer cancel()
 
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
@@ -285,7 +270,7 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 	return output, errMsg, err
 }
 
-func (impl *GitManagerBaseImpl) CreateCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
+func (impl *GitManagerBaseImpl) createCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {
 	newCtx := ctx
 	cancel := func() {}
 
@@ -307,4 +292,11 @@ func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 		timeout = cmdTimeout
 	}
 	return timeout
+}
+
+func (impl *GitManagerBaseImpl) ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error) {
+	cmd, cancel := impl.createCmdWithContext(gitContext, name, arg...)
+	defer cancel()
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	return output, errMsg, err
 }

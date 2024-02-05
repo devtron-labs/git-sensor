@@ -24,13 +24,14 @@ import (
 	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
-	"github.com/devtron-labs/git-sensor/internal"
-	"github.com/devtron-labs/git-sensor/internal/middleware"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"runtime/debug"
+	"strings"
 	"time"
 )
 
@@ -41,11 +42,11 @@ type GitWatcherImpl struct {
 	logger                       *zap.SugaredLogger
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository
 	pubSubClient                 *pubsub.PubSubClientServiceImpl
-	locker                       *internal.RepositoryLocker
+	locker                       *internals.RepositoryLocker
 	pollConfig                   *PollConfig
 	webhookHandler               WebhookHandler
-	configuration                *internal.Configuration
-	gitManager                   GitManagerImpl
+	configuration                *internals.Configuration
+	gitManager                   GitManager
 }
 
 type GitWatcher interface {
@@ -61,9 +62,9 @@ func NewGitWatcherImpl(repositoryManager RepositoryManager,
 	materialRepo sql.MaterialRepository,
 	logger *zap.SugaredLogger,
 	ciPipelineMaterialRepository sql.CiPipelineMaterialRepository,
-	locker *internal.RepositoryLocker,
-	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internal.Configuration,
-	gitmanager GitManagerImpl,
+	locker *internals.RepositoryLocker,
+	pubSubClient *pubsub.PubSubClientServiceImpl, webhookHandler WebhookHandler, configuration *internals.Configuration,
+	gitmanager GitManager,
 ) (*GitWatcherImpl, error) {
 
 	cfg := &PollConfig{}
@@ -183,22 +184,28 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
-
-	gitCtx := BuildGitContext(context.Background()).
-		WithCredentials(userName, password)
-
-	location, err := GetLocationForMaterial(material)
+	location := material.CheckoutLocation
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
 		return err
 	}
+	gitCtx := BuildGitContext(context.Background()).
+		WithCredentials(userName, password).
+		WithCloningMode(impl.configuration.CloningMode)
 
 	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
-			err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
+			if strings.Contains(material.CheckoutLocation, "/.git") {
+				location, _, _, err = impl.repositoryManager.GetLocationForMaterial(material, gitCtx.CloningMode)
+				if err != nil {
+					impl.logger.Errorw("error in getting clone location ", "material", material, "err", err)
+					return err
+				}
+			}
+			_, err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
 			if err != nil {
 				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
 				return err
@@ -225,6 +232,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	var updatedMaterials []*CiPipelineMaterialBean
 	var updatedMaterialsModel []*sql.CiPipelineMaterial
 	var erroredMaterialsModels []*sql.CiPipelineMaterial
+	checkoutLocation := material.CheckoutLocation
 	for _, material := range materials {
 		if material.Type != sql.SOURCE_TYPE_BRANCH_FIXED {
 			continue
@@ -232,7 +240,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount, checkoutLocation)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
