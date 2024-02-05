@@ -32,7 +32,6 @@ func InitializeApp() (*app.App, error) {
 		wireset.CommonWireSet,
 		git.NewRepositoryManagerImpl,
 		wire.Bind(new(git.RepositoryManager), new(*git.RepositoryManagerImpl)),
-		wireset.CommonWireSet2,
 	)
 	return &app.App{}, nil
 }

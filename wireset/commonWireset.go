@@ -30,9 +30,6 @@ var CommonWireSet = wire.NewSet(app.NewApp,
 	wire.Bind(new(sql.GitProviderRepository), new(*sql.GitProviderRepositoryImpl)),
 	git.NewGitManagerImpl,
 	wire.Bind(new(git.GitManager), new(*git.GitManagerImpl)),
-)
-
-var CommonWireSet2 = wire.NewSet(
 	git.NewRepositoryManagerAnalyticsImpl,
 	wire.Bind(new(git.RepositoryManagerAnalytics), new(*git.RepositoryManagerAnalyticsImpl)),
 	pkg.NewRepoManagerImpl,
