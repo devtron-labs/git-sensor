@@ -18,6 +18,7 @@ package git
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -148,7 +149,7 @@ func AppendOldCommitsFromHistory(newCommits []*GitCommitBase, commitHistory stri
 	if len(commitHistory) > 0 {
 		err := json.Unmarshal([]byte(commitHistory), &oldCommits)
 		if err != nil {
-			return newCommits, nil
+			return newCommits, fmt.Errorf("unmarshalling error %v", err)
 		}
 	}
 	totalCommits := append(newCommits, oldCommits...)
