@@ -17,6 +17,8 @@
 package git
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/devtron-labs/git-sensor/internal/sql"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -139,6 +141,22 @@ type GitCommitBase struct {
 	FileStats   *FileStats   `json:",omitempty"`
 	WebhookData *WebhookData `json:"webhookData"`
 	Excluded    bool         `json:",omitempty"`
+}
+
+func AppendOldCommitsFromHistory(newCommits []*GitCommitBase, commitHistory string, fetchedCount int) ([]*GitCommitBase, error) {
+
+	oldCommits := make([]*GitCommitBase, 0)
+	if len(commitHistory) > 0 {
+		err := json.Unmarshal([]byte(commitHistory), &oldCommits)
+		if err != nil {
+			return newCommits, fmt.Errorf("unmarshalling error %v", err)
+		}
+	}
+	totalCommits := append(newCommits, oldCommits...)
+	if len(totalCommits) > fetchedCount {
+		totalCommits = totalCommits[:fetchedCount]
+	}
+	return totalCommits, nil
 }
 
 func (gitCommit *GitCommitBase) SetFileStats(stats *FileStats) {
