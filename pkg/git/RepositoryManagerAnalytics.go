@@ -2,10 +2,12 @@ package git
 
 import (
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"go.uber.org/zap"
 	"io"
 	"log"
 	"strings"
@@ -17,14 +19,20 @@ type RepositoryManagerAnalytics interface {
 }
 
 type RepositoryManagerAnalyticsImpl struct {
-	*RepositoryManagerImpl
+	repoManager   RepositoryManager
+	gitManager    GitManager
+	configuration *internals.Configuration
+	logger        *zap.SugaredLogger
 }
 
-func NewRepositoryManagerAnalyticsImpl(
-	repositoryManagerImpl *RepositoryManagerImpl,
-) *RepositoryManagerAnalyticsImpl {
+func NewRepositoryManagerAnalyticsImpl(repoManager RepositoryManager, gitManager GitManager,
+	configuration *internals.Configuration, logger *zap.SugaredLogger) *RepositoryManagerAnalyticsImpl {
 	return &RepositoryManagerAnalyticsImpl{
-		RepositoryManagerImpl: repositoryManagerImpl}
+		repoManager:   repoManager,
+		gitManager:    gitManager,
+		configuration: configuration,
+		logger:        logger,
+	}
 }
 
 func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Hash) ([]*object.Commit, error) {

@@ -17,7 +17,7 @@
 
 package git
 
-import "github.com/devtron-labs/git-sensor/internal/sql"
+import "github.com/devtron-labs/git-sensor/internals/sql"
 
 type WebhookEventBeanConverter interface {
 	ConvertFromWebhookParsedDataSqlBean(sqlBean *sql.WebhookEventParsedData) *WebhookData
@@ -25,51 +25,48 @@ type WebhookEventBeanConverter interface {
 }
 
 type WebhookEventBeanConverterImpl struct {
-
 }
 
 func NewWebhookEventBeanConverterImpl() *WebhookEventBeanConverterImpl {
-	return &WebhookEventBeanConverterImpl{
-
-	}
+	return &WebhookEventBeanConverterImpl{}
 }
 
 func (impl WebhookEventBeanConverterImpl) ConvertFromWebhookParsedDataSqlBean(sqlBean *sql.WebhookEventParsedData) *WebhookData {
 	return &WebhookData{
-		Id : sqlBean.Id,
+		Id:              sqlBean.Id,
 		EventActionType: sqlBean.EventActionType,
-		Data : sqlBean.Data,
+		Data:            sqlBean.Data,
 	}
 }
 
 func (impl WebhookEventBeanConverterImpl) ConvertFromWebhookEventSqlBean(webhookEventFromDb *sql.GitHostWebhookEvent) *WebhookEventConfig {
 
 	webhookEvent := &WebhookEventConfig{
-		Id : webhookEventFromDb.Id,
-		GitHostId: webhookEventFromDb.GitHostId,
-		Name: webhookEventFromDb.Name,
+		Id:            webhookEventFromDb.Id,
+		GitHostId:     webhookEventFromDb.GitHostId,
+		Name:          webhookEventFromDb.Name,
 		EventTypesCsv: webhookEventFromDb.EventTypesCsv,
-		ActionType: webhookEventFromDb.ActionType,
-		IsActive: webhookEventFromDb.IsActive,
-		CreatedOn: webhookEventFromDb.CreatedOn,
-		UpdatedOn: webhookEventFromDb.UpdatedOn,
+		ActionType:    webhookEventFromDb.ActionType,
+		IsActive:      webhookEventFromDb.IsActive,
+		CreatedOn:     webhookEventFromDb.CreatedOn,
+		UpdatedOn:     webhookEventFromDb.UpdatedOn,
 	}
 
 	// build selectors
 	var webhookEventSelectors []*WebhookEventSelectors
 	for _, selectorFromDb := range webhookEventFromDb.Selectors {
 		selector := &WebhookEventSelectors{
-			Id : selectorFromDb.Id,
-			EventId: selectorFromDb.EventId,
-			Name: selectorFromDb.Name,
-			Selector: selectorFromDb.Selector,
-			ToShow: selectorFromDb.ToShow,
+			Id:               selectorFromDb.Id,
+			EventId:          selectorFromDb.EventId,
+			Name:             selectorFromDb.Name,
+			Selector:         selectorFromDb.Selector,
+			ToShow:           selectorFromDb.ToShow,
 			ToShowInCiFilter: selectorFromDb.ToShowInCiFilter,
-			FixValue: selectorFromDb.FixValue,
-			PossibleValues: selectorFromDb.PossibleValues,
-			IsActive: selectorFromDb.IsActive,
-			CreatedOn: selectorFromDb.CreatedOn,
-			UpdatedOn: selectorFromDb.UpdatedOn,
+			FixValue:         selectorFromDb.FixValue,
+			PossibleValues:   selectorFromDb.PossibleValues,
+			IsActive:         selectorFromDb.IsActive,
+			CreatedOn:        selectorFromDb.CreatedOn,
+			UpdatedOn:        selectorFromDb.UpdatedOn,
 		}
 		webhookEventSelectors = append(webhookEventSelectors, selector)
 	}

@@ -19,7 +19,7 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/devtron-labs/git-sensor/internal/sql"
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"io"

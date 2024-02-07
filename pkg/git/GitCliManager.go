@@ -1,6 +1,7 @@
 package git
 
 import (
+	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
 	"path/filepath"
@@ -8,18 +9,16 @@ import (
 	"strings"
 )
 
-type GitCliManager interface {
-	GitManager
-}
-
 type GitCliManagerImpl struct {
-	*GitManagerBaseImpl
+	GitManagerBase
+	logger *zap.SugaredLogger
 }
 
-func NewGitCliManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GitCliManagerImpl {
+func NewGitCliManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger) *GitCliManagerImpl {
 
 	return &GitCliManagerImpl{
-		GitManagerBaseImpl: baseManagerImpl,
+		GitManagerBase: baseManager,
+		logger:         logger,
 	}
 }
 
@@ -88,18 +87,14 @@ func openGitRepo(path string) error {
 }
 func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "init")
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "init")
-	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "init")
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
 
 func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) error {
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
-	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
 	return err
 }
@@ -109,11 +104,8 @@ func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, b
 	rangeCmdArgs := []string{branchRef}
 	extraCmdArgs := []string{"-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT}
 	cmdArgs := impl.getCommandForLogRange(branchRef, from, to, rangeCmdArgs, baseCmdArgs, extraCmdArgs)
-
 	impl.logger.Debugw("git", cmdArgs)
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", cmdArgs...)
-	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", cmdArgs...)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err
@@ -138,9 +130,7 @@ func (impl *GitCliManagerImpl) getCommandForLogRange(branchRef string, from stri
 
 func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash string) (GitCommit, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
-	cmd, cancel := impl.CreateCmdWithContext(gitCtx, "git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
-	defer cancel()
-	output, errMsg, err := impl.runCommand(cmd)
+	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "show", hash, "--date=iso-strict", GITFORMAT, "-s")
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
 		return nil, err

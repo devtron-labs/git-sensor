@@ -5,19 +5,19 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"go.uber.org/zap"
 	"os"
 )
 
-type GoGitSDKManager interface {
-	GitManager
-}
 type GoGitSDKManagerImpl struct {
-	*GitManagerBaseImpl
+	GitManagerBase
+	logger *zap.SugaredLogger
 }
 
-func NewGoGitSDKManagerImpl(baseManagerImpl *GitManagerBaseImpl) *GoGitSDKManagerImpl {
+func NewGoGitSDKManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger) *GoGitSDKManagerImpl {
 	return &GoGitSDKManagerImpl{
-		GitManagerBaseImpl: baseManagerImpl,
+		GitManagerBase: baseManager,
+		logger:         logger,
 	}
 }
 
