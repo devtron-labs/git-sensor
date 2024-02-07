@@ -145,9 +145,11 @@ type GitCommitBase struct {
 func AppendOldCommitsFromHistory(newCommits []*GitCommitBase, commitHistory string, fetchedCount int) ([]*GitCommitBase, error) {
 
 	oldCommits := make([]*GitCommitBase, 0)
-	err := json.Unmarshal([]byte(commitHistory), &oldCommits)
-	if err != nil {
-		return nil, err
+	if len(commitHistory) > 0 {
+		err := json.Unmarshal([]byte(commitHistory), &oldCommits)
+		if err != nil {
+			return newCommits, nil
+		}
 	}
 	totalCommits := append(newCommits, oldCommits...)
 	if len(totalCommits) > fetchedCount {
