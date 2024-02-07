@@ -240,7 +240,13 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		impl.logger.Debugw("Running changesBySinceRepository for material - ", material)
 		impl.logger.Debugw("---------------------------------------------------------- ")
 		// parse env variables here, then search for the count field and pass here.
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, "", "", impl.configuration.GitHistoryCount, checkoutLocation)
+		lastSeenHash := ""
+		if len(material.LastSeenHash) > 0 {
+			// this might misbehave is the hash stored in table is corrupted somehow
+			lastSeenHash = material.LastSeenHash
+		}
+		fetchCount := impl.configuration.GitHistoryCount
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, lastSeenHash, "", fetchCount, checkoutLocation)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
@@ -248,6 +254,12 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		} else if len(commits) > 0 {
 			latestCommit := commits[0]
 			if latestCommit.GetCommit().Commit != material.LastSeenHash {
+
+				commitsTotal, err := AppendOldCommitsFromHistory(commits, material.CommitHistory, fetchCount)
+				if err != nil {
+					impl.logger.Errorw("error in appending history to new commits", "material", material.GitMaterialId, "err", err)
+				}
+
 				// new commit found
 				mb := &CiPipelineMaterialBean{
 					Id:            material.Id,
@@ -263,7 +275,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				material.CommitAuthor = latestCommit.Author
 				material.CommitDate = latestCommit.Date
 				material.CommitMessage = latestCommit.Message
-				commitJson, _ := json.Marshal(commits)
+				commitJson, _ := json.Marshal(commitsTotal)
 				material.CommitHistory = string(commitJson)
 				material.Errored = false
 				material.ErrorMsg = ""
