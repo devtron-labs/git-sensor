@@ -250,7 +250,6 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 				commitsTotal, err := AppendOldCommitsFromHistory(commits, material.CommitHistory, fetchCount)
 				if err != nil {
 					impl.logger.Errorw("error in appending history to new commits", "material", material.GitMaterialId, "err", err)
-					return err
 				}
 
 				// new commit found
