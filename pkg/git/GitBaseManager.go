@@ -95,8 +95,8 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
-	impl.logger.Errorw("error string", "err", err.Error())
-	if strings.Contains(err.Error(), "cannot lock ref") {
+	impl.logger.Errorw("error msg string", errMsg)
+	if strings.Contains(errMsg, LOCK_REF_MESSAGE) {
 		pruneCmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
 		defer cancel()
 		impl.logger.Debugw("error in fetch, pruning local refs and retrying")
