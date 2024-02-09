@@ -26,7 +26,6 @@ const (
 	GIT_ASK_PASS                = "/git-ask-pass.sh"
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
 	LOCK_REF_MESSAGE            = "cannot lock ref"
-	LOCK_REF_ERROR              = "error in locking reference"
 )
 
 func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {

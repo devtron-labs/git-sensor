@@ -95,16 +95,13 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
-	fmt.Println("error msg string", errMsg)
-	if strings.Contains(errMsg, LOCK_REF_MESSAGE) {
+	if strings.Contains(output, LOCK_REF_MESSAGE) {
 		pruneCmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
 		defer cancel()
 		impl.logger.Debugw("error in fetch, pruning local refs and retrying")
 		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
 		_, _, _ = impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password)
-
 		output, errMsg, err = impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
-
 	}
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -156,22 +153,21 @@ func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, pass
 func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg string, err error) {
 	cmd.Env = append(cmd.Env, "HOME=/dev/null")
 	outBytes, err := cmd.CombinedOutput()
+	output := string(outBytes)
+	output = strings.TrimSpace(output)
 	if err != nil {
 		impl.logger.Errorw("error in git cli operation", "msg", string(outBytes), "err", err)
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
-			return "", string(outBytes), err
+			return output, string(outBytes), err
 		}
-		if strings.Contains(string(outBytes), AUTHENTICATION_FAILED_ERROR) {
+		if strings.Contains(output, AUTHENTICATION_FAILED_ERROR) {
 			impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
-			return "", "authentication failed", errors.New("authentication failed")
+			return output, "authentication failed", errors.New("authentication failed")
 		}
 		errOutput := string(exErr.Stderr)
-		impl.logger.Infow("errOutput", string(exErr.Stderr), "err", err)
-		return "", errOutput, err
+		return output, errOutput, err
 	}
-	output := string(outBytes)
-	output = strings.TrimSpace(output)
 	return output, "", nil
 }
 
