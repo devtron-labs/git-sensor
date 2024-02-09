@@ -96,12 +96,22 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	if strings.Contains(output, LOCK_REF_MESSAGE) {
-		pruneCmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
-		defer cancel()
-		impl.logger.Debugw("error in fetch, pruning local refs and retrying")
+
+		pruneCmd, pruneCmdCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
+		defer pruneCmdCancel()
+		impl.logger.Info("error in fetch, pruning local refs and retrying")
 		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
-		_, _, _ = impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password)
-		output, errMsg, err = impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+		_, _, err = impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password)
+		if err != nil {
+			impl.logger.Errorw("error in pruning local refs that do not exist at remote")
+			return output, errMsg, err
+		}
+
+		retryFetchCmd, retryFetchCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
+		defer retryFetchCancel()
+
+		output, errMsg, err = impl.runCommandWithCred(retryFetchCmd, gitCtx.Username, gitCtx.Password)
+
 	}
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
