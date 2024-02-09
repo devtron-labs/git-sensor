@@ -95,7 +95,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
-	impl.logger.Info("error msg string", errMsg)
+	fmt.Println("error msg string", errMsg)
 	if strings.Contains(errMsg, LOCK_REF_MESSAGE) {
 		pruneCmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
 		defer cancel()
@@ -167,7 +167,7 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 			return "", "authentication failed", errors.New("authentication failed")
 		}
 		errOutput := string(exErr.Stderr)
-		impl.logger.Infow("errOutput", exErr.Stderr, "err", err)
+		impl.logger.Infow("errOutput", string(exErr.Stderr), "err", err)
 		return "", errOutput, err
 	}
 	output := string(outBytes)
