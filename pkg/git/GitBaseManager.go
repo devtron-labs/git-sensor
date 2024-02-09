@@ -95,6 +95,16 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	if strings.Contains(err.Error(), "cannot lock ref") {
+		pruneCmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
+		defer cancel()
+		impl.logger.Debugw("error in fetch, pruning local refs and retrying")
+		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
+		_, _, _ = impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password)
+
+		output, errMsg, err = impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+
+	}
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
