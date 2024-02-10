@@ -25,6 +25,7 @@ func NewGitCliManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger)
 const (
 	GIT_ASK_PASS                = "/git-ask-pass.sh"
 	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
+	LOCK_REF_MESSAGE            = "cannot lock ref"
 )
 
 func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {
