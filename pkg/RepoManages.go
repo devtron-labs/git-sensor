@@ -203,11 +203,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
-			totalCommits, err := git.AppendOldCommitsFromHistory(commits, pipelineMaterial.CommitHistory, fetchCount)
-			if err != nil {
-				impl.logger.Errorw("error in appending history to fetched commit", "err", err, "pipelineMaterialId", pipelineMaterial.Id)
-			}
-			b, err := json.Marshal(totalCommits)
+			b, err := json.Marshal(commits)
 			if err == nil {
 				pipelineMaterial.CommitHistory = string(b)
 				if len(commits) > 0 {
