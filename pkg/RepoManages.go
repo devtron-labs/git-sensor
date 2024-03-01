@@ -367,6 +367,14 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 		material.CheckoutMsgAny = err.Error()
 		material.FetchErrorMessage = err.Error()
 	}
+	remoteOriginUrl, err := impl.repositoryManager.GetRemoteOriginUrl(gitCtx, checkoutLocationForFetching)
+	if err != nil {
+		material.CheckoutStatus = false
+		material.CheckoutMsgAny = err.Error()
+		material.FetchErrorMessage = err.Error()
+	} else {
+		material.Url = remoteOriginUrl
+	}
 	err = impl.materialRepository.Update(material)
 	if err != nil {
 		impl.logger.Errorw("error in updating material repo", "err", err, "material", material)

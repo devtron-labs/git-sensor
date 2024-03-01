@@ -43,6 +43,7 @@ type RepositoryManager interface {
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
 	FetchRepo(gitCtx GitContext, location string) error
+	GetRemoteOriginUrl(gitCtx GitContext, location string) (string, error)
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error)
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
@@ -134,10 +135,10 @@ func (impl *RepositoryManagerImpl) GetSshPrivateKeyPath(gitCtx GitContext, gitPr
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
 		return "", err
 	}
-	if !impl.IsSpaceAvailableOnDisk() {
-		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return "", err
-	}
+	//if !impl.IsSpaceAvailableOnDisk() {
+	//	err = errors.New("git-sensor PVC - disk full, please increase space")
+	//	return "", err
+	//}
 	err = impl.gitManager.Init(gitCtx, location, url, true)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
@@ -164,6 +165,16 @@ func (impl *RepositoryManagerImpl) FetchRepo(gitCtx GitContext, location string)
 	}
 	impl.logger.Debugw("opt msg", "opt", opt)
 	return nil
+}
+
+func (impl *RepositoryManagerImpl) GetRemoteOriginUrl(gitCtx GitContext, location string) (string, error) {
+	remoteOrigin, errorMsg, err := impl.gitManager.GetRemoteOrigin(gitCtx, location)
+	if err != nil {
+		impl.logger.Errorw("error in fetching repo", "errorMsg", errorMsg, "err", err)
+		return "", err
+	}
+	impl.logger.Debugw("output msg for GetRemoteOriginUrl", "remoteOriginUrl", remoteOrigin)
+	return remoteOrigin, nil
 }
 
 func (impl *RepositoryManagerImpl) Clean(dir string) error {

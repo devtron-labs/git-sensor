@@ -37,11 +37,13 @@ type GitManagerBase interface {
 	PathMatcher(fileStats *FileStats, gitMaterial *sql.GitMaterial) bool
 	// Fetch executes git fetch
 	Fetch(gitCtx GitContext, rootDir string) (response, errMsg string, err error)
+	// GetRemoteOrigin gets remote origin url from git config
+	GetRemoteOrigin(gitCtx GitContext, rootDir string) (response, errMsg string, err error)
 	// Checkout executes git checkout
 	Checkout(gitCtx GitContext, rootDir, branch string) (response, errMsg string, err error)
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
-	//  FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
+	// FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
 	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
@@ -112,6 +114,15 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 		output, errMsg, err = impl.runCommandWithCred(retryFetchCmd, gitCtx.Username, gitCtx.Password)
 	}
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) GetRemoteOrigin(gitCtx GitContext, rootDir string) (response, errMsg string, err error) {
+	impl.logger.Debugw("git config --get remote.origin.url", "location", rootDir)
+	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "config", "--get", "remote.origin.url")
+	defer cancel()
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	impl.logger.Debugw("git config --get remote.origin.url", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
 }
 
