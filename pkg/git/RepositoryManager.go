@@ -44,7 +44,7 @@ type RepositoryManager interface {
 	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
 	FetchRepo(gitCtx GitContext, location string) error
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
-	GetCheckoutLocation(checkoutPath string) string
+	GetCheckoutLocation(gitCtx GitContext, material *sql.GitMaterial, url, checkoutPath string) string
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
 	// Clean cleans a directory
 	Clean(cloneDir string) error
@@ -102,7 +102,7 @@ func (impl *RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMater
 	return "", httpsMatched, sshMatched, fmt.Errorf("unsupported format url %s", material.Url)
 }
 
-func (impl *RepositoryManagerImpl) GetCheckoutLocation(checkoutPath string) string {
+func (impl *RepositoryManagerImpl) GetCheckoutLocation(gitCtx GitContext, material *sql.GitMaterial, url, checkoutPath string) string {
 	return checkoutPath
 }
 
