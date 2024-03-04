@@ -44,7 +44,7 @@ type RepositoryManager interface {
 	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
 	FetchRepo(gitCtx GitContext, location string) error
 	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
-	GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error)
+	GetCheckoutLocation(checkoutPath string) string
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
 	// Clean cleans a directory
 	Clean(cloneDir string) error
@@ -102,15 +102,8 @@ func (impl *RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMater
 	return "", httpsMatched, sshMatched, fmt.Errorf("unsupported format url %s", material.Url)
 }
 
-func (impl *RepositoryManagerImpl) GetCheckoutPathAndLocation(gitCtx GitContext, material *sql.GitMaterial, url string) (string, string, error) {
-	var checkoutPath string
-	var checkoutLocationForFetching string
-	checkoutPath, _, _, err := impl.GetLocationForMaterial(material, gitCtx.CloningMode)
-	if err != nil {
-		return checkoutPath, checkoutLocationForFetching, err
-	}
-	checkoutLocationForFetching = checkoutPath
-	return checkoutPath, checkoutLocationForFetching, nil
+func (impl *RepositoryManagerImpl) GetCheckoutLocation(checkoutPath string) string {
+	return checkoutPath
 }
 
 func (impl *RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
