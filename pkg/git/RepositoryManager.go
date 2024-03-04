@@ -48,10 +48,8 @@ type RepositoryManager interface {
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
 	// Clean cleans a directory
 	Clean(cloneDir string) error
-	// ChangesSince given the checkput path, retrieves the latest commits for the gt repo existing on the path
-	ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error)
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error)
 	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error)
 	// GetCommitForTag retrieves the commit metadata for given tag
@@ -239,12 +237,23 @@ func (impl *RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkout
 
 // from -> old commit
 // to -> new commit
-func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string) ([]*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
 
 	var err error
+	if count == 0 {
+		count = impl.configuration.GitHistoryCount
+	}
+
+	if openNewGitRepo {
+		repository, err = impl.gitManager.OpenRepoPlain(checkoutPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
@@ -330,25 +339,6 @@ func (impl *RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase
 		gitCommits = gitCommits[:len(gitCommits)-1]
 	}
 	return gitCommits
-}
-
-func (impl *RepositoryManagerImpl) ChangesSince(gitCtx GitContext, checkoutPath string, branch string, from string, to string, count int) ([]*GitCommitBase, error) {
-	var err error
-	start := time.Now()
-	defer func() {
-		util.TriggerGitOperationMetrics("changesSince", start, err)
-	}()
-	if count == 0 {
-		count = impl.configuration.GitHistoryCount
-	}
-	r, err := impl.gitManager.OpenRepoPlain(checkoutPath)
-	if err != nil {
-		return nil, err
-	}
-	///---------------------
-	return impl.ChangesSinceByRepository(gitCtx, r, branch, from, to, count, checkoutPath)
-	///----------------------
-
 }
 
 func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
