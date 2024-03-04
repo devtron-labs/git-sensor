@@ -255,11 +255,12 @@ func (impl RepoManagerImpl) SaveGitProvider(provider *sql.GitProvider) (*sql.Git
 // handle update
 func (impl RepoManagerImpl) AddRepo(gitCtx git.GitContext, materials []*sql.GitMaterial) ([]*sql.GitMaterial, error) {
 	for _, material := range materials {
-		_, err := impl.addRepo(gitCtx, material)
+		updatedMaterial, err := impl.addRepo(gitCtx, material)
 		if err != nil {
 			impl.logger.Errorw("error in saving material ", "material", material, "err", err)
 			return materials, err
 		}
+		material = updatedMaterial
 	}
 	return materials, nil
 }
@@ -297,27 +298,28 @@ func (impl RepoManagerImpl) UpdateRepo(gitCtx git.GitContext, material *sql.GitM
 	}
 
 	if !existingMaterial.Deleted {
-		err = impl.checkoutUpdatedRepo(gitCtx, material.Id)
+		updatedMaterial, err := impl.checkoutUpdatedRepo(gitCtx, material.Id)
 		if err != nil {
 			impl.logger.Errorw("error in checking out updated repo", "err", err)
 			return nil, err
 		}
+		existingMaterial.Url = updatedMaterial.Url
 	}
 	return existingMaterial, nil
 }
 
-func (impl RepoManagerImpl) checkoutUpdatedRepo(gitCtx git.GitContext, materialId int) error {
+func (impl RepoManagerImpl) checkoutUpdatedRepo(gitCtx git.GitContext, materialId int) (*sql.GitMaterial, error) {
 	material, err := impl.materialRepository.FindById(materialId)
 	if err != nil {
 		impl.logger.Errorw("error in fetching material", "id", materialId, "err", err)
-		return err
+		return nil, err
 	}
-	_, err = impl.checkoutMaterial(gitCtx, material)
+	updatedMaterial, err := impl.checkoutMaterial(gitCtx, material)
 	if err != nil {
 		impl.logger.Errorw("error in repo refresh", "id", material, "err", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return updatedMaterial, nil
 }
 
 func (impl RepoManagerImpl) addRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error) {

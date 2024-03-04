@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"github.com/devtron-labs/git-sensor/api/adapter"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
@@ -14,8 +15,8 @@ import (
 
 type GrpcHandler interface {
 	SaveGitProvider(ctx context.Context, req *pb.GitProvider) (*pb.Empty, error)
-	AddRepo(ctx context.Context, req *pb.AddRepoRequest) (*pb.Empty, error)
-	UpdateRepo(ctx context.Context, req *pb.GitMaterial) (*pb.Empty, error)
+	AddRepo(ctx context.Context, req *pb.AddRepoRequest) (*pb.AddRepoRequest, error)
+	UpdateRepo(ctx context.Context, req *pb.GitMaterial) (*pb.GitMaterial, error)
 	SavePipelineMaterial(ctx context.Context, req *pb.SavePipelineMaterialRequest) (*pb.Empty, error)
 
 	// ----
@@ -80,68 +81,51 @@ func (impl *GrpcHandlerImpl) SaveGitProvider(ctx context.Context, req *pb.GitPro
 
 // AddRepo save git materials
 func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest) (
-	*pb.Empty, error) {
+	*pb.AddRepoRequest, error) {
 
 	// Mapping to sql package specified struct type
 	var gitMaterials []*sql.GitMaterial
 	if req.GitMaterialList != nil {
 		gitMaterials = make([]*sql.GitMaterial, 0, len(req.GitMaterialList))
 		for _, item := range req.GitMaterialList {
-
-			gitMaterials = append(gitMaterials, &sql.GitMaterial{
-				Id:               int(item.Id),
-				GitProviderId:    int(item.GitProviderId),
-				Url:              item.Url,
-				FetchSubmodules:  item.FetchSubmodules,
-				Name:             item.Name,
-				CheckoutLocation: item.CheckoutLocation,
-				CheckoutStatus:   item.CheckoutStatus,
-				CheckoutMsgAny:   item.CheckoutMsgAny,
-				Deleted:          item.Deleted,
-				FilterPattern:    item.FilterPattern,
-			})
+			gitMaterials = append(gitMaterials, adapter.ConvertToMaterialModel(item))
 		}
 	}
 
 	gitCtx := git.BuildGitContext(ctx)
 
-	_, err := impl.repositoryManager.AddRepo(gitCtx, gitMaterials)
+	updatedGitMaterials, err := impl.repositoryManager.AddRepo(gitCtx, gitMaterials)
 	if err != nil {
 		impl.logger.Errorw("error while adding repo",
 			"err", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.Empty{}, nil
+	response := make([]*pb.GitMaterial, 0, len(req.GitMaterialList))
+	for _, item := range updatedGitMaterials {
+		response = append(response, adapter.GenerateMaterialRequest(item))
+	}
+	return &pb.AddRepoRequest{
+		GitMaterialList: response,
+	}, nil
 }
 
 // UpdateRepo updates GitMaterial
 func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
-	*pb.Empty, error) {
+	*pb.GitMaterial, error) {
 	gitCtx := git.BuildGitContext(ctx)
 
 	// Mapping
-	mappedGitMaterial := &sql.GitMaterial{
-		Id:               int(req.Id),
-		GitProviderId:    int(req.GitProviderId),
-		Url:              req.Url,
-		FetchSubmodules:  req.FetchSubmodules,
-		Name:             req.Name,
-		CheckoutLocation: req.CheckoutLocation,
-		CheckoutStatus:   req.CheckoutStatus,
-		CheckoutMsgAny:   req.CheckoutMsgAny,
-		Deleted:          req.Deleted,
-		FilterPattern:    req.FilterPattern,
-	}
+	mappedGitMaterial := adapter.ConvertToMaterialModel(req)
 
 	// Update repo
-	_, err := impl.repositoryManager.UpdateRepo(gitCtx, mappedGitMaterial)
+	updatedGitMaterial, err := impl.repositoryManager.UpdateRepo(gitCtx, mappedGitMaterial)
 	if err != nil {
 		impl.logger.Errorw("error while updating repo",
 			"name", mappedGitMaterial.Name,
 			"err", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.Empty{}, nil
+	return adapter.GenerateMaterialRequest(updatedGitMaterial), nil
 }
 
 // SavePipelineMaterial saves pipeline material

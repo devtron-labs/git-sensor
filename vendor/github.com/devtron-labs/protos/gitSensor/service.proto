@@ -277,10 +277,10 @@ service GitSensorService {
   rpc SaveGitProvider(GitProvider) returns (Empty);
 
   // Add Repo
-  rpc AddRepo(AddRepoRequest) returns (Empty);
+  rpc AddRepo(AddRepoRequest) returns (AddRepoRequest);
 
   // Update Repo
-  rpc UpdateRepo(GitMaterial) returns (Empty);
+  rpc UpdateRepo(GitMaterial) returns (GitMaterial);
 
   // Save CI pipeline material
   rpc SavePipelineMaterial(SavePipelineMaterialRequest) returns (Empty);

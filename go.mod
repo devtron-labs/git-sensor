@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/devtron-labs/common-lib v0.0.10-0.20240118140811-762cb3b7f9a4
-	github.com/devtron-labs/protos v0.0.3-0.20240130061723-7b2e12ab0abb
+	github.com/devtron-labs/protos v0.0.3-0.20240304061646-0e553cb5ebad
 	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-pg/pg v6.15.1+incompatible
