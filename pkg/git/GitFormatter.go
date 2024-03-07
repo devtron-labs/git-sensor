@@ -48,7 +48,6 @@ type GitCommitFormat struct {
 
 func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 	//remove the new line character which is after each terminal comma
-	out = strings.ReplaceAll(out, "},\\\\n", "},")
 	out = strings.ReplaceAll(out, "},\n", "},")
 
 	// to escape the special characters like quotes and newline characters in the commit data
@@ -62,6 +61,7 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 
 	logOut = logOut[1 : len(logOut)-2] // trim surround characters (surrounding quotes and trailing comma)
 	logOut = strings.Join([]string{"[", "]"}, logOut)
+	logOut = strings.ReplaceAll(logOut, "\\x", "")
 
 	var gitCommitFormattedList []GitCommitFormat
 	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
