@@ -61,6 +61,7 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 
 	logOut = logOut[1 : len(logOut)-2] // trim surround characters (surrounding quotes and trailing comma)
 	logOut = strings.Join([]string{"[", "]"}, logOut)
+	logOut = strings.ReplaceAll(logOut, "\\x", "")
 
 	var gitCommitFormattedList []GitCommitFormat
 	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
