@@ -354,7 +354,7 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	gitCtx = gitCtx.WithCredentials(userName, password).
 		WithCloningMode(impl.configuration.CloningMode)
 
-	checkoutPath, _, _, err := impl.repositoryManager.GetLocationForMaterial(material, gitCtx.CloningMode)
+	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
 		return material, err
 	}

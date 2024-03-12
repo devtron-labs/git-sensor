@@ -43,7 +43,7 @@ type RepositoryManager interface {
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
 	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
 	FetchRepo(gitCtx GitContext, location string) error
-	GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
+	GetCheckoutLocationFromGitUrl(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutLocation(gitCtx GitContext, material *sql.GitMaterial, url, checkoutPath string) string
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
 	// Clean cleans a directory
@@ -82,7 +82,7 @@ func (impl *RepositoryManagerImpl) IsSpaceAvailableOnDisk() bool {
 	return availableSpace > int64(impl.configuration.MinLimit)*1024*1024
 }
 
-func (impl *RepositoryManagerImpl) GetLocationForMaterial(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error) {
+func (impl *RepositoryManagerImpl) GetCheckoutLocationFromGitUrl(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error) {
 	//gitRegex := `/(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$/`
 	httpsRegex := `^https.*`
 	httpsMatched, err := regexp.MatchString(httpsRegex, material.Url)
