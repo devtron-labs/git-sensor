@@ -46,9 +46,8 @@ const (
 
 func GetProjectName(url string) string {
 	//if url = https://github.com/devtron-labs/git-sensor.git then it will return git-sensor
-	projName := strings.Split(url, ".")[1]
-	projectName := projName[strings.LastIndex(projName, "/")+1:]
-	return projectName
+	url = url[strings.LastIndex(url, "/")+1:]
+	return strings.TrimSuffix(url, ".git")
 }
 func GetCheckoutPath(url string, cloneLocation string) string {
 	//url= https://github.com/devtron-labs/git-sensor.git cloneLocation= git-base/1/github.com/prakash100198

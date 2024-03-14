@@ -199,7 +199,8 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			WithCloningMode(impl.configuration.CloningMode)
 
 		fetchCount := impl.configuration.GitHistoryCount
-		commits, err := impl.repositoryManager.ChangesSince(gitCtx, material.CheckoutLocation, pipelineMaterial.Value, "", "", fetchCount)
+		var repository *git.GitRepository
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
@@ -353,10 +354,12 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	gitCtx = gitCtx.WithCredentials(userName, password).
 		WithCloningMode(impl.configuration.CloningMode)
 
-	checkoutPath, checkoutLocationForFetching, err := impl.repositoryManager.GetCheckoutPathAndLocation(gitCtx, material, gitProvider.Url)
+	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
 		return material, err
 	}
+
+	checkoutLocationForFetching := impl.repositoryManager.GetCheckoutLocation(gitCtx, material, gitProvider.Url, checkoutPath)
 
 	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if err == nil {
@@ -669,7 +672,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation)
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
 
 	if commits == nil {
 		return nil, err
@@ -719,7 +722,8 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		repoLock.Mutex.Unlock()
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
-	commits, err := impl.repositoryManager.ChangesSince(gitCtx, gitMaterial.CheckoutLocation, branchName, "", gitHash, 1)
+	var repository *git.GitRepository
+	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
