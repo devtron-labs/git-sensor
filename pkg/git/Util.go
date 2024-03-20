@@ -127,7 +127,12 @@ func getFileStat(commitDiff string) (FileStats, error) {
 	lines := strings.Split(strings.TrimSpace(commitDiff), "\n")
 
 	for _, line := range lines {
-		parts := strings.Fields(line)
+		parts := strings.Split(line, "\t")
+
+		if parts[0] == "-" && parts[1] == "-" {
+			// ignoring binary file
+			continue
+		}
 
 		if len(parts) != 3 {
 			fmt.Errorf("invalid git diff --numstat output")
@@ -150,4 +155,8 @@ func getFileStat(commitDiff string) (FileStats, error) {
 	}
 
 	return filestat, nil
+}
+
+func IsShallowCloningEnabled(cloningMode string, checkoutPath string) bool {
+	return cloningMode == CloningModeShallow && strings.Contains(checkoutPath, "/.git")
 }

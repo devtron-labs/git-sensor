@@ -43,6 +43,8 @@ type GitManagerBase interface {
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
 	//  FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
 	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
+	// GetCommitStatsViaCli retrieves the stats for the given commit vs its parent via git cli
+	GetCommitStatsViaCli(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 	ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error)
@@ -315,4 +317,14 @@ func (impl *GitManagerBaseImpl) ExecuteCustomCommand(gitContext GitContext, name
 	defer cancel()
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
 	return output, errMsg, err
+}
+
+func (impl *GitManagerBaseImpl) GetCommitStatsViaCli(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
+	gitCommit := commit.GetCommit()
+	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", checkoutPath)
+	if err != nil {
+		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", checkoutPath, "errorMsg", errorMsg, "err", err)
+		return nil, err
+	}
+	return getFileStat(fileStat)
 }
