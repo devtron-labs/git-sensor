@@ -123,6 +123,9 @@ func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteU
 }
 
 func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
+	if IsShallowCloningEnabled(gitCtx.CloningMode, checkoutPath) {
+		return impl.GitManagerBase.GetCommitStatsViaCli(gitCtx, commit, checkoutPath)
+	}
 	gitCommit := commit.(*GitCommitGoGit)
 
 	stats, err := gitCommit.Cm.Stats()
