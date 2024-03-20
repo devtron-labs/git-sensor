@@ -146,12 +146,7 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 
 func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
 	gitCommit := commit.GetCommit()
-	fileStat, errorMsg, err := impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", checkoutPath)
-	if err != nil {
-		impl.logger.Errorw("error in fetching fileStat of commit: ", gitCommit.Commit, "checkoutPath", checkoutPath, "errorMsg", errorMsg, "err", err)
-		return nil, err
-	}
-	return getFileStat(fileStat)
+	return impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", checkoutPath)
 }
 
 func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, error) {

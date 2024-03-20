@@ -129,23 +129,23 @@ func getFileStat(commitDiff string) (FileStats, error) {
 	for _, line := range lines {
 		parts := strings.Split(line, "\t")
 
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid git diff --numstat output")
+		}
+
 		if parts[0] == "-" && parts[1] == "-" {
 			// ignoring binary file
 			continue
 		}
 
-		if len(parts) != 3 {
-			fmt.Errorf("invalid git diff --numstat output")
-		}
-
 		added, err := strconv.Atoi(parts[0])
 		if err != nil {
-			fmt.Errorf("failed to parse number of lines added: %w", err)
+			fmt.Println("failed to parse number of lines added: %w", err)
 		}
 
 		deleted, err := strconv.Atoi(parts[1])
 		if err != nil {
-			fmt.Errorf("failed to parse number of lines deleted: %w", err)
+			fmt.Println("failed to parse number of lines deleted: %w", err)
 		}
 		filestat = append(filestat, FileStat{
 			Name:     parts[2],
