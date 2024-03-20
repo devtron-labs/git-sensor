@@ -2,6 +2,7 @@ package git
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -66,6 +67,7 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 	var gitCommitFormattedList []GitCommitFormat
 	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
 	if err != nil {
+		fmt.Printf("log output:- %s", logOut)
 		return nil, err
 	}
 	return gitCommitFormattedList, nil
