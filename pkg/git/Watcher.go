@@ -199,7 +199,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
 			if strings.Contains(material.CheckoutLocation, "/.git") {
-				location, _, _, err = impl.repositoryManager.GetLocationForMaterial(material, gitCtx.CloningMode)
+				location, _, _, err = impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 				if err != nil {
 					impl.logger.Errorw("error in getting clone location ", "material", material, "err", err)
 					return err
@@ -246,7 +246,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			lastSeenHash = material.LastSeenHash
 		}
 		fetchCount := impl.configuration.GitHistoryCount
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, lastSeenHash, "", fetchCount, checkoutLocation)
+		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, lastSeenHash, "", fetchCount, checkoutLocation, false)
 		if err != nil {
 			material.Errored = true
 			material.ErrorMsg = err.Error()
