@@ -156,6 +156,6 @@ func getFileStat(commitDiff string) (FileStats, error) {
 
 	return filestat, nil
 }
-func WasRepoShallowCloned(checkoutPath string) bool {
+func IsRepoShallowCloned(checkoutPath string) bool {
 	return strings.Contains(checkoutPath, "/.git")
 }
