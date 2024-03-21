@@ -130,7 +130,7 @@ func getFileStat(commitDiff string) (FileStats, error) {
 		parts := strings.Split(line, "\t")
 
 		if len(parts) != 3 {
-			fmt.Sprintf("invalid git diff --numstat output")
+			fmt.Sprintf("invalid git diff --numstat output, parts: %v", parts)
 			continue
 		}
 
