@@ -139,6 +139,7 @@ func getFileStat(commitDiff string) (FileStats, error) {
 			continue
 		}
 
+		//TODO not ignoring in case of error in below cases because of include/exclude feature where file name is important
 		added, err := strconv.Atoi(parts[0])
 		if err != nil {
 			fmt.Printf("failed to parse number of lines added: %v\n", err)
