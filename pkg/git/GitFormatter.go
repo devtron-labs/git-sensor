@@ -67,7 +67,7 @@ func parseFormattedLogOutput(out string) ([]GitCommitFormat, error) {
 	var gitCommitFormattedList []GitCommitFormat
 	err := json.Unmarshal([]byte(logOut), &gitCommitFormattedList)
 	if err != nil {
-		fmt.Sprintf("log output: %s, err: %v", logOut, err)
+		fmt.Println(fmt.Sprintf("log output: %s, err: %v", logOut, err))
 		return nil, err
 	}
 	return gitCommitFormattedList, nil
