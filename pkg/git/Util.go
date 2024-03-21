@@ -130,7 +130,7 @@ func getFileStat(commitDiff string) (FileStats, error) {
 		parts := strings.Split(line, "\t")
 
 		if len(parts) != 3 {
-			fmt.Sprintf("invalid git diff --numstat output, parts: %v", parts)
+			fmt.Printf("invalid git diff --numstat output, parts: %v\n", parts)
 			continue
 		}
 
@@ -141,12 +141,12 @@ func getFileStat(commitDiff string) (FileStats, error) {
 
 		added, err := strconv.Atoi(parts[0])
 		if err != nil {
-			fmt.Sprintf("failed to parse number of lines added: %v", err)
+			fmt.Printf("failed to parse number of lines added: %v\n", err)
 		}
 
 		deleted, err := strconv.Atoi(parts[1])
 		if err != nil {
-			fmt.Sprintf("failed to parse number of lines deleted: %v", err)
+			fmt.Printf("failed to parse number of lines deleted: %v\n", err)
 		}
 
 		filestat = append(filestat, FileStat{
