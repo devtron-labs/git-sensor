@@ -18,6 +18,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/devtron-labs/git-sensor/internals/middleware"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"io/ioutil"
 	"os"
@@ -131,6 +132,7 @@ func getFileStat(commitDiff string) (FileStats, error) {
 
 		if len(parts) != 3 {
 			fmt.Printf("invalid git diff --numstat output, parts: %v\n", parts)
+			middleware.CommitStatParsingErrorCounter.WithLabelValues().Inc()
 			continue
 		}
 
@@ -138,16 +140,21 @@ func getFileStat(commitDiff string) (FileStats, error) {
 			// ignoring binary file
 			continue
 		}
-
+		var isParsingError bool
 		//TODO not ignoring in case of error in below cases because of include/exclude feature where file name is important
 		added, err := strconv.Atoi(parts[0])
 		if err != nil {
 			fmt.Printf("failed to parse number of lines added: %v\n", err)
+			isParsingError = true
 		}
 
 		deleted, err := strconv.Atoi(parts[1])
 		if err != nil {
 			fmt.Printf("failed to parse number of lines deleted: %v\n", err)
+			isParsingError = true
+		}
+		if isParsingError {
+			middleware.CommitStatParsingErrorCounter.WithLabelValues().Inc()
 		}
 
 		filestat = append(filestat, FileStat{

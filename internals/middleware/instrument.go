@@ -117,3 +117,11 @@ var PanicCounter = promauto.NewCounterVec(
 		ConstLabels: constLabels,
 	},
 	[]string{})
+
+var CommitStatParsingErrorCounter = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name:        "commit_stats_parsing_errors_counter",
+		Help:        "total number of parsing errors encountered while processing git commit stats.",
+		ConstLabels: constLabels,
+	},
+	[]string{})
