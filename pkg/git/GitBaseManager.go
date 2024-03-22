@@ -42,7 +42,7 @@ type GitManagerBase interface {
 	// ConfigureSshCommand configures ssh in git repo
 	ConfigureSshCommand(gitCtx GitContext, rootDir string, sshPrivateKeyPath string) (response, errMsg string, err error)
 	//  FetchDiffStatBetweenCommits returns the file stats reponse on executing git action
-	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error)
+	FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (FileStats, error)
 	// LogMergeBase get the commit diff between using a merge base strategy
 	LogMergeBase(gitCtx GitContext, rootDir, from string, to string) ([]*Commit, error)
 	ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error)
@@ -271,7 +271,7 @@ func GetBranchReference(branch string) (string, string) {
 	return branch, branchRef
 }
 
-func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, oldHash string, newHash string, rootDir string) (FileStats, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 
 	if newHash == "" {
@@ -283,7 +283,11 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return output, errMsg, err
+	if err != nil || len(errMsg) > 0 {
+		impl.logger.Errorw("error in fetching fileStat diff btw commits: ", "oldHash", oldHash, "newHash", newHash, "checkoutPath", rootDir, "errorMsg", errMsg, "err", err)
+		return nil, err
+	}
+	return getFileStat(output)
 }
 
 func (impl *GitManagerBaseImpl) createCmdWithContext(ctx GitContext, name string, arg ...string) (*exec.Cmd, context.CancelFunc) {

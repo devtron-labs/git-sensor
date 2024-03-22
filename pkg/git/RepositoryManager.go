@@ -316,7 +316,12 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 				}()
 				//TODO: implement below Stats() function using git CLI as it panics in some cases, remove defer function after using git CLI
 
-				stats, err := impl.gitManager.GetCommitStats(gitCtx, commit, repository.rootDir)
+				statsCheckoutPath := repository.rootDir
+				if len(statsCheckoutPath) == 0 {
+					//TODO: needed this in case of go-git mode where we are executing cli command
+					statsCheckoutPath = checkoutPath
+				}
+				stats, err := impl.gitManager.GetCommitStats(gitCtx, commit, statsCheckoutPath)
 				if err != nil {
 					impl.logger.Errorw("error in  fetching stats", "err", err)
 				}

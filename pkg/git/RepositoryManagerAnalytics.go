@@ -202,14 +202,9 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	if strings.Contains(checkoutPath, "/.git") || impl.configuration.UseGitCli {
 		oldHashString := oldHash.String()
 		newHashString := newHash.String()
-		outputMsg, errorMsg, err := impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, oldHashString, newHashString, checkoutPath)
+		fileStats, err = impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, oldHashString, newHashString, checkoutPath)
 		if err != nil {
-			impl.logger.Errorw("error in fetching fileStat diff between commits ", "errorMsg", errorMsg, "err", err)
-			return nil, err
-		}
-		fileStats, err = getFileStat(outputMsg)
-		if err != nil {
-			impl.logger.Errorw("can't convert git diff into fileStats ", "err", err)
+			impl.logger.Errorw("error in fetching fileStat diff between commits and converting git diff into fileStats ", "err", err)
 		}
 	} else {
 		patch, err := impl.getPatchObject(gitCtx, repository.Repository, oldHash, newHash)
