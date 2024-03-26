@@ -349,7 +349,16 @@ func (impl GitWatcherImpl) SubscribeWebhookEvent() error {
 		}
 		impl.webhookHandler.HandleWebhookEvent(webhookEvent)
 	}
-	err := impl.pubSubClient.Subscribe(pubsub.WEBHOOK_EVENT_TOPIC, callback)
+
+	var loggerFunc pubsub.LoggerFunc = func(msg model.PubSubMsg) (string, []interface{}) {
+		webhookEvent := &WebhookEvent{}
+		err := json.Unmarshal([]byte(msg.Data), &webhookEvent)
+		if err != nil {
+			return "error while unmarshalling WebhookEvent object", []interface{}{"err", err, "msg", msg.Data}
+		}
+		return "got message for WebhookEvent stage completion", []interface{}{"eventType", webhookEvent.EventType, "gitHostId", webhookEvent.GitHostId, "payloadId", webhookEvent.PayloadId}
+	}
+	err := impl.pubSubClient.Subscribe(pubsub.WEBHOOK_EVENT_TOPIC, callback, loggerFunc)
 	return err
 }
 
