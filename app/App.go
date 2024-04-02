@@ -160,7 +160,7 @@ func (app *App) initGrpcServer(port int) error {
 
 // Stop stops the grpcServer and cleans resources. Called during shutdown
 func (app *App) Stop() {
-	app.Logger.Infow("orchestrator shutdown initiating")
+	app.Logger.Infow("git-sensor shutdown initiating")
 
 	app.Logger.Infow("stopping cron")
 	app.watcher.StopCron()
