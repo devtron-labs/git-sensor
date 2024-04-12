@@ -10,7 +10,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const GrpcRequest = "grpc.request.content"
+const (
+	RequestFieldKey = "grpc.request.content"
+	MethodFieldKey  = "grpc.method"
+)
 
 // InterceptorLogger adapts go-kit logger to interceptor logger.
 func InterceptorLogger(enableLogger bool, lg *zap.SugaredLogger) logging.Logger {
@@ -19,13 +22,14 @@ func InterceptorLogger(enableLogger bool, lg *zap.SugaredLogger) logging.Logger 
 			return
 		}
 		finalReq := extractedFields(fields)
-		message := fmt.Sprintf("AUDIT_LOG: requestMethod: %s, requestPayload: %s", fields[1], finalReq)
+		index := slices.Index(fields, MethodFieldKey)
+		message := fmt.Sprintf("AUDIT_LOG: requestMethod: %s, requestPayload: %s", fields[index+1], finalReq)
 		lg.Info(message)
 		fmt.Println("hello")
 	})
 }
 func extractedFields(fields []any) []byte {
-	index := slices.Index(fields, GrpcRequest)
+	index := slices.Index(fields, RequestFieldKey)
 	req := make(map[string]interface{})
 	marshal, _ := json.Marshal(fields[index+1])
 	err := json.Unmarshal(marshal, &req)
