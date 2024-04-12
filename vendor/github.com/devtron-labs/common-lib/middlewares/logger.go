@@ -7,7 +7,10 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
+
+const GrpcRequest = "grpc.request.content"
 
 // InterceptorLogger adapts go-kit logger to interceptor logger.
 func InterceptorLogger(enableLogger bool, lg *zap.SugaredLogger) logging.Logger {
@@ -16,15 +19,15 @@ func InterceptorLogger(enableLogger bool, lg *zap.SugaredLogger) logging.Logger 
 			return
 		}
 		finalReq := extractedFields(fields)
-		message := fmt.Sprintf("AUDIT_LOG: level: %v,requestMethod: %s, requestPayload: %s", lvl, fields[1], finalReq)
+		message := fmt.Sprintf("AUDIT_LOG: requestMethod: %s, requestPayload: %s", fields[1], finalReq)
 		lg.Info(message)
 		fmt.Println("hello")
 	})
 }
 func extractedFields(fields []any) []byte {
-	length := len(fields)
+	index := slices.Index(fields, GrpcRequest)
 	req := make(map[string]interface{})
-	marshal, _ := json.Marshal(fields[length-1])
+	marshal, _ := json.Marshal(fields[index+1])
 	err := json.Unmarshal(marshal, &req)
 	if err != nil {
 		return nil
