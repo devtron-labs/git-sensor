@@ -77,8 +77,7 @@ func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWa
 }
 
 type LoggerConfig struct {
-	EnableLogger    bool     `env:"FEATURE_LOGGER_MIDDLEWARE_ENABLE" envDefault:"false"`
-	RemoveReqFields []string `env:"FEATURE_LOGGER_MIDDLEWARE_REMOVE_FIELDS" envSeparator:","`
+	EnableLogger bool `env:"FEATURE_LOGGER_MIDDLEWARE_ENABLE" envDefault:"false"`
 }
 
 func GetLoggerConfig() (*LoggerConfig, error) {
