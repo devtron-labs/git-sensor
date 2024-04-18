@@ -62,7 +62,7 @@ github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/devtron-labs/common-lib v0.0.16-0.20240416094654-bff0c937150f
+# github.com/devtron-labs/common-lib v0.0.16-0.20240418060324-b414ea7c74a3
 ## explicit; go 1.20
 github.com/devtron-labs/common-lib/constants
 github.com/devtron-labs/common-lib/middlewares
