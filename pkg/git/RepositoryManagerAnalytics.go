@@ -9,7 +9,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 	"io"
-	"log"
 	"strings"
 	"time"
 )
@@ -78,7 +77,7 @@ func computeDiff(r *git.Repository, newHash *plumbing.Hash, oldHash *plumbing.Ha
 		m, err := ancestorStack[lastIndex].MergeBase(c2)
 		//fmt.Printf("mergebase between %s and %s is %s length %d\n", ancestorStack[lastIndex].Hash.String(), c2.Hash.String(), m[0].Hash.String(), len(m))
 		if err != nil {
-			log.Fatal("Error in mergebase " + ancestorStack[lastIndex].Hash.String() + " " + c2.Hash.String())
+			return nil, fmt.Errorf("error in mergebase %s %s - err %w", ancestorStack[lastIndex].Hash.String(), c2.Hash.String(), err)
 		}
 		// if commit being analyzed is itself merge commit then dont process as it is common in both old and new
 		if in(ancestorStack[lastIndex], m) {
