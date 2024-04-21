@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/caarlos0/env"
-	constants "github.com/devtron-labs/common-lib/constants"
+	"github.com/devtron-labs/common-lib/constants"
+	"github.com/devtron-labs/common-lib/middlewares"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
@@ -29,6 +30,7 @@ import (
 	pb "github.com/devtron-labs/protos/gitSensor"
 	"github.com/go-pg/pg"
 	"github.com/gorilla/handlers"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.uber.org/zap"
@@ -54,10 +56,11 @@ type App struct {
 	pubSubClient       *pubsub.PubSubClientServiceImpl
 	GrpcControllerImpl *api.GrpcHandlerImpl
 	StartupConfig      *bean.StartupConfig
+	LoggerConfig       *LoggerConfig
 }
 
-func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcHandlerImpl) *App {
-	return &App{
+func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWatcherImpl, db *pg.DB, pubSubClient *pubsub.PubSubClientServiceImpl, GrpcControllerImpl *api.GrpcHandlerImpl) (*App, error) {
+	app := &App{
 		MuxRouter:          MuxRouter,
 		Logger:             Logger,
 		watcher:            impl,
@@ -65,6 +68,22 @@ func NewApp(MuxRouter *api.MuxRouter, Logger *zap.SugaredLogger, impl *git.GitWa
 		pubSubClient:       pubSubClient,
 		GrpcControllerImpl: GrpcControllerImpl,
 	}
+	cfg, err := GetLoggerConfig()
+	if err != nil {
+		return nil, err
+	}
+	app.LoggerConfig = cfg
+	return app, err
+}
+
+type LoggerConfig struct {
+	EnableLogger bool `env:"FEATURE_LOGGER_MIDDLEWARE_ENABLE" envDefault:"false"`
+}
+
+func GetLoggerConfig() (*LoggerConfig, error) {
+	cfg := &LoggerConfig{}
+	err := env.Parse(cfg)
+	return cfg, err
 }
 
 type PanicLogger struct {
@@ -137,9 +156,13 @@ func (app *App) initGrpcServer(port int) error {
 		}),
 		grpc.ChainStreamInterceptor(
 			grpc_prometheus.StreamServerInterceptor,
+			logging.StreamServerInterceptor(middlewares.InterceptorLogger(app.LoggerConfig.EnableLogger, app.Logger),
+				logging.WithLogOnEvents(logging.PayloadReceived)),
 			recovery.StreamServerInterceptor(recoveryOption)), // panic interceptor, should be at last
 		grpc.ChainUnaryInterceptor(
 			grpc_prometheus.UnaryServerInterceptor,
+			logging.UnaryServerInterceptor(middlewares.InterceptorLogger(app.LoggerConfig.EnableLogger, app.Logger),
+				logging.WithLogOnEvents(logging.PayloadReceived)),
 			recovery.UnaryServerInterceptor(recoveryOption)), // panic interceptor, should be at last
 	}
 	// create a new gRPC grpcServer
