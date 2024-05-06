@@ -41,7 +41,10 @@ func InitializeApp() (*app.App, error) {
 	gitProviderRepositoryImpl := sql.NewGitProviderRepositoryImpl(db)
 	ciPipelineMaterialRepositoryImpl := sql.NewCiPipelineMaterialRepositoryImpl(db, sugaredLogger)
 	repositoryLocker := internals.NewRepositoryLocker(sugaredLogger)
-	pubSubClientServiceImpl := pubsub_lib.NewPubSubClientServiceImpl(sugaredLogger)
+	pubSubClientServiceImpl, err := pubsub_lib.NewPubSubClientServiceImpl(sugaredLogger)
+	if err != nil {
+		return nil, err
+	}
 	webhookEventRepositoryImpl := sql.NewWebhookEventRepositoryImpl(db)
 	webhookEventParsedDataRepositoryImpl := sql.NewWebhookEventParsedDataRepositoryImpl(db)
 	webhookEventDataMappingRepositoryImpl := sql.NewWebhookEventDataMappingRepositoryImpl(db)
