@@ -49,13 +49,24 @@ type RepositoryManager interface {
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewRepo bool) ([]*GitCommitBase, error)
+	// ChangesSinceByRepositoryWithFileStats returns the latest commits list for the given range and count for an existing repo along with file stats
+	ChangesSinceByRepositoryWithFileStats(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewRepo bool) ([]*GitCommitBase, error)
 	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error)
 	// GetCommitForTag retrieves the commit metadata for given tag
 	GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error)
 	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
 	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
+}
+
+type changesSinceByRepositoryConfig struct {
+	openNewRepo    bool
+	fetchFileStats bool
+}
+
+func newChangesSinceByRepositoryConfig(openNewRepo bool, fetchFileStats bool) changesSinceByRepositoryConfig {
+	return changesSinceByRepositoryConfig{openNewRepo, fetchFileStats}
 }
 
 type RepositoryManagerImpl struct {
@@ -228,9 +239,22 @@ func (impl *RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkout
 	return gitCommit.GetCommit(), nil
 }
 
+func (impl *RepositoryManagerImpl) ChangesSinceByRepositoryWithFileStats(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewRepo bool) ([]*GitCommitBase, error) {
+	return impl.changesSinceByRepository(gitCtx, repository, branch, from, to, count, checkoutPath, changesSinceByRepositoryConfig{
+		openNewRepo:    openNewRepo,
+		fetchFileStats: true,
+	})
+}
+func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewRepo bool) ([]*GitCommitBase, error) {
+	return impl.changesSinceByRepository(gitCtx, repository, branch, from, to, count, checkoutPath, changesSinceByRepositoryConfig{
+		openNewRepo:    openNewRepo,
+		fetchFileStats: false,
+	})
+}
+
 // from -> old commit
 // to -> new commit
-func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) changesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, changesSinceByRepositoryConfig changesSinceByRepositoryConfig) ([]*GitCommitBase, error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
@@ -240,7 +264,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 		count = impl.configuration.GitHistoryCount
 	}
 
-	if openNewGitRepo {
+	if changesSinceByRepositoryConfig.openNewRepo {
 		repository, err = impl.gitManager.OpenRepoPlain(checkoutPath)
 		if err != nil {
 			return nil, err
@@ -308,7 +332,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 			gitCommits = append(gitCommits, gitCommit)
 			itrCounter = itrCounter + 1
 
-			if impl.configuration.EnableFileStats {
+			if changesSinceByRepositoryConfig.fetchFileStats && impl.configuration.EnableFileStats {
 				defer func() {
 					if err := recover(); err != nil {
 						impl.logger.Error("file stats function panicked for commit", "err", err, "commit", commit, "count", count)
