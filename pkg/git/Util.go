@@ -35,8 +35,8 @@ const (
 	FETCH_TIMEOUT_SEC         = 30
 	GITHUB_PROVIDER           = "github.com"
 	GITLAB_PROVIDER           = "gitlab.com"
-	CloningModeTreeless       = "TREELESS"
-	CloningModeFull           = "FULL"
+	CLONING_MODE_TREELESS     = "TREELESS"
+	CLONING_MODE_FULL         = "FULL"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
