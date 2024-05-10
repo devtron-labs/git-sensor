@@ -35,7 +35,7 @@ const (
 	FETCH_TIMEOUT_SEC         = 30
 	GITHUB_PROVIDER           = "github.com"
 	GITLAB_PROVIDER           = "gitlab.com"
-	CloningModeShallow        = "SHALLOW"
+	CloningModeTreeless       = "TREELESS"
 	CloningModeFull           = "FULL"
 )
 
@@ -166,6 +166,6 @@ func getFileStat(commitDiff string) (FileStats, error) {
 
 	return filestat, nil
 }
-func IsRepoShallowCloned(checkoutPath string) bool {
+func IsRepoTreelessCloned(checkoutPath string) bool {
 	return strings.Contains(checkoutPath, "/.git")
 }
