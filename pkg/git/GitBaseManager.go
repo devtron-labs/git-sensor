@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type GitManager interface {
@@ -278,11 +279,12 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 		newHash = oldHash
 		oldHash = oldHash + "^"
 	}
+	startTime := time.Now()
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 	defer cancel()
 
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
-	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	impl.logger.Debugw("git diff --numstat result", "root", rootDir, "time_taken=", time.Since(startTime).Seconds(), "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil || len(errMsg) > 0 {
 		impl.logger.Errorw("error in fetching fileStat diff btw commits: ", "oldHash", oldHash, "newHash", newHash, "checkoutPath", rootDir, "errorMsg", errMsg, "err", err)
 		return nil, err
