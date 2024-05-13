@@ -150,7 +150,7 @@ func (impl *RepositoryManagerImpl) GetSshPrivateKeyPath(gitCtx GitContext, gitPr
 	if authMode == sql.AUTH_MODE_SSH {
 		sshPrivateKeyPath, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
-			impl.logger.Errorw("error while creating ssh file for clone", "checkoutPath", location, "sshPrivateKeyPath", sshPrivateKeyPath, "err", err)
+			impl.logger.Errorw("error while creating ssh file for shallow clone", "checkoutPath", location, "sshPrivateKeyPath", sshPrivateKeyPath, "err", err)
 			return "", err
 		}
 	}

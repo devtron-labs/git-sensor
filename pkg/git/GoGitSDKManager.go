@@ -123,7 +123,7 @@ func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteU
 }
 
 func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
-	if IsRepoTreelessCloned(checkoutPath) {
+	if IsRepoShallowCloned(checkoutPath) {
 		return impl.GitManagerBase.FetchDiffStatBetweenCommits(gitCtx, commit.GetCommit().Commit, "", checkoutPath)
 	}
 	gitCommit := commit.(*GitCommitGoGit)

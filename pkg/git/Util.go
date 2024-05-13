@@ -35,8 +35,8 @@ const (
 	FETCH_TIMEOUT_SEC         = 30
 	GITHUB_PROVIDER           = "github.com"
 	GITLAB_PROVIDER           = "gitlab.com"
-	CLONING_MODE_TREELESS     = "TREELESS"
-	CLONING_MODE_FULL         = "FULL"
+	CloningModeShallow        = "SHALLOW"
+	CloningModeFull           = "FULL"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -166,6 +166,6 @@ func getFileStat(commitDiff string) (FileStats, error) {
 
 	return filestat, nil
 }
-func IsRepoTreelessCloned(checkoutPath string) bool {
+func IsRepoShallowCloned(checkoutPath string) bool {
 	return strings.Contains(checkoutPath, "/.git")
 }
