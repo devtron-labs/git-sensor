@@ -23,6 +23,7 @@ import (
 	"github.com/caarlos0/env"
 	"github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
+	"github.com/devtron-labs/common-lib/pubsub-lib/metrics"
 	"github.com/devtron-labs/common-lib/pubsub-lib/model"
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/middleware"
@@ -48,6 +49,8 @@ type GitWatcherImpl struct {
 	configuration                *internals.Configuration
 	gitManager                   GitManager
 }
+
+const PANIC = "panic"
 
 type GitWatcher interface {
 	PollAndUpdateGitMaterial(material *sql.GitMaterial) (*sql.GitMaterial, error)
@@ -371,6 +374,9 @@ func (impl *CronLoggerImpl) Info(msg string, keysAndValues ...interface{}) {
 }
 
 func (impl *CronLoggerImpl) Error(err error, msg string, keysAndValues ...interface{}) {
+	if msg == PANIC {
+		metrics.IncPanicRecoveryCount("cron", "", "", "")
+	}
 	keysAndValues = append([]interface{}{"err", err}, keysAndValues...)
 	impl.logger.Errorw(msg, keysAndValues...)
 }
