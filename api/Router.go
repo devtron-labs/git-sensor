@@ -18,6 +18,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/devtron-labs/common-lib/middlewares"
 	"github.com/devtron-labs/common-lib/monitoring"
 	"github.com/devtron-labs/git-sensor/util"
 	"github.com/gorilla/mux"
@@ -62,6 +63,7 @@ func (r MuxRouter) Init() {
 		}
 		_, _ = writer.Write(b)
 	})
+	r.Router.Use(middlewares.Recovery)
 	r.Router.Path("/git-provider").HandlerFunc(r.restHandler.SaveGitProvider).Methods("POST")
 	r.Router.Path("/git-repo").HandlerFunc(r.restHandler.AddRepo).Methods("POST")
 	r.Router.Path("/git-repo").HandlerFunc(r.restHandler.UpdateRepo).Methods("PUT")
