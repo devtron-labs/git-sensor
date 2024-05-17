@@ -201,7 +201,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	if strings.Contains(checkoutPath, "/.git") || impl.configuration.UseGitCli {
 		oldHashString := oldHash.String()
 		newHashString := newHash.String()
-		fileStats, err = impl.gitManager.FetchDiffStatBetweenCommits(gitCtx, oldHashString, newHashString, checkoutPath)
+		fileStats, err = impl.gitManager.FetchDiffStatBetweenCommitsWithNumstat(gitCtx, oldHashString, newHashString, checkoutPath)
 		if err != nil {
 			impl.logger.Errorw("error in fetching fileStat diff between commits and converting git diff into fileStats ", "err", err)
 		}
