@@ -22,6 +22,7 @@ import (
 	"github.com/caarlos0/env"
 	constants "github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
+	"github.com/devtron-labs/common-lib/pubsub-lib/metrics"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals/middleware"
@@ -127,6 +128,7 @@ func (app *App) initGrpcServer(port int) error {
 	}
 
 	grpcPanicRecoveryHandler := func(p any) (err error) {
+		metrics.IncPanicRecoveryCount("grpc", "", "", "")
 		app.Logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", p, "stack", string(debug.Stack()))
 		return status.Errorf(codes.Internal, "%s", p)
 	}
