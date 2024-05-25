@@ -41,7 +41,7 @@ type RepositoryManager interface {
 	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
 	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
-	GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
+	InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
 	FetchRepo(gitCtx GitContext, location string) error
 	GetCheckoutLocationFromGitUrl(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutLocation(gitCtx GitContext, material *sql.GitMaterial, url, checkoutPath string) string
@@ -107,31 +107,21 @@ func (impl *RepositoryManagerImpl) GetCheckoutLocation(gitCtx GitContext, materi
 }
 
 func (impl *RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
-	_, err := impl.GetSshPrivateKeyPath(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
+	_, err := impl.InitRepoAndGetSshPrivateKeyPath(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
 	if err != nil {
 		return err
 	}
 	return impl.FetchRepo(gitCtx, location)
 }
 
-func (impl *RepositoryManagerImpl) GetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
+func (impl *RepositoryManagerImpl) InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
 	var err error
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("add", start, err)
 	}()
-	err = os.RemoveAll(location)
+	err = impl.CleanupAndInitRepo(gitCtx, location, url)
 	if err != nil {
-		impl.logger.Errorw("error in cleaning checkout path", "err", err)
-		return "", err
-	}
-	if !impl.IsSpaceAvailableOnDisk() {
-		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return "", err
-	}
-	err = impl.gitManager.Init(gitCtx, location, url, true)
-	if err != nil {
-		impl.logger.Errorw("err in git init", "err", err)
 		return "", err
 	}
 	var sshPrivateKeyPath string
@@ -145,6 +135,24 @@ func (impl *RepositoryManagerImpl) GetSshPrivateKeyPath(gitCtx GitContext, gitPr
 	}
 
 	return sshPrivateKeyPath, nil
+}
+
+func (impl *RepositoryManagerImpl) CleanupAndInitRepo(gitCtx GitContext, location string, url string) error {
+	err := os.RemoveAll(location)
+	if err != nil {
+		impl.logger.Errorw("error in cleaning checkout path", "err", err)
+		return err
+	}
+	if !impl.IsSpaceAvailableOnDisk() {
+		err = errors.New("git-sensor PVC - disk full, please increase space")
+		return err
+	}
+	err = impl.gitManager.Init(gitCtx, location, url, true)
+	if err != nil {
+		impl.logger.Errorw("err in git init", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (impl *RepositoryManagerImpl) FetchRepo(gitCtx GitContext, location string) error {
