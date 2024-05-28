@@ -31,7 +31,7 @@ const (
 	SOURCE_TYPE_WEBHOOK      SourceType = "WEBHOOK"
 )
 
-//TODO: add support for submodule
+// TODO: add support for submodule
 type GitMaterial struct {
 	tableName        struct{} `sql:"git_material"`
 	Id               int      `sql:"id,pk"`
@@ -48,6 +48,7 @@ type GitMaterial struct {
 	FetchStatus         bool      `json:"fetch_status"`
 	LastFetchErrorCount int       `json:"last_fetch_error_count"` //continues fetch error
 	FetchErrorMessage   string    `json:"fetch_error_message"`
+	CloningMode         string    `json:"cloning_mode"`
 	FilterPattern       []string  `sql:"filter_pattern"`
 	GitProvider         *GitProvider
 	CiPipelineMaterials []*CiPipelineMaterial

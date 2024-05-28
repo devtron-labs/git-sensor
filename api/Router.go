@@ -75,6 +75,7 @@ func (r MuxRouter) Init() {
 
 	r.Router.Path("/admin/reload-all").HandlerFunc(r.restHandler.ReloadAllMaterial).Methods("POST")
 	r.Router.Path("/admin/reload/{materialId}").HandlerFunc(r.restHandler.ReloadMaterial).Methods("POST")
+	r.Router.Path("/admin/reload/materials").HandlerFunc(r.restHandler.ReloadMaterials).Methods("POST")
 
 	r.Router.Path("/release/changes").HandlerFunc(r.restHandler.GetChangesInRelease).Methods("POST")
 
