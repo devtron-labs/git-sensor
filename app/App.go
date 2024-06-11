@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2020 Devtron Labs
+ * Copyright (c) 2020-2024. Devtron Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package app
@@ -22,6 +22,7 @@ import (
 	"github.com/caarlos0/env"
 	constants "github.com/devtron-labs/common-lib/constants"
 	pubsub "github.com/devtron-labs/common-lib/pubsub-lib"
+	"github.com/devtron-labs/common-lib/pubsub-lib/metrics"
 	"github.com/devtron-labs/git-sensor/api"
 	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals/middleware"
@@ -127,6 +128,7 @@ func (app *App) initGrpcServer(port int) error {
 	}
 
 	grpcPanicRecoveryHandler := func(p any) (err error) {
+		metrics.IncPanicRecoveryCount("grpc", "", "", "")
 		app.Logger.Error(constants.PanicLogIdentifier, "recovered from panic", "panic", p, "stack", string(debug.Stack()))
 		return status.Errorf(codes.Internal, "%s", p)
 	}
