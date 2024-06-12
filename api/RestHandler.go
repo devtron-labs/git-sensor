@@ -196,7 +196,7 @@ func (handler RestHandlerImpl) ReloadMaterials(w http.ResponseWriter, r *http.Re
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
-	for _, materialReq := range request.reloadMaterial {
+	for _, materialReq := range request.ReloadMaterial {
 		handler.logger.Infow("reload all pipelineMaterial request", "id", materialReq.GitmaterialId)
 		gitCtx := git.BuildGitContext(r.Context()).WithCloningMode(materialReq.CloningMode)
 		err = handler.repositoryManager.ResetRepo(gitCtx, materialReq.GitmaterialId)
@@ -206,7 +206,10 @@ func (handler RestHandlerImpl) ReloadMaterials(w http.ResponseWriter, r *http.Re
 		}
 	}
 	//TODO: handle in such a way that it can propagate which material weren't able to reload
-	handler.writeJsonResp(w, nil, "reloaded", http.StatusOK)
+	handler.writeJsonResp(w, nil, Response{
+		Code:   http.StatusOK,
+		Status: http.StatusText(http.StatusOK),
+	}, http.StatusOK)
 
 }
 

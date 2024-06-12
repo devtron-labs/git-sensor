@@ -1,11 +1,11 @@
 package api
 
 type ReloadMaterialsDto struct {
-	reloadMaterial []ReloadMaterialDto
+	ReloadMaterial []ReloadMaterialDto `json:"reloadMaterial"`
 }
 
 type ReloadMaterialDto struct {
 	AppId         int    `json:"appId"`
-	GitmaterialId int    `json:"gitmaterialId"`
+	GitmaterialId int    `json:"gitMaterialId"`
 	CloningMode   string `json:"cloningMode"`
 }
