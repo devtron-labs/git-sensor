@@ -194,6 +194,8 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 	}
 	gitCtx := BuildGitContext(context.Background()).
 		WithCredentials(userName, password).
+		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert).
+		WithGitProviderId(gitProvider.Id).
 		WithCloningMode(impl.configuration.CloningMode)
 
 	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)

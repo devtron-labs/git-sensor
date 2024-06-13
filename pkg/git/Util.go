@@ -30,7 +30,11 @@ import (
 const (
 	GIT_BASE_DIR              = "/git-base/"
 	SSH_PRIVATE_KEY_DIR       = GIT_BASE_DIR + "ssh-keys/"
+	TLS_FILES_DIR             = GIT_BASE_DIR + "tls-files/"
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
+	TLS_KEY_FILE_NAME         = "tls_key"
+	TLS_CERT_FILE_NAME        = "tls_cert"
+	CA_CERT_FILE_NAME         = "ca_cert"
 	CLONE_TIMEOUT_SEC         = 600
 	FETCH_TIMEOUT_SEC         = 30
 	GITHUB_PROVIDER           = "github.com"
@@ -119,6 +123,36 @@ func CreateOrUpdateSshPrivateKeyOnDisk(gitProviderId int, sshPrivateKeyContent s
 		return err
 	}
 
+	return nil
+}
+
+func CreateTlsPathFilesWithData(gitProviderId int, content string, fileName string) (string, error) {
+	tlsFolderPath := path.Join(TLS_FILES_DIR, strconv.Itoa(gitProviderId))
+	tlsFilePath := path.Join(tlsFolderPath, fileName)
+
+	// if file exists then delete file
+	if _, err := os.Stat(tlsFilePath); os.IsExist(err) {
+		os.Remove(tlsFilePath)
+	}
+	// create dirs
+	err := os.MkdirAll(tlsFolderPath, 0755)
+	if err != nil {
+		return "", err
+	}
+
+	// create file with content
+	err = ioutil.WriteFile(tlsFilePath, []byte(content), 0600)
+	if err != nil {
+		return "", err
+	}
+	return tlsFilePath, nil
+}
+
+func DeleteAFileIfExists(path string) error {
+	if _, err := os.Stat(path); os.IsExist(err) {
+		err = os.Remove(path)
+		return err
+	}
 	return nil
 }
 

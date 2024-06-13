@@ -81,6 +81,9 @@ func (impl *GrpcHandlerImpl) SaveGitProvider(ctx context.Context, req *pb.GitPro
 		SshPrivateKey: req.SshPrivateKey,
 		AuthMode:      sql.AuthMode(req.AuthMode),
 		Active:        req.Active,
+		CaCert:        req.CaCert,
+		TlsCert:       req.TlsCert,
+		TlsKey:        req.TlsKey,
 	}
 
 	_, err := impl.repositoryManager.SaveGitProvider(gitProvider)

@@ -38,6 +38,9 @@ type GitProvider struct {
 	AccessToken   string   `sql:"access_token"`
 	AuthMode      AuthMode `sql:"auth_mode,notnull"`
 	Active        bool     `sql:"active,notnull"`
+	TlsCert       string   `sql:"tls_cert"`
+	TlsKey        string   `sql:"tls_key"`
+	CaCert        string   `sql:"ca_cert"`
 	//models.AuditLog
 }
 

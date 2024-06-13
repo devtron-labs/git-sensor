@@ -110,12 +110,18 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	impl.logger.Debugw("git fetch ", "location", rootDir)
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	defer cancel()
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	tlsPathInfo, err := createFilesForTlsData(gitCtx)
+	if err != nil {
+		//making it non-blocking
+		impl.logger.Errorw("error encountered in createFilesForTlsData", "err", err)
+	}
+	defer impl.deleteTlsFiles(tlsPathInfo)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
 	if strings.Contains(output, LOCK_REF_MESSAGE) {
 		impl.logger.Info("error in fetch, pruning local refs and retrying", "rootDir", rootDir)
 		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
 		pruneCmd, pruneCmdCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
-		pruneOutput, pruneMsg, pruneErr := impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password)
+		pruneOutput, pruneMsg, pruneErr := impl.runCommandWithCred(pruneCmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
 		defer pruneCmdCancel()
 		if pruneErr != nil {
 			impl.logger.Errorw("error in pruning local refs that do not exist at remote")
@@ -125,7 +131,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 		retryFetchCmd, retryFetchCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 		defer retryFetchCancel()
 
-		output, errMsg, err = impl.runCommandWithCred(retryFetchCmd, gitCtx.Username, gitCtx.Password)
+		output, errMsg, err = impl.runCommandWithCred(retryFetchCmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
 	}
 	impl.logger.Debugw("fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	return output, errMsg, err
@@ -165,12 +171,33 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 	return commits, nil
 }
 
-func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string) (response, errMsg string, err error) {
+func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string, tlsPathInfo *TlsPathInfo) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
+	if tlsPathInfo != nil {
+		if tlsPathInfo.TlsKeyPath != "" && tlsPathInfo.TlsCertPath != "" {
+			cmd.Env = append(cmd.Env,
+				fmt.Sprintf("GIT_SSL_KEY=%s", tlsPathInfo.TlsKeyPath),
+				fmt.Sprintf("GIT_SSL_CERT=%s", tlsPathInfo.TlsCertPath))
+		}
+		if tlsPathInfo.CaCertPath != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_SSL_CAINFO=%s", tlsPathInfo.CaCertPath))
+		}
+	}
+	return impl.runCommand(cmd)
+}
+
+func (impl *GitManagerBaseImpl) runCommandWithTlsData(cmd *exec.Cmd, tlsPathInfo *TlsPathInfo) (response, errMsg string, err error) {
+	if tlsPathInfo != nil {
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_SSL_CAINFO=%s", tlsPathInfo.CaCertPath),
+			fmt.Sprintf("GIT_SSL_KEY=%s", tlsPathInfo.TlsKeyPath),
+			fmt.Sprintf("GIT_SSL_CERT=%s", tlsPathInfo.TlsCertPath),
+		)
+	}
 	return impl.runCommand(cmd)
 }
 
@@ -296,8 +323,13 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommits(gitCtx GitContext, o
 	}
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--numstat", oldHash, newHash)
 	defer cancel()
-
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	tlsPathInfo, err := createFilesForTlsData(gitCtx)
+	if err != nil {
+		//making it non-blocking
+		impl.logger.Errorw("error encountered in createFilesForTlsData", "err", err)
+	}
+	defer impl.deleteTlsFiles(tlsPathInfo)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil || len(errMsg) > 0 {
 		impl.logger.Errorw("error in fetching fileStat diff btw commits: ", "oldHash", oldHash, "newHash", newHash, "checkoutPath", rootDir, "errorMsg", errMsg, "err", err)
@@ -333,6 +365,63 @@ func (impl *GitManagerBaseImpl) getCommandTimeout(command string) int {
 func (impl *GitManagerBaseImpl) ExecuteCustomCommand(gitContext GitContext, name string, arg ...string) (response, errMsg string, err error) {
 	cmd, cancel := impl.createCmdWithContext(gitContext, name, arg...)
 	defer cancel()
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password)
+	tlsPathInfo, err := createFilesForTlsData(gitContext)
+	if err != nil {
+		//making it non-blocking
+		impl.logger.Errorw("error encountered in createFilesForTlsData", "err", err)
+	}
+	defer impl.deleteTlsFiles(tlsPathInfo)
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitContext.Username, gitContext.Password, tlsPathInfo)
 	return output, errMsg, err
+}
+
+func createFilesForTlsData(gitContext GitContext) (*TlsPathInfo, error) {
+	var tlsKeyFilePath string
+	var tlsCertFilePath string
+	var caCertFilePath string
+	var err error
+	if gitContext.TLSKey != "" && gitContext.TLSCertificate != "" {
+		tlsKeyFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSKey, TLS_KEY_FILE_NAME)
+		if err != nil {
+			return nil, err
+		}
+		tlsCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSCertificate, TLS_CERT_FILE_NAME)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if gitContext.CACert != "" {
+		caCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.CACert, CA_CERT_FILE_NAME)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return BuildTlsInfoPath(caCertFilePath, tlsKeyFilePath, tlsCertFilePath), nil
+
+}
+
+func (impl *GitManagerBaseImpl) deleteTlsFiles(pathInfo *TlsPathInfo) {
+	if pathInfo == nil {
+		return
+	}
+	if pathInfo.TlsKeyPath != "" {
+		err := DeleteAFileIfExists(pathInfo.TlsKeyPath)
+		if err != nil {
+			impl.logger.Errorw("error in deleting file", "tlsKeyPath", pathInfo.TlsKeyPath, "err", err)
+		}
+	}
+
+	if pathInfo.TlsCertPath != "" {
+		err := DeleteAFileIfExists(pathInfo.TlsCertPath)
+		if err != nil {
+			impl.logger.Errorw("error in deleting file", "TlsCertPath", pathInfo.TlsCertPath, "err", err)
+		}
+	}
+	if pathInfo.CaCertPath != "" {
+		err := DeleteAFileIfExists(pathInfo.CaCertPath)
+		if err != nil {
+			impl.logger.Errorw("error in deleting file", "CaCertPath", pathInfo.CaCertPath, "err", err)
+		}
+	}
+	return
 }

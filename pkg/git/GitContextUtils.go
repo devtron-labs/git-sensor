@@ -26,11 +26,27 @@ type GitContext struct {
 	Username        string
 	Password        string
 	CloningMode     string
+	CACert          string
+	TLSKey          string
+	TLSCertificate  string
+	GitProviderId   int
 }
 
 func (gitCtx GitContext) WithCredentials(Username string, Password string) GitContext {
 	gitCtx.Username = Username
 	gitCtx.Password = Password
+	return gitCtx
+}
+
+func (gitCtx GitContext) WithTLSData(caData string, tlsKey string, tlsCertificate string) GitContext {
+	gitCtx.CACert = caData
+	gitCtx.TLSKey = tlsKey
+	gitCtx.TLSCertificate = tlsCertificate
+	return gitCtx
+}
+
+func (gitCtx GitContext) WithGitProviderId(gitProviderId int) GitContext {
+	gitCtx.GitProviderId = gitProviderId
 	return gitCtx
 }
 

@@ -333,3 +333,9 @@ type IteratorRequest struct {
 	FromCommitHash string
 	ToCommitHash   string
 }
+
+type TlsPathInfo struct {
+	CaCertPath  string
+	TlsKeyPath  string
+	TlsCertPath string
+}
