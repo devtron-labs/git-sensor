@@ -33,8 +33,8 @@ const (
 	TLS_FILES_DIR             = GIT_BASE_DIR + "tls-files/"
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
 	TLS_KEY_FILE_NAME         = "tls_key"
-	TLS_CERT_FILE_NAME        = "tls_cert"
-	CA_CERT_FILE_NAME         = "ca_cert"
+	TLS_CERT_FILE_NAME        = "tls_cert.pem"
+	CA_CERT_FILE_NAME         = "ca_cert.pem"
 	CLONE_TIMEOUT_SEC         = 600
 	FETCH_TIMEOUT_SEC         = 30
 	GITHUB_PROVIDER           = "github.com"
