@@ -25,6 +25,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/util"
 	"go.uber.org/zap"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -380,18 +381,20 @@ func createFilesForTlsData(gitContext GitContext) (*TlsPathInfo, error) {
 	var tlsCertFilePath string
 	var caCertFilePath string
 	var err error
+	// this is to avoid concurrency issue, random number is appended at the end of file, where this file is read/created/deleted by multiple commands simultaneously.
+	randomNumber := rand.Intn(100000)
 	if gitContext.TLSKey != "" && gitContext.TLSCertificate != "" {
-		tlsKeyFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSKey, TLS_KEY_FILE_NAME)
+		tlsKeyFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSKey, fmt.Sprintf("%s_%v", TLS_KEY_FILE_NAME, randomNumber))
 		if err != nil {
 			return nil, err
 		}
-		tlsCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSCertificate, TLS_CERT_FILE_NAME)
+		tlsCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.TLSCertificate, fmt.Sprintf("%s_%v", TLS_CERT_FILE_NAME, randomNumber))
 		if err != nil {
 			return nil, err
 		}
 	}
 	if gitContext.CACert != "" {
-		caCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.CACert, CA_CERT_FILE_NAME)
+		caCertFilePath, err = CreateTlsPathFilesWithData(gitContext.GitProviderId, gitContext.CACert, fmt.Sprintf("%s_%v", CA_CERT_FILE_NAME, randomNumber))
 		if err != nil {
 			return nil, err
 		}
