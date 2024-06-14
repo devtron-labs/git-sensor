@@ -32,7 +32,7 @@ const (
 	SSH_PRIVATE_KEY_DIR       = GIT_BASE_DIR + "ssh-keys/"
 	TLS_FILES_DIR             = GIT_BASE_DIR + "tls-files/"
 	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
-	TLS_KEY_FILE_NAME         = "tls_key"
+	TLS_KEY_FILE_NAME         = "tls_key.key"
 	TLS_CERT_FILE_NAME        = "tls_cert.pem"
 	CA_CERT_FILE_NAME         = "ca_cert.pem"
 	CLONE_TIMEOUT_SEC         = 600
