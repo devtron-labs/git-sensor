@@ -31,6 +31,8 @@ github.com/devtron-labs/common-lib v0.0.18-0.20240520062828-c6c38c3f135e h1:feRK
 github.com/devtron-labs/common-lib v0.0.18-0.20240520062828-c6c38c3f135e/go.mod h1:deAcJ5IjUjM6ozZQLJEgPWDUA0mKa632LBsKx8uM9TE=
 github.com/devtron-labs/protos v0.0.3-0.20240614064039-c8647dc19a48 h1:xblnoJzpoqE1Nf4LwLgY7mSXpA5YD4MocFsFGOjrEN4=
 github.com/devtron-labs/protos v0.0.3-0.20240614064039-c8647dc19a48/go.mod h1:ypUknVph8Ph4dxSlrFoouf7wLedQxHku2LQwgRrdgS4=
+github.com/devtron-labs/protos v0.0.3-0.20240614110103-8d05fec622b3 h1:XsTpQA2ewZWkDv5JorddKqKpJakGptfYDytGx5UZxk0=
+github.com/devtron-labs/protos v0.0.3-0.20240614110103-8d05fec622b3/go.mod h1:ypUknVph8Ph4dxSlrFoouf7wLedQxHku2LQwgRrdgS4=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=

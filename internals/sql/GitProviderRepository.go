@@ -28,19 +28,20 @@ const (
 )
 
 type GitProvider struct {
-	tableName     struct{} `sql:"git_provider"`
-	Id            int      `sql:"id,pk"`
-	Name          string   `sql:"name,notnull"`
-	Url           string   `sql:"url,notnull"`
-	UserName      string   `sql:"user_name"`
-	Password      string   `sql:"password"`
-	SshPrivateKey string   `sql:"ssh_private_key"`
-	AccessToken   string   `sql:"access_token"`
-	AuthMode      AuthMode `sql:"auth_mode,notnull"`
-	Active        bool     `sql:"active,notnull"`
-	TlsCert       string   `sql:"tls_cert"`
-	TlsKey        string   `sql:"tls_key"`
-	CaCert        string   `sql:"ca_cert"`
+	tableName              struct{} `sql:"git_provider"`
+	Id                     int      `sql:"id,pk"`
+	Name                   string   `sql:"name,notnull"`
+	Url                    string   `sql:"url,notnull"`
+	UserName               string   `sql:"user_name"`
+	Password               string   `sql:"password"`
+	SshPrivateKey          string   `sql:"ssh_private_key"`
+	AccessToken            string   `sql:"access_token"`
+	AuthMode               AuthMode `sql:"auth_mode,notnull"`
+	Active                 bool     `sql:"active,notnull"`
+	TlsCert                string   `sql:"tls_cert"`
+	TlsKey                 string   `sql:"tls_key"`
+	CaCert                 string   `sql:"ca_cert"`
+	TlsVerificationEnabled bool     `sql:"enable_tls_verification"`
 	//models.AuditLog
 }
 

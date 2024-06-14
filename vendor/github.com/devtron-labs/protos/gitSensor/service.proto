@@ -23,6 +23,7 @@ message GitProvider {
   string TlsCert =10;
   string TlsKey  =11;
   string CaCert  =12;
+  bool TlsVerificationEnabled =13;
 }
 
 message GitMaterial {
