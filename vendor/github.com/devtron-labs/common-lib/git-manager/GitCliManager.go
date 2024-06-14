@@ -53,12 +53,12 @@ const DefaultRemoteName = "origin"
 
 func (impl *GitCliManagerImpl) Fetch(gitContext GitContext, rootDir string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git fetch ", "location", rootDir)
-	tlsPathInfo, err := createFilesForTlsData(gitContext)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
 	}
-	defer deleteTlsFiles(tlsPathInfo)
+	defer DeleteTlsFiles(tlsPathInfo)
 	cmd := exec.Command("git", "-C", rootDir, "fetch", "origin", "--tags", "--force")
 	output, errMsg, err := impl.RunCommandWithCred(cmd, gitContext.Auth.Username, gitContext.Auth.Password, tlsPathInfo)
 	log.Println(util.DEVTRON, "fetch output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -67,12 +67,12 @@ func (impl *GitCliManagerImpl) Fetch(gitContext GitContext, rootDir string) (res
 
 func (impl *GitCliManagerImpl) Checkout(gitContext GitContext, rootDir string, checkout string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git checkout ", "location", rootDir)
-	tlsPathInfo, err := createFilesForTlsData(gitContext)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
 	}
-	defer deleteTlsFiles(tlsPathInfo)
+	defer DeleteTlsFiles(tlsPathInfo)
 	cmd := exec.Command("git", "-C", rootDir, "checkout", checkout, "--force")
 	output, errMsg, err := impl.RunCommandWithCred(cmd, gitContext.Auth.Username, gitContext.Auth.Password, tlsPathInfo)
 	log.Println(util.DEVTRON, "checkout output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
@@ -255,12 +255,12 @@ func (impl *GitCliManagerImpl) GitCheckout(gitContext GitContext, checkoutPath s
 
 func (impl *GitCliManagerImpl) shallowClone(gitContext GitContext, rootDir string, remoteUrl string, sourceBranch string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git shallow clone ", "location", rootDir)
-	tlsPathInfo, err := createFilesForTlsData(gitContext)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
 	}
-	defer deleteTlsFiles(tlsPathInfo)
+	defer DeleteTlsFiles(tlsPathInfo)
 	cmd := exec.Command("git", "-C", rootDir, "clone", "--filter=tree:0", "--single-branch", "-b", sourceBranch, remoteUrl, "--no-checkout")
 	output, errMsg, err := impl.RunCommandWithCred(cmd, gitContext.Auth.Username, gitContext.Auth.Password, tlsPathInfo)
 	log.Println(util.DEVTRON, "shallow clone output", "root", rootDir, "opt", output, "errMsg", errMsg, "error", err)

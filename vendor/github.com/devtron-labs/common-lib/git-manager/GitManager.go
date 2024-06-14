@@ -202,30 +202,30 @@ func (impl *GitManager) CloneAndCheckout(ciProjectDetails []CiProjectDetails, wo
 	return nil
 }
 
-func createFilesForTlsData(gitContext GitContext) (*TlsPathInfo, error) {
+func CreateFilesForTlsData(tlsData *TLSData) (*TlsPathInfo, error) {
 
-	if gitContext.TLSData == nil {
+	if tlsData == nil {
 		return nil, nil
 	}
-	if gitContext.TLSData.TlsVerificationEnabled {
+	if tlsData.TlsVerificationEnabled {
 		var tlsKeyFilePath string
 		var tlsCertFilePath string
 		var caCertFilePath string
 		var err error
 		// this is to avoid concurrency issue, random number is appended at the end of file, where this file is read/created/deleted by multiple commands simultaneously.
 		randomNumber := rand.Intn(100000)
-		if gitContext.TLSData.TLSKey != "" && gitContext.TLSData.TLSCertificate != "" {
-			tlsKeyFilePath, err = utils.CreateFolderAndFileWithContent(gitContext.TLSData.TLSKey, fmt.Sprintf("%s_%v", TLS_KEY_FILE_NAME, randomNumber), TLS_FILES_DIR)
+		if tlsData.TLSKey != "" && tlsData.TLSCertificate != "" {
+			tlsKeyFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSKey, fmt.Sprintf("%s_%v", TLS_KEY_FILE_NAME, randomNumber), TLS_FILES_DIR)
 			if err != nil {
 				return nil, err
 			}
-			tlsCertFilePath, err = utils.CreateFolderAndFileWithContent(gitContext.TLSData.TLSCertificate, fmt.Sprintf("%s_%v", TLS_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
+			tlsCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSCertificate, fmt.Sprintf("%s_%v", TLS_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
 			if err != nil {
 				return nil, err
 			}
 		}
-		if gitContext.TLSData.CACert != "" {
-			caCertFilePath, err = utils.CreateFolderAndFileWithContent(gitContext.TLSData.CACert, fmt.Sprintf("%s_%v", CA_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
+		if tlsData.CACert != "" {
+			caCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.CACert, fmt.Sprintf("%s_%v", CA_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
 			if err != nil {
 				return nil, err
 			}
@@ -235,7 +235,7 @@ func createFilesForTlsData(gitContext GitContext) (*TlsPathInfo, error) {
 	return nil, nil
 }
 
-func deleteTlsFiles(pathInfo *TlsPathInfo) {
+func DeleteTlsFiles(pathInfo *TlsPathInfo) {
 	if pathInfo == nil {
 		return
 	}
