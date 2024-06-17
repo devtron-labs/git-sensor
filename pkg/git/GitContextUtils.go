@@ -22,15 +22,27 @@ import (
 )
 
 type GitContext struct {
-	context.Context // Embedding original Go context
-	Username        string
-	Password        string
-	CloningMode     string
+	context.Context        // Embedding original Go context
+	Username               string
+	Password               string
+	CloningMode            string
+	CACert                 string
+	TLSKey                 string
+	TLSCertificate         string
+	TLSVerificationEnabled bool
 }
 
 func (gitCtx GitContext) WithCredentials(Username string, Password string) GitContext {
 	gitCtx.Username = Username
 	gitCtx.Password = Password
+	return gitCtx
+}
+
+func (gitCtx GitContext) WithTLSData(caData string, tlsKey string, tlsCertificate string, tlsVerificationEnabled bool) GitContext {
+	gitCtx.CACert = caData
+	gitCtx.TLSKey = tlsKey
+	gitCtx.TLSCertificate = tlsCertificate
+	gitCtx.TLSVerificationEnabled = tlsVerificationEnabled
 	return gitCtx
 }
 
