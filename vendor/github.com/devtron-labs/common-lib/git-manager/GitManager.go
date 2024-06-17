@@ -202,7 +202,7 @@ func (impl *GitManager) CloneAndCheckout(ciProjectDetails []CiProjectDetails, wo
 	return nil
 }
 
-func CreateFilesForTlsData(tlsData *TLSData) (*TlsPathInfo, error) {
+func CreateFilesForTlsData(tlsData *TLSData, directoryPath string) (*TlsPathInfo, error) {
 
 	if tlsData == nil {
 		return nil, nil
@@ -215,17 +215,17 @@ func CreateFilesForTlsData(tlsData *TLSData) (*TlsPathInfo, error) {
 		// this is to avoid concurrency issue, random number is appended at the end of file, where this file is read/created/deleted by multiple commands simultaneously.
 		randomNumber := rand.Intn(100000)
 		if tlsData.TLSKey != "" && tlsData.TLSCertificate != "" {
-			tlsKeyFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSKey, fmt.Sprintf("%s_%v", TLS_KEY_FILE_NAME, randomNumber), TLS_FILES_DIR)
+			tlsKeyFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSKey, fmt.Sprintf("%s_%v", TLS_KEY_FILE_NAME, randomNumber), directoryPath)
 			if err != nil {
 				return nil, err
 			}
-			tlsCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSCertificate, fmt.Sprintf("%s_%v", TLS_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
+			tlsCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.TLSCertificate, fmt.Sprintf("%s_%v", TLS_CERT_FILE_NAME, randomNumber), directoryPath)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if tlsData.CACert != "" {
-			caCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.CACert, fmt.Sprintf("%s_%v", CA_CERT_FILE_NAME, randomNumber), TLS_FILES_DIR)
+			caCertFilePath, err = utils.CreateFolderAndFileWithContent(tlsData.CACert, fmt.Sprintf("%s_%v", CA_CERT_FILE_NAME, randomNumber), directoryPath)
 			if err != nil {
 				return nil, err
 			}

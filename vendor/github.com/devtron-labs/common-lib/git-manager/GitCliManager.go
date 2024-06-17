@@ -53,7 +53,7 @@ const DefaultRemoteName = "origin"
 
 func (impl *GitCliManagerImpl) Fetch(gitContext GitContext, rootDir string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git fetch ", "location", rootDir)
-	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData, gitContext.WorkingDir)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
@@ -67,7 +67,7 @@ func (impl *GitCliManagerImpl) Fetch(gitContext GitContext, rootDir string) (res
 
 func (impl *GitCliManagerImpl) Checkout(gitContext GitContext, rootDir string, checkout string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git checkout ", "location", rootDir)
-	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData, gitContext.WorkingDir)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
@@ -255,7 +255,7 @@ func (impl *GitCliManagerImpl) GitCheckout(gitContext GitContext, checkoutPath s
 
 func (impl *GitCliManagerImpl) shallowClone(gitContext GitContext, rootDir string, remoteUrl string, sourceBranch string) (response, errMsg string, err error) {
 	log.Println(util.DEVTRON, "git shallow clone ", "location", rootDir)
-	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData)
+	tlsPathInfo, err := CreateFilesForTlsData(gitContext.TLSData, gitContext.WorkingDir)
 	if err != nil {
 		//making it non-blocking
 		fmt.Println("error encountered in createFilesForTlsData", "err", err)
