@@ -75,7 +75,7 @@ github.com/devtron-labs/common-lib/pubsub-lib
 github.com/devtron-labs/common-lib/pubsub-lib/metrics
 github.com/devtron-labs/common-lib/pubsub-lib/model
 github.com/devtron-labs/common-lib/utils
-# github.com/devtron-labs/protos v0.0.3-0.20240614110103-8d05fec622b3
+# github.com/devtron-labs/protos v0.0.3-0.20240617111821-3ce37e891508
 ## explicit; go 1.17
 github.com/devtron-labs/protos/gitSensor
 # github.com/emirpasic/gods v1.18.1

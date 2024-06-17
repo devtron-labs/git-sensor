@@ -72,19 +72,19 @@ func (impl *GrpcHandlerImpl) SaveGitProvider(ctx context.Context, req *pb.GitPro
 
 	// mapping req
 	gitProvider := &sql.GitProvider{
-		Id:                     int(req.Id),
-		Name:                   req.Name,
-		Url:                    req.Url,
-		UserName:               req.UserName,
-		Password:               req.Password,
-		AccessToken:            req.AccessToken,
-		SshPrivateKey:          req.SshPrivateKey,
-		AuthMode:               sql.AuthMode(req.AuthMode),
-		Active:                 req.Active,
-		CaCert:                 req.CaCert,
-		TlsCert:                req.TlsCert,
-		TlsKey:                 req.TlsKey,
-		TlsVerificationEnabled: req.TlsVerificationEnabled,
+		Id:                    int(req.Id),
+		Name:                  req.Name,
+		Url:                   req.Url,
+		UserName:              req.UserName,
+		Password:              req.Password,
+		AccessToken:           req.AccessToken,
+		SshPrivateKey:         req.SshPrivateKey,
+		AuthMode:              sql.AuthMode(req.AuthMode),
+		Active:                req.Active,
+		CaCert:                req.CaCert,
+		TlsCert:               req.TlsCert,
+		TlsKey:                req.TlsKey,
+		EnableTLSVerification: req.EnableTLSVerification,
 	}
 
 	_, err := impl.repositoryManager.SaveGitProvider(gitProvider)
