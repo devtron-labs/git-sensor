@@ -91,10 +91,9 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 			return err
 		}
 
-		impl.logger.Debug("got webhookEventParsedData by uniqueId for event", "webhookEventParsedDataId", webhookParsedEventGetData.Id, "uniqueId", webhookEventParsedData.UniqueId)
-
 		// save or update in DB
 		if webhookParsedEventGetData != nil {
+			impl.logger.Debug("got webhookEventParsedData by uniqueId for event", "webhookEventParsedDataId", webhookParsedEventGetData.Id, "uniqueId", webhookEventParsedData.UniqueId)
 			webhookEventParsedData.Id = webhookParsedEventGetData.Id
 			webhookEventParsedData.CreatedOn = webhookParsedEventGetData.CreatedOn
 			webhookEventParsedData.UpdatedOn = time.Now()
