@@ -162,13 +162,13 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 			}
 
 			//MatchFilter
-			impl.logger.Debug("Matching filter")
+			impl.logger.Debug("Matching for filters")
 			filterResults, overallMatch, err := impl.MatchFilter(event, fullDataMap, ciPipelineMaterial.Value)
 			if err != nil {
 				impl.logger.Errorw("err in matching filter", "err", err)
 				return err
 			}
-			impl.logger.Debug("Matched : ", overallMatch)
+			impl.logger.Debug("filter match status", "matched", overallMatch)
 
 			// insert/update mapping into DB
 			err = impl.HandleMaterialWebhookMappingIntoDb(ciPipelineMaterial.Id, webhookEventParsedData.Id, overallMatch, filterResults)
@@ -187,6 +187,7 @@ func (impl WebhookEventServiceImpl) MatchCiTriggerConditionAndNotify(event *sql.
 
 			// if condition is match, then notify for CI
 			if overallMatch {
+				impl.logger.Debug("notify for ci complete event", "ciPipelineMaterialId", ciPipelineMaterial.Id)
 				impl.NotifyForAutoCi(impl.BuildNotifyCiObject(ciPipelineMaterial, webhookEventParsedData, filterResults))
 			}
 		}
@@ -206,6 +207,7 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 
 	// match event Id
 	if event.Id != webhookSourceTypeValue.EventId {
+		impl.logger.Debug("event id did not matched", "eventId", event.Id, "webhookSourceTypeValue.EventId", webhookSourceTypeValue.EventId)
 		return nil, false, nil
 	}
 
@@ -214,6 +216,7 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 	// if no condition found then assume it matched
 	condition := webhookSourceTypeValue.Condition
 	if len(condition) == 0 {
+		impl.logger.Debug("no filter conditions found, event matched!")
 		return nil, true, nil
 	}
 
@@ -250,6 +253,7 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 				filterResult.MatchedGroups = matchedGroups
 			}
 			if overallMatch && !filterResult.ConditionMatched {
+				impl.logger.Debug("event match condition failed", "conditionRegexValue", conditionRegexValue, "actualValue", actualValue)
 				overallMatch = false
 			}
 		}
@@ -259,7 +263,6 @@ func (impl WebhookEventServiceImpl) MatchFilter(event *sql.GitHostWebhookEvent, 
 		}
 
 	}
-
 	return filterResults, overallMatch, nil
 }
 
@@ -331,12 +334,12 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingIntoDb(ciPipelin
 
 	if isNewMapping {
 		// insert into DB
-		impl.logger.Debug("Saving mapping into DB")
+		impl.logger.Debug("Saving mapping into DB", "ciPipelineMaterialWebhookDataMapping", ciPipelineMaterialWebhookDataMapping)
 		ciPipelineMaterialWebhookDataMapping.CreatedOn = time.Now()
 		err = impl.webhookEventDataMappingRepository.SaveCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
 	} else {
 		// update DB
-		impl.logger.Debug("Updating mapping into DB")
+		impl.logger.Debug("Updating mapping into DB", "ciPipelineMaterialWebhookDataMapping", ciPipelineMaterialWebhookDataMapping)
 		ciPipelineMaterialWebhookDataMapping.Id = mapping.Id
 		err = impl.webhookEventDataMappingRepository.UpdateCiPipelineMaterialWebhookDataMapping(ciPipelineMaterialWebhookDataMapping)
 	}
@@ -354,6 +357,7 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingFilterResultInto
 
 	// if not new mapping, then inactivate old
 	if !isNewMapping {
+		impl.logger.Debug("inactivate old webhookDataMapping", "webhookDataMappingId", webhookDataMappingId)
 		err := impl.webhookEventDataMappingFilterResultRepository.InactivateForMappingId(webhookDataMappingId)
 		if err != nil {
 			impl.logger.Errorw("err in inactivating ci-pipeline vs webhook data mapping filter results", "err", err)
@@ -362,6 +366,7 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingFilterResultInto
 	}
 
 	if len(filterResults) == 0 {
+		impl.logger.Debug("no filterResults found, skipping", "filterResults", filterResults)
 		return nil
 	}
 
@@ -376,6 +381,6 @@ func (impl WebhookEventServiceImpl) HandleMaterialWebhookMappingFilterResultInto
 		impl.logger.Errorw("err in saving ci-pipeline vs webhook data mapping filter results", "err", err)
 		return err
 	}
-
+	impl.logger.Debug("saved Webhook Event Data Mapping Filter Result", "filterResults", filterResults)
 	return nil
 }

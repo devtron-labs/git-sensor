@@ -41,7 +41,7 @@ func NewWebhookHandlerImpl(logger *zap.SugaredLogger, webhookEventService Webhoo
 }
 
 func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) error {
-	impl.logger.Debug("Webhook event came")
+	impl.logger.Debug("received webhook event", "webhookEvent", webhookEvent)
 
 	gitHostId := webhookEvent.GitHostId
 	eventType := webhookEvent.EventType
@@ -63,8 +63,9 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 	}
 
 	// operate for all matching event (match for eventType)
-	impl.logger.Debug("Checking for event matching")
+	impl.logger.Debug("Checking for all events for match")
 	for _, event := range events {
+		impl.logger.Debug("Checking for event", "eventId", event.Id)
 		if len(event.EventTypesCsv) > 0 {
 			eventTypes := strings.Split(event.EventTypesCsv, ",")
 			if !contains(eventTypes, eventType) {
@@ -72,14 +73,11 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 			}
 		}
 
+		impl.logger.Debug("event type matched for", "eventId", event.Id, "eventType", eventType)
 		eventId := event.Id
 
 		// parse event data using selectors
-		webhookEventParsedData, fullDataMap, err := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
-		if err != nil {
-			impl.logger.Errorw("error in parsing webhook event data", "err", err)
-			return err
-		}
+		webhookEventParsedData, fullDataMap := impl.webhookEventParser.ParseEvent(event.Selectors, payloadJson)
 
 		// set event details in webhook data (eventId and merged/non-merged etc..)
 		webhookEventParsedData.EventId = eventId
@@ -93,17 +91,26 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 			return err
 		}
 
+		impl.logger.Debug("got webhookEventParsedData by uniqueId for event", "webhookEventParsedDataId", webhookParsedEventGetData.Id, "uniqueId", webhookEventParsedData.UniqueId)
+
 		// save or update in DB
 		if webhookParsedEventGetData != nil {
 			webhookEventParsedData.Id = webhookParsedEventGetData.Id
 			webhookEventParsedData.CreatedOn = webhookParsedEventGetData.CreatedOn
 			webhookEventParsedData.UpdatedOn = time.Now()
-			impl.webhookEventService.UpdateWebhookParsedEventData(webhookEventParsedData)
+			dbErr := impl.webhookEventService.UpdateWebhookParsedEventData(webhookEventParsedData)
+			if dbErr != nil {
+				impl.logger.Errorw("error in updating webhookEventParsedData", "webhookEventParsedData", webhookEventParsedData, "err", dbErr)
+			}
 		} else {
 			webhookEventParsedData.CreatedOn = time.Now()
-			impl.webhookEventService.SaveWebhookParsedEventData(webhookEventParsedData)
+			dbErr := impl.webhookEventService.SaveWebhookParsedEventData(webhookEventParsedData)
+			if dbErr != nil {
+				impl.logger.Errorw("error in saving webhookEventParsedData", "webhookEventParsedData", webhookEventParsedData, "err", dbErr)
+			}
 		}
 
+		impl.logger.Debug("webhookEventParsedData updated successfully", "webhookEventParsedData", webhookEventParsedData)
 		// match ci trigger condition and notify
 		err = impl.webhookEventService.MatchCiTriggerConditionAndNotify(event, webhookEventParsedData, fullDataMap)
 		if err != nil {

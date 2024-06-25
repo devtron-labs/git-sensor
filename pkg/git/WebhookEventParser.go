@@ -24,7 +24,7 @@ import (
 )
 
 type WebhookEventParser interface {
-	ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string, error)
+	ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string)
 }
 
 type WebhookEventParserImpl struct {
@@ -51,7 +51,7 @@ const (
 	WEBHOOK_SELECTOR_SOURCE_BRANCH_NAME_NAME string = "source branch name"
 )
 
-func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string, error) {
+func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEventSelectors, requestPayloadJson string) (*sql.WebhookEventParsedData, map[string]string) {
 
 	impl.logger.Debug("parsing webhook event data")
 
@@ -96,5 +96,5 @@ func (impl WebhookEventParserImpl) ParseEvent(selectors []*sql.GitHostWebhookEve
 	impl.logger.Debug("webhookEventParsedData : ", webhookEventParsedData)
 	impl.logger.Debug("wholeData : ", wholeData)
 
-	return webhookEventParsedData, wholeData, nil
+	return webhookEventParsedData, wholeData
 }
