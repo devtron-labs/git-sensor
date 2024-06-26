@@ -295,7 +295,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 				breakLoop = true
 				return
 			}
-			if !commitToFind && strings.Contains(commit.GetCommit().Commit, to) {
+			if !commitToFind && strings.HasPrefix(commit.GetCommit().Commit, to) {
 				commitToFind = true
 			}
 			if !commitToFind {
