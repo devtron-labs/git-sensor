@@ -26,6 +26,7 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"strings"
 )
 
 type RepoManager interface {
@@ -721,6 +722,10 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 	var repository *git.GitRepository
 	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
+		if strings.Contains(err.Error(), git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
+			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
+			return nil, nil
+		}
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
 	}

@@ -28,15 +28,17 @@ import (
 )
 
 const (
-	GIT_BASE_DIR              = "/git-base/"
-	SSH_PRIVATE_KEY_DIR       = GIT_BASE_DIR + "ssh-keys/"
-	SSH_PRIVATE_KEY_FILE_NAME = "ssh_pvt_key"
-	CLONE_TIMEOUT_SEC         = 600
-	FETCH_TIMEOUT_SEC         = 30
-	GITHUB_PROVIDER           = "github.com"
-	GITLAB_PROVIDER           = "gitlab.com"
-	CloningModeShallow        = "SHALLOW"
-	CloningModeFull           = "FULL"
+	GIT_BASE_DIR                   = "/git-base/"
+	SSH_PRIVATE_KEY_DIR            = GIT_BASE_DIR + "ssh-keys/"
+	SSH_PRIVATE_KEY_FILE_NAME      = "ssh_pvt_key"
+	CLONE_TIMEOUT_SEC              = 600
+	FETCH_TIMEOUT_SEC              = 30
+	GITHUB_PROVIDER                = "github.com"
+	GITLAB_PROVIDER                = "gitlab.com"
+	CloningModeShallow             = "SHALLOW"
+	CloningModeFull                = "FULL"
+	NO_COMMIT_GIT_ERROR_MESSAGE    = "unknown revision or path not in the working tree."
+	NO_COMMIT_CUSTOM_ERROR_MESSAGE = "No Commit Found"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
