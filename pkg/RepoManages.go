@@ -26,6 +26,7 @@ import (
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	"strings"
 )
 
 type RepoManager interface {
@@ -195,8 +196,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			continue
 		}
 
-		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password).
-			WithCloningMode(impl.configuration.CloningMode)
+		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password)
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
@@ -351,8 +351,7 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 		return material, nil
 	}
 
-	gitCtx = gitCtx.WithCredentials(userName, password).
-		WithCloningMode(impl.configuration.CloningMode)
+	gitCtx = gitCtx.WithCredentials(userName, password)
 
 	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
@@ -638,8 +637,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
 
-	gitCtx = gitCtx.WithCredentials(userName, password).
-		WithCloningMode(impl.configuration.CloningMode)
+	gitCtx = gitCtx.WithCredentials(userName, password)
 
 	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
@@ -707,8 +705,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		return nil, err
 	}
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
-		WithCloningMode(impl.configuration.CloningMode)
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
 	// validate checkout status of gitMaterial
 	if !gitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
@@ -725,6 +722,10 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 	var repository *git.GitRepository
 	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
+		if strings.Contains(err.Error(), git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
+			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
+			return nil, nil
+		}
 		impl.logger.Errorw("error while fetching commit info", "pipelineMaterialId", pipelineMaterialId, "gitHash", gitHash, "err", err)
 		return nil, err
 	}
@@ -763,8 +764,7 @@ func (impl RepoManagerImpl) GetReleaseChanges(gitCtx git.GitContext, request *Re
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
-		WithCloningMode(impl.configuration.CloningMode)
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
 
 	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitCtx, gitMaterial.CheckoutLocation, request.OldCommit, request.NewCommit)
 	if err != nil {

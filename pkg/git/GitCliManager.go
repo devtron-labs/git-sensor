@@ -17,6 +17,7 @@
 package git
 
 import (
+	"errors"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -125,6 +126,9 @@ func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, b
 	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", cmdArgs...)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil {
+		if strings.Contains(output, NO_COMMIT_GIT_ERROR_MESSAGE) {
+			return nil, errors.New(NO_COMMIT_CUSTOM_ERROR_MESSAGE)
+		}
 		return nil, err
 	}
 	commits, err := impl.processGitLogOutput(output)
@@ -162,7 +166,7 @@ func (impl *GitCliManagerImpl) GitShow(gitCtx GitContext, rootDir string, hash s
 
 func (impl *GitCliManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {
 	gitCommit := commit.GetCommit()
-	return impl.FetchDiffStatBetweenCommits(gitCtx, gitCommit.Commit, "", checkoutPath)
+	return impl.FetchDiffStatBetweenCommitsNameOnly(gitCtx, gitCommit.Commit, "", checkoutPath)
 }
 
 func (impl *GitCliManagerImpl) processGitLogOutput(out string) ([]GitCommit, error) {

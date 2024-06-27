@@ -29,8 +29,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/devtron-labs/common-lib v0.0.18-0.20240520062828-c6c38c3f135e h1:feRK1mshlcKh9/dV5sWUtZTsMEBV3perE/OjmnvulQg=
 github.com/devtron-labs/common-lib v0.0.18-0.20240520062828-c6c38c3f135e/go.mod h1:deAcJ5IjUjM6ozZQLJEgPWDUA0mKa632LBsKx8uM9TE=
-github.com/devtron-labs/protos v0.0.3-0.20240130061723-7b2e12ab0abb h1:CkfQQgZc950/hTPqtQSiHV2RmZgkBLGCzwR02FZYjAU=
-github.com/devtron-labs/protos v0.0.3-0.20240130061723-7b2e12ab0abb/go.mod h1:pjLjgoa1GzbkOkvbMyP4SAKsaiK7eG6GoQCNauG03JA=
+github.com/devtron-labs/protos v0.0.3-0.20240527113333-08a3be5ec6c1 h1:R6qVeFaayqstBSu4w+ipWQqJyMKDqBVV3a11qoA2IaM=
+github.com/devtron-labs/protos v0.0.3-0.20240527113333-08a3be5ec6c1/go.mod h1:ypUknVph8Ph4dxSlrFoouf7wLedQxHku2LQwgRrdgS4=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=

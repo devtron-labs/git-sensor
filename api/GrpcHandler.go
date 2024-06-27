@@ -43,6 +43,7 @@ type GrpcHandler interface {
 	RefreshGitMaterial(ctx context.Context, req *pb.RefreshGitMaterialRequest) (*pb.RefreshGitMaterialResponse, error)
 	ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error)
 	ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (*pb.GenericResponse, error)
+	ReloadMaterials(ctx context.Context, req *pb.ReloadMaterialsRequest) (*pb.GenericResponse, error)
 	GetChangesInRelease(ctx context.Context, req *pb.ReleaseChangeRequest) (*pb.GitChanges, error)
 	GetWebhookData(ctx context.Context, req *pb.WebhookDataRequest) (*pb.WebhookAndCiData, error)
 	GetAllWebhookEventConfigForHost(ctx context.Context, req *pb.WebhookEventConfigRequest) (*pb.WebhookEventConfigResponse, error)
@@ -119,7 +120,11 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 		}
 	}
 
-	gitCtx := git.BuildGitContext(ctx)
+	cloningMode := git.CloningModeFull
+	if req.GitMaterialList != nil || len(req.GitMaterialList) > 0 {
+		cloningMode = req.GitMaterialList[0].GetCloningMode()
+	}
+	gitCtx := git.BuildGitContext(ctx).WithCloningMode(cloningMode)
 
 	_, err := impl.repositoryManager.AddRepo(gitCtx, gitMaterials)
 	if err != nil {
@@ -133,7 +138,7 @@ func (impl *GrpcHandlerImpl) AddRepo(ctx context.Context, req *pb.AddRepoRequest
 // UpdateRepo updates GitMaterial
 func (impl *GrpcHandlerImpl) UpdateRepo(ctx context.Context, req *pb.GitMaterial) (
 	*pb.Empty, error) {
-	gitCtx := git.BuildGitContext(ctx)
+	gitCtx := git.BuildGitContext(ctx).WithCloningMode(req.GetCloningMode())
 
 	// Mapping
 	mappedGitMaterial := &sql.GitMaterial{
@@ -301,8 +306,6 @@ func (impl *GrpcHandlerImpl) GetHeadForPipelineMaterials(ctx context.Context, re
 func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.CommitMetadataRequest) (
 	*pb.GitCommit, error) {
 
-	gitCtx := git.BuildGitContext(ctx)
-
 	// Mapping req body
 	mappedReq := &git.CommitMetadataRequest{
 		PipelineMaterialId: int(req.PipelineMaterialId),
@@ -313,6 +316,7 @@ func (impl *GrpcHandlerImpl) GetCommitMetadata(ctx context.Context, req *pb.Comm
 
 	var gitCommit *git.GitCommitBase
 	var err error
+	gitCtx := git.BuildGitContext(ctx)
 
 	if len(req.GitTag) > 0 {
 		gitCommit, err = impl.repositoryManager.GetCommitInfoForTag(gitCtx, mappedReq)
@@ -475,6 +479,24 @@ func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadM
 
 		return nil, err
 	}
+	return &pb.GenericResponse{
+		Message: "reloaded",
+	}, nil
+}
+
+func (impl *GrpcHandlerImpl) ReloadMaterials(ctx context.Context, req *pb.ReloadMaterialsRequest) (
+	*pb.GenericResponse, error) {
+	for _, material := range req.GetReloadMaterials() {
+		gitCtx := git.BuildGitContext(ctx).WithCloningMode(material.GetCloningMode())
+		err := impl.repositoryManager.ResetRepo(gitCtx, int(material.MaterialId))
+		if err != nil {
+			impl.logger.Errorw("error while reloading material",
+				"materialId", material.MaterialId,
+				"err", err)
+
+		}
+	}
+
 	return &pb.GenericResponse{
 		Message: "reloaded",
 	}, nil
