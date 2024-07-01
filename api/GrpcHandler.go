@@ -460,8 +460,8 @@ func (impl *GrpcHandlerImpl) RefreshGitMaterial(ctx context.Context, req *pb.Ref
 
 func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	gitCtx := git.BuildGitContext(ctx)
-	impl.repositoryManager.ReloadAllRepo(gitCtx)
-	return &pb.Empty{}, nil
+	err := impl.repositoryManager.ReloadAllRepo(gitCtx, nil)
+	return &pb.Empty{}, err
 }
 
 func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (

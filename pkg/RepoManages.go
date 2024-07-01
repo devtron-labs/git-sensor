@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/internals/util"
@@ -38,7 +39,7 @@ type RepoManager interface {
 	AddRepo(gitCtx git.GitContext, material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
 	UpdateRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error)
 	SavePipelineMaterial(gitCtx git.GitContext, material []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error)
-	ReloadAllRepo(gitCtx git.GitContext)
+	ReloadAllRepo(gitCtx git.GitContext, req *bean.ReloadAllMaterialQuery) (err error)
 	ResetRepo(gitCtx git.GitContext, materialId int) error
 	GetReleaseChanges(gitCtx git.GitContext, request *ReleaseChangesRequest) (*git.GitChanges, error)
 	GetCommitInfoForTag(gitCtx git.GitContext, request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
@@ -202,7 +203,10 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 		var repository *git.GitRepository
 		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
-		if err == nil {
+		if gitCtx.Err() != nil {
+			impl.logger.Errorw("context error in getting commits", "err", gitCtx.Err())
+			return gitCtx.Err()
+		} else if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
 			b, err := json.Marshal(commits)
 			if err == nil {
@@ -362,7 +366,10 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	checkoutLocationForFetching := impl.repositoryManager.GetCheckoutLocation(gitCtx, material, gitProvider.Url, checkoutPath)
 
 	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
-	if err == nil {
+	if gitCtx.Err() != nil {
+		impl.logger.Errorw("context error in git checkout", "err", gitCtx.Err())
+		return material, gitCtx.Err()
+	} else if err == nil {
 		material.CheckoutLocation = checkoutLocationForFetching
 		material.CheckoutStatus = true
 	} else {
@@ -387,18 +394,38 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	return material, nil
 }
 
-func (impl RepoManagerImpl) ReloadAllRepo(gitCtx git.GitContext) {
-	materials, err := impl.materialRepository.FindAll()
-	if err != nil {
-		impl.logger.Errorw("error in reloading materials")
-	}
-	for _, material := range materials {
-		if _, err := impl.checkoutRepo(gitCtx, material); err != nil {
-			impl.logger.Errorw("error in checkout", "material", material, "err", err)
+func (impl RepoManagerImpl) ReloadAllRepo(gitCtx git.GitContext, req *bean.ReloadAllMaterialQuery) (err error) {
+	var materials []*sql.GitMaterial
+	if req != nil {
+		materials, err = impl.materialRepository.FindInRage(req.Start, req.End)
+		if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in getting reload materials"), "err", err)
+			return err
 		}
-
+	} else {
+		materials, err = impl.materialRepository.FindAll()
+		if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in getting reload materials"), "err", err)
+			return err
+		}
 	}
+
+	for _, material := range materials {
+		impl.logger.Infow(bean.GetReloadAllLog("performing material checkout for"), "materialId", material.Id)
+		_, err = impl.checkoutRepo(gitCtx, material)
+		if gitCtx.Err() != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in material checkout"), "materialId", material.Id, "err", gitCtx.Err())
+			return gitCtx.Err()
+		} else if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("context error in material while checkout"), "materialId", material.Id, "err", err)
+			// skipping for other materials to be processed
+		} else {
+			impl.logger.Infow(bean.GetReloadAllLog("successfully checked out for material"), "materialId", material.Id)
+		}
+	}
+	return nil
 }
+
 func (impl RepoManagerImpl) ResetRepo(gitCtx git.GitContext, materialId int) error {
 	material, err := impl.materialRepository.FindById(materialId)
 	if err != nil {

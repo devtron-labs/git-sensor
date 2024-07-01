@@ -59,6 +59,7 @@ type MaterialRepository interface {
 	Save(material *GitMaterial) error
 	FindActive() ([]*GitMaterial, error)
 	FindAll() ([]*GitMaterial, error)
+	FindInRage(startFrom int, endAt int) ([]*GitMaterial, error)
 	FindAllActiveByUrls(urls []string) ([]*GitMaterial, error)
 }
 type MaterialRepositoryImpl struct {
@@ -99,6 +100,21 @@ func (repo MaterialRepositoryImpl) FindAll() ([]*GitMaterial, error) {
 		Column("git_material.*", "GitProvider").
 		Where("deleted =? ", false).
 		Select()
+	return materials, err
+}
+
+func (repo MaterialRepositoryImpl) FindInRage(startFrom int, endAt int) ([]*GitMaterial, error) {
+	var materials []*GitMaterial
+	query := repo.dbConnection.Model(&materials).
+		Column("git_material.*", "GitProvider").
+		Where("deleted =? ", false)
+	if startFrom != 0 {
+		query.Where("id >= ?", startFrom)
+	}
+	if endAt != 0 {
+		query.Where("id <= ?", endAt)
+	}
+	err := query.Select()
 	return materials, err
 }
 
