@@ -49,7 +49,7 @@ type RepositoryManager interface {
 	// Clean cleans a directory
 	Clean(cloneDir string) error
 	// ChangesSinceByRepository returns the latest commits list for the given range and count for an existing repo
-	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error)
+	ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) (gitCommits []*GitCommitBase, cliOutput string, errMsg string, err error)
 	// GetCommitMetadata retrieves the commit metadata for given hash
 	GetCommitMetadata(gitCtx GitContext, checkoutPath, commitHash string) (*GitCommitBase, error)
 	// GetCommitForTag retrieves the commit metadata for given tag
@@ -238,12 +238,11 @@ func (impl *RepositoryManagerImpl) GetCommitMetadata(gitCtx GitContext, checkout
 
 // from -> old commit
 // to -> new commit
-func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) ([]*GitCommitBase, error) {
+func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, repository *GitRepository, branch string, from string, to string, count int, checkoutPath string, openNewGitRepo bool) (gitCommits []*GitCommitBase, cliOutput string, errMsg string, err error) {
 	// fix for azure devops (manual trigger webhook bases pipeline) :
 	// branch name comes as 'refs/heads/master', we need to extract actual branch name out of it.
 	// https://stackoverflow.com/questions/59956206/how-to-get-a-branch-name-with-a-slash-in-azure-devops
 
-	var err error
 	if count == 0 {
 		count = impl.configuration.GitHistoryCount
 	}
@@ -251,7 +250,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 	if openNewGitRepo {
 		repository, err = impl.gitManager.OpenRepoPlain(checkoutPath)
 		if err != nil {
-			return nil, err
+			return nil, "", "", err
 		}
 	}
 
@@ -260,7 +259,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 		util.TriggerGitOperationMetrics("changesSinceByRepository", start, err)
 	}()
 	branch, branchRef := GetBranchReference(branch)
-	itr, err := impl.gitManager.GetCommitIterator(gitCtx, repository, IteratorRequest{
+	itr, cliOutput, errMsg, err := impl.gitManager.GetCommitIterator(gitCtx, repository, IteratorRequest{
 		BranchRef:      branchRef,
 		Branch:         branch,
 		CommitCount:    count,
@@ -269,9 +268,8 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 	})
 	if err != nil {
 		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
-		return nil, err
+		return nil, cliOutput, errMsg, err
 	}
-	var gitCommits []*GitCommitBase
 	itrCounter := 0
 	commitToFind := len(to) == 0 //no commit mentioned
 	breakLoop := false
@@ -337,7 +335,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 			}
 		}()
 	}
-	return gitCommits, err
+	return gitCommits, "", "", err
 }
 
 func (impl *RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase {

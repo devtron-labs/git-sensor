@@ -94,19 +94,19 @@ func (impl *GoGitSDKManagerImpl) GetCommitForHash(gitCtx GitContext, checkoutPat
 	return gitCommit, nil
 }
 
-func (impl *GoGitSDKManagerImpl) GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GoGitSDKManagerImpl) GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (commitIterator CommitIterator, cliOutput string, errMsg string, err error) {
 
 	ref, err := repository.Reference(plumbing.ReferenceName(iteratorRequest.BranchRef), true)
 	if err != nil && err == plumbing.ErrReferenceNotFound {
-		return nil, fmt.Errorf("ref not found %s branch  %s", err, iteratorRequest.Branch)
+		return nil, "", "", fmt.Errorf("ref not found %s branch  %s", err, iteratorRequest.Branch)
 	} else if err != nil {
-		return nil, fmt.Errorf("error in getting reference %s branch  %s", err, iteratorRequest.Branch)
+		return nil, "", "", fmt.Errorf("error in getting reference %s branch  %s", err, iteratorRequest.Branch)
 	}
 	itr, err := repository.Log(&git.LogOptions{From: ref.Hash()})
 	if err != nil {
-		return nil, fmt.Errorf("error in getting iterator %s branch  %s", err, iteratorRequest.Branch)
+		return nil, "", "", fmt.Errorf("error in getting iterator %s branch  %s", err, iteratorRequest.Branch)
 	}
-	return &CommitGoGitIterator{itr}, nil
+	return &CommitGoGitIterator{itr}, "", "", nil
 }
 
 func (impl *GoGitSDKManagerImpl) OpenRepoPlain(checkoutPath string) (*GitRepository, error) {

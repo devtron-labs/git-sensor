@@ -200,7 +200,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
+		commits, _, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
@@ -670,7 +670,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
+	commits, _, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
 
 	if commits == nil {
 		return nil, err
@@ -720,9 +720,9 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 	var repository *git.GitRepository
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
+	commits, cliOutput, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
-		if strings.Contains(err.Error(), git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
+		if strings.Contains(cliOutput, git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
 			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
 			return nil, nil
 		}

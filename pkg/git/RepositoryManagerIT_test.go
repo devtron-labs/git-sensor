@@ -599,7 +599,7 @@ func TestRepositoryManager_ChangesSinceByRepository(t *testing.T) {
 		r, err := repositoryManagerImpl.gitManager.OpenRepoPlain(tt.payload.checkoutPath)
 		assert.Nil(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repositoryManagerImpl.ChangesSinceByRepository(BuildGitContext(context.Background()), r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, tt.payload.checkoutPath)
+			got, _, _, err := repositoryManagerImpl.ChangesSinceByRepository(BuildGitContext(context.Background()), r, tt.payload.branch, tt.payload.from, tt.payload.to, tt.payload.count, tt.payload.checkoutPath)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ChangesSinceByRepository() error in %s, error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
