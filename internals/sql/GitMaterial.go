@@ -110,10 +110,10 @@ func (repo MaterialRepositoryImpl) FindInRage(startFrom int, endAt int) ([]*GitM
 		Column("git_material.*", "GitProvider").
 		Where("deleted =? ", false)
 	if startFrom != 0 {
-		query.Where("id >= ?", startFrom)
+		query.Where("git_material.id >= ?", startFrom)
 	}
 	if endAt != 0 {
-		query.Where("id <= ?", endAt)
+		query.Where("git_material.id <= ?", endAt)
 	}
 	err := query.Select()
 	return materials, err
