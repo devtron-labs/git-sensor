@@ -16,13 +16,13 @@
 
 INSERT INTO git_host_webhook_event (git_host_id, name, event_types_csv,
                                     action_type, is_active, created_on)
-VALUES (3, 'Pull Request', 'Tag Push Hook', 'non-merged','t', NOW()),
-       (3, 'Tag Creation', 'Merge Request Hook', 'merged','t', NOW());
+VALUES (3, 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
+       (3, 'Tag Creation', 'Tag Push Hook', 'merged','t', NOW());
 
 INSERT INTO git_host_webhook_event_selectors
 (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
 VALUES (5, 'unique id', 'object_attributes.id', 'f', 'f', 't', NULL, NOW()),
-       (5, 'repository url', 'repository.homepage', 'f', 'f', 't', NULL, NOW()),
+       (5, 'repository url', 'project.http_url', 'f', 'f', 't', NULL, NOW()),
        (5, 'title', 'object_attributes.title', 't', 't', 't', NULL, NOW()),
        (5, 'git url', 'object_attributes.url', 't', 'f', 't', NULL, NOW()),
        (5, 'author', 'user.username', 't', 't', 't', NULL, NOW()),
@@ -43,7 +43,7 @@ VALUES
     (6, 'date', 'object_attributes.updated_at', 't', 'f', 't', NULL, NOW()),
     (6, 'tag name', 'ref', 't', 'f', 't', NULL, NOW()),
     (6, 'target checkout', 'checkout_sha', 't', 'f', 't', NULL, NOW()),
-    (6, 'tag creation indentifier', 'checkout_sha', 't', 't', 't', NULL, NOW()),
+    (6, 'tag creation identifier', 'checkout_sha', 't', 't', 't', NULL, NOW()),
     (6, 'repository ssh url', 'project.ssh_url', 't', 't', 't', NULL, NOW());
 
 
