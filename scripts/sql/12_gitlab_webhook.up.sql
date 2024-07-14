@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ALTER TABLE git_host_webhook_event ADD COLUMN IF NOT EXISTS git_host_name varchar(250);
 
-INSERT INTO git_host_webhook_event (git_host_id, name, event_types_csv,
+INSERT INTO git_host_webhook_event (git_host_name, name, event_types_csv,
                                     action_type, is_active, created_on)
-VALUES (3, 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
-       (3, 'Tag Creation', 'Tag Push Hook', 'merged','t', NOW());
+VALUES ('Gitlab_Devtron' 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
+       ('Gitlab_Devtron', 'Tag Creation', 'Tag Push Hook', 'merged','t', NOW());
 
 INSERT INTO git_host_webhook_event_selectors
 (event_id, name, selector, to_show, to_show_in_ci_filter, is_active, possible_values, created_on)
