@@ -314,9 +314,19 @@ func (impl *GitManagerBaseImpl) FetchDiffStatBetweenCommitsNameOnly(gitCtx GitCo
 		oldHash = oldHash + "^"
 	}
 	cmd, cancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "diff", "--name-only", oldHash, newHash)
-	defer cancel()
 
-	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password)
+	tlsPathInfo, err := commonLibGitManager.CreateFilesForTlsData(commonLibGitManager.BuildTlsData(gitCtx.TLSKey, gitCtx.TLSCertificate, gitCtx.CACert, gitCtx.TLSVerificationEnabled), TLS_FILES_DIR)
+	if err != nil {
+		//making it non-blocking
+		impl.logger.Errorw("error encountered in createFilesForTlsData", "err", err)
+	}
+
+	defer func() {
+		cancel()
+		commonLibGitManager.DeleteTlsFiles(tlsPathInfo)
+	}()
+
+	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
 	if err != nil || len(errMsg) > 0 {
 		impl.logger.Errorw("error in fetching fileStat diff btw commits: ", "oldHash", oldHash, "newHash", newHash, "checkoutPath", rootDir, "errorMsg", errMsg, "err", err)

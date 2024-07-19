@@ -23,7 +23,7 @@ message GitProvider {
   string TlsCert =10;
   string TlsKey  =11;
   string CaCert  =12;
-  bool EnableTLSVerification =13;
+  bool EnableTLSVerification = 13;
 }
 
 message GitMaterial {
@@ -37,6 +37,7 @@ message GitMaterial {
   string checkoutMsgAny = 8;
   bool deleted = 9;
   repeated string filterPattern = 10;
+  string cloningMode = 11;
 }
 
 message SavePipelineMaterialRequest {
@@ -135,6 +136,15 @@ message RefreshGitMaterialResponse {
 
 message ReloadMaterialRequest {
   int64 materialId = 1;
+}
+
+message ReloadMaterialsRequest{
+repeated ReloadMaterial reloadMaterials = 1;
+}
+
+message ReloadMaterial{
+  int64 materialId = 1;
+  string cloningMode = 2;
 }
 
 message GenericResponse {
@@ -309,6 +319,9 @@ service GitSensorService {
 
   // Reload all material
   rpc ReloadAllMaterial(Empty) returns (Empty);
+
+  // Reload list of materials
+  rpc ReloadMaterials(ReloadMaterialsRequest) returns (GenericResponse);
 
   // Reload a specific material
   rpc ReloadMaterial(ReloadMaterialRequest) returns (GenericResponse);
