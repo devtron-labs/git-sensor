@@ -41,6 +41,8 @@ const (
 	GITLAB_PROVIDER           = "gitlab.com"
 	CloningModeShallow        = "SHALLOW"
 	CloningModeFull           = "FULL"
+	NO_COMMIT_GIT_ERROR_MESSAGE    = "unknown revision or path not in the working tree."
+	NO_COMMIT_CUSTOM_ERROR_MESSAGE = "No Commit Found"
 )
 
 //git@gitlab.com:devtron-client-gitops/wms-user-management.git
@@ -157,7 +159,7 @@ func DeleteAFileIfExists(path string) error {
 }
 
 // sample commitDiff :=4\t3\tModels/models.go\n2\t2\tRepository/Repository.go\n0\t2\main.go
-func getFileStat(commitDiff string) (FileStats, error) {
+func processFileStatOutputWithNumstat(commitDiff string) (FileStats, error) {
 	filestat := FileStats{}
 	lines := strings.Split(strings.TrimSpace(commitDiff), "\n")
 
@@ -195,6 +197,21 @@ func getFileStat(commitDiff string) (FileStats, error) {
 			Name:     parts[2],
 			Addition: added,
 			Deletion: deleted,
+		})
+	}
+
+	return filestat, nil
+}
+
+// sample commitDiff :=pkg/bulkAction/BulkUpdateService.go\nscripts/sql/244_alter_resource_release_feature.down.sql\nscripts/sql/244_alter_resource_release_feature.up.sql
+func processFileStatOutputNameOnly(commitDiff string) (FileStats, error) {
+	filestat := FileStats{}
+	lines := strings.Split(strings.TrimSpace(commitDiff), "\n")
+
+	for _, line := range lines {
+
+		filestat = append(filestat, FileStat{
+			Name: line,
 		})
 	}
 

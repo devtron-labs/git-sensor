@@ -18,10 +18,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
@@ -38,6 +41,7 @@ type RestHandler interface {
 	GetCommitMetadataForPipelineMaterial(w http.ResponseWriter, r *http.Request)
 	ReloadAllMaterial(w http.ResponseWriter, r *http.Request)
 	ReloadMaterial(w http.ResponseWriter, r *http.Request)
+	ReloadMaterials(w http.ResponseWriter, r *http.Request)
 	GetChangesInRelease(w http.ResponseWriter, r *http.Request)
 	GetCommitInfoForTag(w http.ResponseWriter, r *http.Request)
 	RefreshGitMaterial(w http.ResponseWriter, r *http.Request)
@@ -116,9 +120,13 @@ func (handler RestHandlerImpl) SaveGitProvider(w http.ResponseWriter, r *http.Re
 func (handler RestHandlerImpl) AddRepo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
-	gitCtx := git.BuildGitContext(r.Context())
 	var Repo []*sql.GitMaterial
 	err := decoder.Decode(&Repo)
+	cloningMode := git.CloningModeFull
+	if Repo != nil && len(Repo) > 0 {
+		cloningMode = Repo[0].CloningMode
+	}
+	gitCtx := git.BuildGitContext(r.Context()).WithCloningMode(cloningMode)
 	if err != nil {
 		handler.logger.Error(err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
@@ -135,9 +143,9 @@ func (handler RestHandlerImpl) AddRepo(w http.ResponseWriter, r *http.Request) {
 
 func (handler RestHandlerImpl) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitCtx := git.BuildGitContext(r.Context())
 	var Repo *sql.GitMaterial
 	err := decoder.Decode(&Repo)
+	gitCtx := git.BuildGitContext(r.Context()).WithCloningMode(Repo.CloningMode)
 	if err != nil {
 		handler.logger.Error(err)
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
@@ -174,10 +182,58 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 }
 
 func (handler RestHandlerImpl) ReloadAllMaterial(w http.ResponseWriter, r *http.Request) {
-	handler.logger.Infow("reload all pipelineMaterial request")
+	handler.logger.Infow(bean.GetReloadAllLog("received reload all pipelineMaterial request"))
+	decoder := schema.NewDecoder()
+	decoder.IgnoreUnknownKeys(true)
+	req := &bean.ReloadAllMaterialQuery{}
+	err := decoder.Decode(req, r.URL.Query())
+	if err != nil {
+		handler.logger.Errorw(bean.GetReloadAllLog("invalid query params, ReloadAllMaterial"), "err", err, "query", r.URL.Query())
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	if req.Start < 0 || req.End < 0 || req.Start > req.End {
+		handler.logger.Errorw(bean.GetReloadAllLog("invalid request, ReloadAllMaterial"), "query", r.URL.Query())
+		handler.writeJsonResp(w, fmt.Errorf("invalid query params"), nil, http.StatusBadRequest)
+		return
+	}
 	gitCtx := git.BuildGitContext(r.Context())
-	handler.repositoryManager.ReloadAllRepo(gitCtx)
-	handler.writeJsonResp(w, nil, "reloaded se logs for detail", http.StatusOK)
+	err = handler.repositoryManager.ReloadAllRepo(gitCtx, req)
+	if err != nil {
+		handler.logger.Errorw(bean.GetReloadAllLog("error in request, ReloadAllMaterial"), "query", r.URL.Query(), "err", err)
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+		return
+	}
+	handler.logger.Infow(bean.GetReloadAllLog("Reloaded materials successfully!"), "query", r.URL.Query())
+	handler.writeJsonResp(w, nil, "Reloaded materials successfully!", http.StatusOK)
+}
+
+func (handler RestHandlerImpl) ReloadMaterials(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var request ReloadMaterialsDto
+	err := decoder.Decode(&request)
+
+	//materialId, err := strconv.Atoi(vars["materialId"])
+	if err != nil {
+		handler.logger.Error(err)
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	for _, materialReq := range request.ReloadMaterial {
+		handler.logger.Infow("reload all pipelineMaterial request", "id", materialReq.GitmaterialId)
+		gitCtx := git.BuildGitContext(r.Context()).WithCloningMode(materialReq.CloningMode)
+		err = handler.repositoryManager.ResetRepo(gitCtx, materialReq.GitmaterialId)
+		if err != nil {
+			handler.logger.Errorw("error in reloading pipeline material", "err", err)
+			//handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+		}
+	}
+	//TODO: handle in such a way that it can propagate which material weren't able to reload
+	handler.writeJsonResp(w, nil, Response{
+		Code:   http.StatusOK,
+		Status: http.StatusText(http.StatusOK),
+	}, http.StatusOK)
+
 }
 
 func (handler RestHandlerImpl) ReloadMaterial(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +294,6 @@ func (handler RestHandlerImpl) GetHeadForPipelineMaterials(w http.ResponseWriter
 
 func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	gitCtx := git.BuildGitContext(r.Context())
 
 	material := &git.CommitMetadataRequest{}
 	err := decoder.Decode(material)
@@ -247,6 +302,7 @@ func (handler RestHandlerImpl) GetCommitMetadata(w http.ResponseWriter, r *http.
 		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
 		return
 	}
+	gitCtx := git.BuildGitContext(r.Context())
 	handler.logger.Infow("commit detail request", "req", material)
 	var commits *git.GitCommitBase
 	if len(material.GitTag) > 0 {

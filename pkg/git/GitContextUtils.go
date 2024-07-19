@@ -59,6 +59,9 @@ func (gitCtx GitContext) WithTimeout(timeoutSeconds int) (GitContext, context.Ca
 }
 
 func (gitCtx GitContext) WithCloningMode(CloningMode string) GitContext {
+	if CloningMode == "" {
+		CloningMode = CloningModeFull
+	}
 	gitCtx.CloningMode = CloningMode
 	return gitCtx
 }
