@@ -210,8 +210,9 @@ type WebhookDataRequest struct {
 }
 
 type WebhookEventConfigRequest struct {
-	GitHostId int `json:"gitHostId"`
-	EventId   int `json:"eventId"`
+	GitHostId   int    `json:"gitHostId"`
+	EventId     int    `json:"eventId"`
+	GitHostName string `json:"GitHostName"`
 }
 
 type RefreshGitMaterialRequest struct {

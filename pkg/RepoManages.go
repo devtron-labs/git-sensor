@@ -48,6 +48,7 @@ type RepoManager interface {
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
 	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
+	GetAllWebhookEventConfigForHostName(gitHostName string) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
@@ -857,6 +858,19 @@ func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int, ciPipelineMaterialId
 	return webhookAndCiData, nil
 }
 
+func (impl RepoManagerImpl) GetAllWebhookEventConfigForHostName(gitHostName string) ([]*git.WebhookEventConfig, error) {
+	impl.logger.Debugw("Getting All webhook event config ", "gitHostName", gitHostName)
+
+	webhookEventsFromDb, err := impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostName(gitHostName)
+	if err != nil {
+		impl.logger.Errorw("error in getting webhook events", "gitHostName", gitHostName, "err", err)
+		return nil, err
+	}
+
+	// build events
+	return impl.convertSqlBeansToWebhookEventConfig(webhookEventsFromDb)
+}
+
 func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error) {
 
 	impl.logger.Debugw("Getting All webhook event config ", "gitHostId", gitHostId)
@@ -869,6 +883,11 @@ func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(gitHostId int) ([]*g
 	}
 
 	// build events
+	return impl.convertSqlBeansToWebhookEventConfig(webhookEventsFromDb)
+
+}
+
+func (impl RepoManagerImpl) convertSqlBeansToWebhookEventConfig(webhookEventsFromDb []*sql.GitHostWebhookEvent) ([]*git.WebhookEventConfig, error) {
 	var webhookEvents []*git.WebhookEventConfig
 	for _, webhookEventFromDb := range webhookEventsFromDb {
 		webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)

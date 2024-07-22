@@ -429,7 +429,13 @@ func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWr
 	}
 	handler.logger.Infow("webhook event config request ", "req", request)
 
-	webhookEventConfigArr, err := handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
+	var webhookEventConfigArr []*git.WebhookEventConfig
+	if request.GitHostName != "" {
+		webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHostName(request.GitHostName)
+	} else {
+		webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
+	}
+
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {
