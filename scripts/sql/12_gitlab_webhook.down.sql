@@ -14,5 +14,7 @@
  * limitations under the License.
  */
 
-DELETE FROM git_host_webhook_event_selectors where event_id in (5,6)
-DELETE FROM git_host_webhook_event where git_host_id=3
+DELETE FROM git_host_webhook_event_selectors where event_id in (select id from git_host_webhook_event where git_host_name='Gitlab_Devtron' and name in 'Pull Request', 'Tag Creation')
+DELETE FROM git_host_webhook_event where git_host_name='Gitlab_Devtron';
+ALTER TABLE git_host_webhook_event  DROP COLUMN git_host_name;
+ALTER TABLE git_host_webhook_event ALTER COLUMN git_host_id SET NOT NULL;
