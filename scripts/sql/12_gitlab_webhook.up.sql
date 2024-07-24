@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 ALTER TABLE git_host_webhook_event ADD COLUMN IF NOT EXISTS git_host_name varchar(250);
+ALTER TABLE git_host_webhook_event ALTER COLUMN git_host_id DROP NOT NULL;
 
 INSERT INTO git_host_webhook_event (git_host_name, name, event_types_csv,
                                     action_type, is_active, created_on)
