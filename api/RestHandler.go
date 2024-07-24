@@ -432,6 +432,10 @@ func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWr
 	var webhookEventConfigArr []*git.WebhookEventConfig
 	if request.GitHostName != "" {
 		webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHostName(request.GitHostName)
+		if webhookEventConfigArr == nil || len(webhookEventConfigArr) == 0 {
+			//fallback to try with gitHostId
+			webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
+		}
 	} else {
 		webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
 	}
