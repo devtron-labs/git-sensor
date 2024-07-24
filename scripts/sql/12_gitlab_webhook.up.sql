@@ -17,7 +17,7 @@ ALTER TABLE git_host_webhook_event ADD COLUMN IF NOT EXISTS git_host_name varcha
 
 INSERT INTO git_host_webhook_event (git_host_name, name, event_types_csv,
                                     action_type, is_active, created_on)
-VALUES ('Gitlab_Devtron' 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
+VALUES ('Gitlab_Devtron', 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
        ('Gitlab_Devtron', 'Tag Creation', 'Tag Push Hook', 'merged','t', NOW());
 
 INSERT INTO git_host_webhook_event_selectors
