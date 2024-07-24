@@ -17,10 +17,15 @@
 ALTER TABLE git_host_webhook_event ADD COLUMN IF NOT EXISTS git_host_name varchar(250);
 ALTER TABLE git_host_webhook_event ALTER COLUMN git_host_id DROP NOT NULL;
 
+update git_host_webhook_event set git_host_name='Github' where git_host_id=1;
+update git_host_webhook_event set git_host_name='Bitbucket Cloud' where git_host_id=2;
+
 INSERT INTO git_host_webhook_event (git_host_name, name, event_types_csv,
                                     action_type, is_active, created_on)
 VALUES ('Gitlab_Devtron', 'Pull Request', 'Merge Request Hook', 'non-merged','t', NOW()),
        ('Gitlab_Devtron', 'Tag Creation', 'Tag Push Hook', 'merged','t', NOW());
+
+
 
 -- pr queries
 INSERT INTO git_host_webhook_event_selectors
