@@ -210,8 +210,9 @@ type WebhookDataRequest struct {
 }
 
 type WebhookEventConfigRequest struct {
-	GitHostId int `json:"gitHostId"`
-	EventId   int `json:"eventId"`
+	GitHostId   int    `json:"gitHostId"`
+	EventId     int    `json:"eventId"`
+	GitHostName string `json:"GitHostName"`
 }
 
 type RefreshGitMaterialRequest struct {
@@ -227,6 +228,7 @@ type RefreshGitMaterialResponse struct {
 type WebhookEvent struct {
 	PayloadId          int    `json:"payloadId"`
 	RequestPayloadJson string `json:"requestPayloadJson"`
+	GitHostName        string `json:"gitHostName"`
 	GitHostId          int    `json:"gitHostId"`
 	EventType          string `json:"eventType"`
 }

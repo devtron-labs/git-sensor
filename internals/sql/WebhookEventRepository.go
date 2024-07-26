@@ -26,6 +26,7 @@ type GitHostWebhookEvent struct {
 	tableName     struct{}  `sql:"git_host_webhook_event" pg:",discard_unknown_columns"`
 	Id            int       `sql:"id,pk"`
 	GitHostId     int       `sql:"git_host_id,notnull"`
+	GitHostName   string    `sql:"git_host_name,notnull"`
 	Name          string    `sql:"name,notnull"`
 	EventTypesCsv string    `sql:"event_types_csv,notnull"`
 	ActionType    string    `sql:"action_type,notnull"`
@@ -54,7 +55,9 @@ type GitHostWebhookEventSelectors struct {
 
 type WebhookEventRepository interface {
 	GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*GitHostWebhookEvent, error)
+	GetAllGitHostWebhookEventByGitHostName(gitHostName string) ([]*GitHostWebhookEvent, error)
 	GetWebhookEventConfigByEventId(eventId int) (*GitHostWebhookEvent, error)
+	Update(webhookEvent *GitHostWebhookEvent) error
 }
 
 type WebhookEventRepositoryImpl struct {
@@ -65,7 +68,7 @@ func NewWebhookEventRepositoryImpl(dbConnection *pg.DB) *WebhookEventRepositoryI
 	return &WebhookEventRepositoryImpl{dbConnection: dbConnection}
 }
 
-func (impl WebhookEventRepositoryImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*GitHostWebhookEvent, error) {
+func (impl *WebhookEventRepositoryImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*GitHostWebhookEvent, error) {
 	var gitHostWebhookEvents []*GitHostWebhookEvent
 	err := impl.dbConnection.Model(&gitHostWebhookEvents).
 		Column("git_host_webhook_event.*").
@@ -77,8 +80,20 @@ func (impl WebhookEventRepositoryImpl) GetAllGitHostWebhookEventByGitHostId(gitH
 		Select()
 	return gitHostWebhookEvents, err
 }
+func (impl *WebhookEventRepositoryImpl) GetAllGitHostWebhookEventByGitHostName(gitHostName string) ([]*GitHostWebhookEvent, error) {
+	var gitHostWebhookEvents []*GitHostWebhookEvent
+	err := impl.dbConnection.Model(&gitHostWebhookEvents).
+		Column("git_host_webhook_event.*").
+		Relation("Selectors", func(q *orm.Query) (query *orm.Query, err error) {
+			return q.Where("is_active IS TRUE"), nil
+		}).
+		Where("git_host_name =? ", gitHostName).
+		Where("is_active = TRUE ").
+		Select()
+	return gitHostWebhookEvents, err
+}
 
-func (impl WebhookEventRepositoryImpl) GetWebhookEventConfigByEventId(eventId int) (*GitHostWebhookEvent, error) {
+func (impl *WebhookEventRepositoryImpl) GetWebhookEventConfigByEventId(eventId int) (*GitHostWebhookEvent, error) {
 	gitHostWebhookEvent := &GitHostWebhookEvent{}
 	err := impl.dbConnection.Model(gitHostWebhookEvent).
 		Column("git_host_webhook_event.*").
@@ -90,4 +105,12 @@ func (impl WebhookEventRepositoryImpl) GetWebhookEventConfigByEventId(eventId in
 		Select()
 
 	return gitHostWebhookEvent, err
+}
+
+func (impl *WebhookEventRepositoryImpl) Update(webhookEvent *GitHostWebhookEvent) error {
+	err := impl.dbConnection.Update(webhookEvent)
+	if err != nil {
+		return err
+	}
+	return nil
 }

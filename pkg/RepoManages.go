@@ -47,7 +47,7 @@ type RepoManager interface {
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
-	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
+	GetAllWebhookEventConfigForHost(req *git.WebhookEventConfigRequest) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
@@ -857,18 +857,39 @@ func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int, ciPipelineMaterialId
 	return webhookAndCiData, nil
 }
 
-func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error) {
-
+func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(req *git.WebhookEventConfigRequest) ([]*git.WebhookEventConfig, error) {
+	gitHostId := req.GitHostId
+	gitHostName := req.GitHostName
+	var webhookEventsFromDb []*sql.GitHostWebhookEvent
+	var err error
 	impl.logger.Debugw("Getting All webhook event config ", "gitHostId", gitHostId)
-
-	webhookEventsFromDb, err := impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
-
-	if err != nil {
-		impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
-		return nil, err
+	if gitHostName != "" {
+		webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostName(gitHostName)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events", "gitHostName", gitHostName, "err", err)
+			return nil, err
+		}
+		if webhookEventsFromDb == nil || len(webhookEventsFromDb) == 0 {
+			webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+			if err != nil {
+				impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
+				return nil, err
+			}
+		}
+	} else {
+		webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
+			return nil, err
+		}
 	}
 
 	// build events
+	return impl.convertSqlBeansToWebhookEventConfig(webhookEventsFromDb)
+
+}
+
+func (impl RepoManagerImpl) convertSqlBeansToWebhookEventConfig(webhookEventsFromDb []*sql.GitHostWebhookEvent) ([]*git.WebhookEventConfig, error) {
 	var webhookEvents []*git.WebhookEventConfig
 	for _, webhookEventFromDb := range webhookEventsFromDb {
 		webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)

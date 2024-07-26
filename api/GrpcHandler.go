@@ -560,7 +560,14 @@ func (impl *GrpcHandlerImpl) GetWebhookData(ctx context.Context, req *pb.Webhook
 func (impl *GrpcHandlerImpl) GetAllWebhookEventConfigForHost(ctx context.Context, req *pb.WebhookEventConfigRequest) (
 	*pb.WebhookEventConfigResponse, error) {
 
-	res, err := impl.repositoryManager.GetAllWebhookEventConfigForHost(int(req.GitHostId))
+	var res []*git.WebhookEventConfig
+	var err error
+	reqModel := &git.WebhookEventConfigRequest{
+		GitHostId:   int(req.GitHostId),
+		GitHostName: req.GitHostName,
+		EventId:     int(req.EventId),
+	}
+	res, err = impl.repositoryManager.GetAllWebhookEventConfigForHost(reqModel)
 	if err != nil {
 		impl.logger.Errorw("error while fetching webhook event config",
 			"gitHostId", req.GitHostId,
@@ -568,6 +575,7 @@ func (impl *GrpcHandlerImpl) GetAllWebhookEventConfigForHost(ctx context.Context
 
 		return nil, err
 	}
+
 	webhookConfig := &pb.WebhookEventConfigResponse{}
 	if res == nil {
 		return webhookConfig, nil
