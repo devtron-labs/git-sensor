@@ -198,7 +198,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 		}
 
 		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password).
-		WithTLSData(material.GitProvider.CaCert, material.GitProvider.TlsKey, material.GitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
+			WithTLSData(material.GitProvider.CaCert, material.GitProvider.TlsKey, material.GitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
@@ -357,7 +357,7 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	}
 
 	gitCtx = gitCtx.WithCredentials(userName, password).
-		WithTLSData(material.GitProvider.CaCert, material.GitProvider.TlsKey, material.GitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
+		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert, gitProvider.EnableTLSVerification)
 
 	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
