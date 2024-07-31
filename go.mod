@@ -6,9 +6,9 @@ toolchain go1.22.4
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.25-0.20240719070325-2cb5e69dc592
-	github.com/devtron-labs/protos v0.0.3-0.20240719073841-1c0c5d2079c6
-	github.com/gammazero/workerpool v0.0.0-20200206003619-019d125201ab
+	github.com/devtron-labs/common-lib v0.0.25-0.20240731080454-282e8ce8a2c5
+	github.com/devtron-labs/protos v0.0.3-0.20240726131238-dff2574e623d
+	github.com/gammazero/workerpool v1.1.3
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-pg/pg v6.15.1+incompatible
 	github.com/google/wire v0.6.0
@@ -39,7 +39,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/gammazero/deque v0.0.0-20200124200322-7e84b94275b8 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/gliderlabs/ssh v0.3.6 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
