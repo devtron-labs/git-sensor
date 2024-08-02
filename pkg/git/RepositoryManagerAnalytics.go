@@ -202,6 +202,7 @@ func transform(src *object.Commit, tag *object.Tag) (dst *Commit) {
 func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(gitCtx GitContext, checkoutPath string, Old string, New string) (*GitChanges, error) {
 	var err error
 	start := time.Now()
+	useGitCli := impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics
 	defer func() {
 		util.TriggerGitOperationMetrics("changesSinceByRepositoryForAnalytics", start, err)
 	}()
@@ -214,7 +215,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 	oldHash := plumbing.NewHash(Old)
 
 	var fileStats FileStats
-	if strings.Contains(checkoutPath, "/.git") || impl.configuration.UseGitCli {
+	if strings.Contains(checkoutPath, "/.git") || useGitCli {
 		oldHashString := oldHash.String()
 		newHashString := newHash.String()
 		fileStats, err = impl.gitManager.FetchDiffStatBetweenCommitsWithNumstat(gitCtx, oldHashString, newHashString, checkoutPath)
@@ -243,7 +244,8 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, checkoutPath string, oldHash plumbing.Hash, newHash plumbing.Hash, repository *GitRepository) ([]*Commit, error) {
 	var commitsCli, commitsGoGit []*Commit
 	var err error
-	if impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics || impl.configuration.AnalyticsDebug {
+	useGitCli := impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics
+	if useGitCli || impl.configuration.AnalyticsDebug {
 		impl.logger.Infow("Computing commit diff using cli ", "checkoutPath", checkoutPath)
 		commitsCli, err = impl.gitManager.LogMergeBase(gitCtx, checkoutPath, oldHash.String(), newHash.String())
 		if err != nil {
@@ -251,7 +253,7 @@ func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, 
 			return nil, err
 		}
 	}
-	if !(impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics) || impl.configuration.AnalyticsDebug {
+	if !useGitCli || impl.configuration.AnalyticsDebug {
 		impl.logger.Infow("Computing commit diff using go-git ", "checkoutPath", checkoutPath)
 		ctx, cancel := gitCtx.WithTimeout(impl.configuration.GoGitTimeout)
 		defer cancel()
@@ -267,7 +269,7 @@ func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, 
 		impl.logOldestCommitComparison(commitsGoGit, commitsCli, checkoutPath, oldHash.String(), newHash.String())
 	}
 
-	if !impl.configuration.UseGitCli {
+	if !useGitCli {
 		return commitsGoGit, nil
 	}
 	return commitsCli, nil
