@@ -193,7 +193,8 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 		return err
 	}
 	gitCtx := BuildGitContext(context.Background()).
-		WithCredentials(userName, password)
+		WithCredentials(userName, password).
+		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
 
 	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
 	if err != nil {
