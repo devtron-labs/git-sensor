@@ -243,7 +243,7 @@ func (impl RepositoryManagerAnalyticsImpl) ChangesSinceByRepositoryForAnalytics(
 func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, checkoutPath string, oldHash plumbing.Hash, newHash plumbing.Hash, repository *GitRepository) ([]*Commit, error) {
 	var commitsCli, commitsGoGit []*Commit
 	var err error
-	if impl.configuration.UseGitCli || impl.configuration.UseAnalyticsCommitDiffGitCli || impl.configuration.AnalyticsDebug {
+	if impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics || impl.configuration.AnalyticsDebug {
 		impl.logger.Infow("Computing commit diff using cli ", "checkoutPath", checkoutPath)
 		commitsCli, err = impl.gitManager.LogMergeBase(gitCtx, checkoutPath, oldHash.String(), newHash.String())
 		if err != nil {
@@ -251,7 +251,7 @@ func (impl RepositoryManagerAnalyticsImpl) computeCommitDiff(gitCtx GitContext, 
 			return nil, err
 		}
 	}
-	if !(impl.configuration.UseGitCli || impl.configuration.UseAnalyticsCommitDiffGitCli) || impl.configuration.AnalyticsDebug {
+	if !(impl.configuration.UseGitCli || impl.configuration.UseGitCliAnalytics) || impl.configuration.AnalyticsDebug {
 		impl.logger.Infow("Computing commit diff using go-git ", "checkoutPath", checkoutPath)
 		ctx, cancel := gitCtx.WithTimeout(impl.configuration.GoGitTimeout)
 		defer cancel()
