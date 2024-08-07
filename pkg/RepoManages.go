@@ -197,7 +197,8 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			continue
 		}
 
-		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password)
+		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password).
+			WithTLSData(material.GitProvider.CaCert, material.GitProvider.TlsKey, material.GitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
@@ -355,7 +356,8 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 		return material, nil
 	}
 
-	gitCtx = gitCtx.WithCredentials(userName, password)
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert, gitProvider.EnableTLSVerification)
 
 	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
@@ -664,8 +666,8 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
 
-	gitCtx = gitCtx.WithCredentials(userName, password)
-
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
 	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
@@ -732,8 +734,8 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		return nil, err
 	}
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
-	// validate checkout status of gitMaterial
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification) // validate checkout status of gitMaterial
 	if !gitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
 		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
@@ -791,7 +793,8 @@ func (impl RepoManagerImpl) GetReleaseChanges(gitCtx git.GitContext, request *Re
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
 
 	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitCtx, gitMaterial.CheckoutLocation, request.OldCommit, request.NewCommit)
 	if err != nil {
