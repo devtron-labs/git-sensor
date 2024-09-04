@@ -17,6 +17,7 @@
 package git
 
 import (
+	"github.com/devtron-labs/git-sensor/internals/sql"
 	"go.uber.org/zap"
 	"strings"
 	"time"
@@ -44,22 +45,36 @@ func (impl WebhookHandlerImpl) HandleWebhookEvent(webhookEvent *WebhookEvent) er
 	impl.logger.Debug("Webhook event came")
 
 	gitHostId := webhookEvent.GitHostId
+	gitHostName := webhookEvent.GitHostName
 	eventType := webhookEvent.EventType
 	payloadJson := webhookEvent.RequestPayloadJson
 	payloadId := webhookEvent.PayloadId
 
 	impl.logger.Debugw("webhook event request data", "gitHostId", gitHostId, "eventType", eventType)
 
-	// get all configured events from database for given git host Id
-	events, err := impl.webhookEventService.GetAllGitHostWebhookEventByGitHostId(gitHostId)
-	if err != nil {
-		impl.logger.Errorw("error in getting webhook events from db", "err", err, "gitHostId", gitHostId)
-		return err
+	var events []*sql.GitHostWebhookEvent
+	var err error
+	if gitHostName != "" {
+		// get all configured events from database for given git host Name
+		events, err = impl.webhookEventService.GetAllGitHostWebhookEventByGitHostName(gitHostName)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events from db", "err", err, "gitHostId", gitHostId)
+			return err
+		}
 	}
 
 	if len(events) == 0 {
-		impl.logger.Warnw("webhook events not found for given gitHostId ", "gitHostId", gitHostId)
-		return nil
+		// retry with gitHostId and get all configured events from database for given git host Id
+		events, err = impl.webhookEventService.GetAllGitHostWebhookEventByGitHostId(gitHostId, gitHostName)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events from db", "err", err, "gitHostId", gitHostId)
+			return err
+		}
+		if len(events) == 0 {
+			impl.logger.Warnw("webhook events not found for given gitHostId ", "gitHostId", gitHostId)
+			return nil
+		}
+
 	}
 
 	// operate for all matching event (match for eventType)

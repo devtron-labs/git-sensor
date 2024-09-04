@@ -73,15 +73,19 @@ func (impl *GrpcHandlerImpl) SaveGitProvider(ctx context.Context, req *pb.GitPro
 
 	// mapping req
 	gitProvider := &sql.GitProvider{
-		Id:            int(req.Id),
-		Name:          req.Name,
-		Url:           req.Url,
-		UserName:      req.UserName,
-		Password:      req.Password,
-		AccessToken:   req.AccessToken,
-		SshPrivateKey: req.SshPrivateKey,
-		AuthMode:      sql.AuthMode(req.AuthMode),
-		Active:        req.Active,
+		Id:                    int(req.Id),
+		Name:                  req.Name,
+		Url:                   req.Url,
+		UserName:              req.UserName,
+		Password:              req.Password,
+		AccessToken:           req.AccessToken,
+		SshPrivateKey:         req.SshPrivateKey,
+		AuthMode:              sql.AuthMode(req.AuthMode),
+		Active:                req.Active,
+		CaCert:                req.CaCert,
+		TlsCert:               req.TlsCert,
+		TlsKey:                req.TlsKey,
+		EnableTLSVerification: req.EnableTLSVerification,
 	}
 
 	_, err := impl.repositoryManager.SaveGitProvider(gitProvider)
@@ -464,8 +468,8 @@ func (impl *GrpcHandlerImpl) RefreshGitMaterial(ctx context.Context, req *pb.Ref
 
 func (impl *GrpcHandlerImpl) ReloadAllMaterial(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	gitCtx := git.BuildGitContext(ctx)
-	impl.repositoryManager.ReloadAllRepo(gitCtx)
-	return &pb.Empty{}, nil
+	err := impl.repositoryManager.ReloadAllRepo(gitCtx, nil)
+	return &pb.Empty{}, err
 }
 
 func (impl *GrpcHandlerImpl) ReloadMaterial(ctx context.Context, req *pb.ReloadMaterialRequest) (
@@ -560,7 +564,14 @@ func (impl *GrpcHandlerImpl) GetWebhookData(ctx context.Context, req *pb.Webhook
 func (impl *GrpcHandlerImpl) GetAllWebhookEventConfigForHost(ctx context.Context, req *pb.WebhookEventConfigRequest) (
 	*pb.WebhookEventConfigResponse, error) {
 
-	res, err := impl.repositoryManager.GetAllWebhookEventConfigForHost(int(req.GitHostId))
+	var res []*git.WebhookEventConfig
+	var err error
+	reqModel := &git.WebhookEventConfigRequest{
+		GitHostId:   int(req.GitHostId),
+		GitHostName: req.GitHostName,
+		EventId:     int(req.EventId),
+	}
+	res, err = impl.repositoryManager.GetAllWebhookEventConfigForHost(reqModel)
 	if err != nil {
 		impl.logger.Errorw("error while fetching webhook event config",
 			"gitHostId", req.GitHostId,
@@ -568,6 +579,7 @@ func (impl *GrpcHandlerImpl) GetAllWebhookEventConfigForHost(ctx context.Context
 
 		return nil, err
 	}
+
 	webhookConfig := &pb.WebhookEventConfigResponse{}
 	if res == nil {
 		return webhookConfig, nil

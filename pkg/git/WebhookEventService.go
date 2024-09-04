@@ -30,7 +30,8 @@ import (
 )
 
 type WebhookEventService interface {
-	GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*sql.GitHostWebhookEvent, error)
+	GetAllGitHostWebhookEventByGitHostId(gitHostId int, gitHostName string) ([]*sql.GitHostWebhookEvent, error)
+	GetAllGitHostWebhookEventByGitHostName(gitHostName string) ([]*sql.GitHostWebhookEvent, error)
 	GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error)
 	SaveWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
 	UpdateWebhookParsedEventData(webhookEventParsedData *sql.WebhookEventParsedData) error
@@ -65,9 +66,30 @@ func NewWebhookEventServiceImpl(
 	}
 }
 
-func (impl WebhookEventServiceImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int) ([]*sql.GitHostWebhookEvent, error) {
+func (impl WebhookEventServiceImpl) GetAllGitHostWebhookEventByGitHostId(gitHostId int, gitHostName string) ([]*sql.GitHostWebhookEvent, error) {
 	impl.logger.Debugw("Getting All git host events", "gitHostId", gitHostId)
-	return impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+	events, err := impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+	if err != nil {
+		impl.logger.Errorw("Error in getting all webhook events", "err", err)
+		return nil, err
+	}
+	if events != nil && len(events) > 0 && gitHostName != "" {
+		//handle older events to update git_host_name
+		for _, event := range events {
+			if event.GitHostName == "" {
+				event.GitHostName = gitHostName
+				err = impl.webhookEventRepository.Update(event)
+				if err != nil {
+					impl.logger.Errorw("Error in updating webhook event with git_host_name", "git_host_name", gitHostName, "err", err)
+				}
+			}
+		}
+	}
+	return events, nil
+}
+func (impl WebhookEventServiceImpl) GetAllGitHostWebhookEventByGitHostName(gitHostName string) ([]*sql.GitHostWebhookEvent, error) {
+	impl.logger.Debugw("Getting All git host events", "gitHostName", gitHostName)
+	return impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostName(gitHostName)
 }
 
 func (impl WebhookEventServiceImpl) GetWebhookParsedEventDataByEventIdAndUniqueId(eventId int, uniqueId string) (*sql.WebhookEventParsedData, error) {

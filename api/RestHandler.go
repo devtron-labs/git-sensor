@@ -18,10 +18,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/pkg"
 	"github.com/devtron-labs/git-sensor/pkg/git"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
@@ -179,10 +182,30 @@ func (handler RestHandlerImpl) SavePipelineMaterial(w http.ResponseWriter, r *ht
 }
 
 func (handler RestHandlerImpl) ReloadAllMaterial(w http.ResponseWriter, r *http.Request) {
-	handler.logger.Infow("reload all pipelineMaterial request")
+	handler.logger.Infow(bean.GetReloadAllLog("received reload all pipelineMaterial request"))
+	decoder := schema.NewDecoder()
+	decoder.IgnoreUnknownKeys(true)
+	req := &bean.ReloadAllMaterialQuery{}
+	err := decoder.Decode(req, r.URL.Query())
+	if err != nil {
+		handler.logger.Errorw(bean.GetReloadAllLog("invalid query params, ReloadAllMaterial"), "err", err, "query", r.URL.Query())
+		handler.writeJsonResp(w, err, nil, http.StatusBadRequest)
+		return
+	}
+	if req.Start < 0 || req.End < 0 || req.Start > req.End {
+		handler.logger.Errorw(bean.GetReloadAllLog("invalid request, ReloadAllMaterial"), "query", r.URL.Query())
+		handler.writeJsonResp(w, fmt.Errorf("invalid query params"), nil, http.StatusBadRequest)
+		return
+	}
 	gitCtx := git.BuildGitContext(r.Context())
-	handler.repositoryManager.ReloadAllRepo(gitCtx)
-	handler.writeJsonResp(w, nil, "reloaded se logs for detail", http.StatusOK)
+	err = handler.repositoryManager.ReloadAllRepo(gitCtx, req)
+	if err != nil {
+		handler.logger.Errorw(bean.GetReloadAllLog("error in request, ReloadAllMaterial"), "query", r.URL.Query(), "err", err)
+		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
+		return
+	}
+	handler.logger.Infow(bean.GetReloadAllLog("Reloaded materials successfully!"), "query", r.URL.Query())
+	handler.writeJsonResp(w, nil, "Reloaded materials successfully!", http.StatusOK)
 }
 
 func (handler RestHandlerImpl) ReloadMaterials(w http.ResponseWriter, r *http.Request) {
@@ -406,7 +429,9 @@ func (handler RestHandlerImpl) GetAllWebhookEventConfigForHost(w http.ResponseWr
 	}
 	handler.logger.Infow("webhook event config request ", "req", request)
 
-	webhookEventConfigArr, err := handler.repositoryManager.GetAllWebhookEventConfigForHost(request.GitHostId)
+	var webhookEventConfigArr []*git.WebhookEventConfig
+	webhookEventConfigArr, err = handler.repositoryManager.GetAllWebhookEventConfigForHost(request)
+
 	if err != nil {
 		handler.writeJsonResp(w, err, nil, http.StatusInternalServerError)
 	} else {

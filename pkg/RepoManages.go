@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/devtron-labs/git-sensor/bean"
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/internals/util"
@@ -39,14 +40,14 @@ type RepoManager interface {
 	AddRepo(gitCtx git.GitContext, material []*sql.GitMaterial) ([]*sql.GitMaterial, error)
 	UpdateRepo(gitCtx git.GitContext, material *sql.GitMaterial) (*sql.GitMaterial, error)
 	SavePipelineMaterial(gitCtx git.GitContext, material []*sql.CiPipelineMaterial) ([]*sql.CiPipelineMaterial, error)
-	ReloadAllRepo(gitCtx git.GitContext)
+	ReloadAllRepo(gitCtx git.GitContext, req *bean.ReloadAllMaterialQuery) (err error)
 	ResetRepo(gitCtx git.GitContext, materialId int) error
 	GetReleaseChanges(gitCtx git.GitContext, request *ReleaseChangesRequest) (*git.GitChanges, error)
 	GetCommitInfoForTag(gitCtx git.GitContext, request *git.CommitMetadataRequest) (*git.GitCommitBase, error)
 	RefreshGitMaterial(req *git.RefreshGitMaterialRequest) (*git.RefreshGitMaterialResponse, error)
 
 	GetWebhookAndCiDataById(id int, ciPipelineMaterialId int) (*git.WebhookAndCiData, error)
-	GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error)
+	GetAllWebhookEventConfigForHost(req *git.WebhookEventConfigRequest) ([]*git.WebhookEventConfig, error)
 	GetWebhookEventConfig(eventId int) (*git.WebhookEventConfig, error)
 	GetWebhookPayloadDataForPipelineMaterialId(request *git.WebhookPayloadDataRequest) (*git.WebhookPayloadDataResponse, error)
 	GetWebhookPayloadFilterDataForPipelineMaterialId(request *git.WebhookPayloadFilterDataRequest) (*git.WebhookPayloadFilterDataResponse, error)
@@ -196,13 +197,17 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			continue
 		}
 
-		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password)
+		gitCtx = gitCtx.WithCredentials(material.GitProvider.UserName, material.GitProvider.Password).
+			WithTLSData(material.GitProvider.CaCert, material.GitProvider.TlsKey, material.GitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
 		commits, _, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
-		if err == nil {
+		if gitCtx.Err() != nil {
+			impl.logger.Errorw("context error in getting commits", "err", gitCtx.Err())
+			return gitCtx.Err()
+		} else if err == nil {
 			impl.logger.Infow("commits found", "commit", commits)
 			b, err := json.Marshal(commits)
 			if err == nil {
@@ -351,7 +356,8 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 		return material, nil
 	}
 
-	gitCtx = gitCtx.WithCredentials(userName, password)
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert, gitProvider.EnableTLSVerification)
 
 	checkoutPath, _, _, err := impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 	if err != nil {
@@ -361,7 +367,10 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	checkoutLocationForFetching := impl.repositoryManager.GetCheckoutLocation(gitCtx, material, gitProvider.Url, checkoutPath)
 
 	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
-	if err == nil {
+	if gitCtx.Err() != nil {
+		impl.logger.Errorw("context error in git checkout", "err", gitCtx.Err())
+		return material, gitCtx.Err()
+	} else if err == nil {
 		material.CheckoutLocation = checkoutLocationForFetching
 		material.CheckoutStatus = true
 	} else {
@@ -386,18 +395,38 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	return material, nil
 }
 
-func (impl RepoManagerImpl) ReloadAllRepo(gitCtx git.GitContext) {
-	materials, err := impl.materialRepository.FindAll()
-	if err != nil {
-		impl.logger.Errorw("error in reloading materials")
-	}
-	for _, material := range materials {
-		if _, err := impl.checkoutRepo(gitCtx, material); err != nil {
-			impl.logger.Errorw("error in checkout", "material", material, "err", err)
+func (impl RepoManagerImpl) ReloadAllRepo(gitCtx git.GitContext, req *bean.ReloadAllMaterialQuery) (err error) {
+	var materials []*sql.GitMaterial
+	if req != nil {
+		materials, err = impl.materialRepository.FindInRage(req.Start, req.End)
+		if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in getting reload materials"), "err", err)
+			return err
 		}
-
+	} else {
+		materials, err = impl.materialRepository.FindAll()
+		if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in getting reload materials"), "err", err)
+			return err
+		}
 	}
+
+	for _, material := range materials {
+		impl.logger.Infow(bean.GetReloadAllLog("performing material checkout for"), "materialId", material.Id)
+		_, err = impl.checkoutRepo(gitCtx, material)
+		if gitCtx.Err() != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("error in material checkout"), "materialId", material.Id, "err", gitCtx.Err())
+			return gitCtx.Err()
+		} else if err != nil {
+			impl.logger.Errorw(bean.GetReloadAllLog("context error in material while checkout"), "materialId", material.Id, "err", err)
+			// skipping for other materials to be processed
+		} else {
+			impl.logger.Infow(bean.GetReloadAllLog("successfully checked out for material"), "materialId", material.Id)
+		}
+	}
+	return nil
 }
+
 func (impl RepoManagerImpl) ResetRepo(gitCtx git.GitContext, materialId int) error {
 	material, err := impl.materialRepository.FindById(materialId)
 	if err != nil {
@@ -637,8 +666,8 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 
 	userName, password, err := git.GetUserNamePassword(gitMaterial.GitProvider)
 
-	gitCtx = gitCtx.WithCredentials(userName, password)
-
+	gitCtx = gitCtx.WithCredentials(userName, password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
 	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
@@ -705,8 +734,8 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		return nil, err
 	}
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
-	// validate checkout status of gitMaterial
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification) // validate checkout status of gitMaterial
 	if !gitMaterial.CheckoutStatus {
 		impl.logger.Errorw("checkout not success", "gitMaterialId", gitMaterialId)
 		return nil, fmt.Errorf("checkout not succeed please checkout first %s", gitMaterial.Url)
@@ -764,7 +793,8 @@ func (impl RepoManagerImpl) GetReleaseChanges(gitCtx git.GitContext, request *Re
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 
-	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password)
+	gitCtx = gitCtx.WithCredentials(gitMaterial.GitProvider.UserName, gitMaterial.GitProvider.Password).
+		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
 
 	gitChanges, err := impl.repositoryManagerAnalytics.ChangesSinceByRepositoryForAnalytics(gitCtx, gitMaterial.CheckoutLocation, request.OldCommit, request.NewCommit)
 	if err != nil {
@@ -830,18 +860,39 @@ func (impl RepoManagerImpl) GetWebhookAndCiDataById(id int, ciPipelineMaterialId
 	return webhookAndCiData, nil
 }
 
-func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(gitHostId int) ([]*git.WebhookEventConfig, error) {
-
+func (impl RepoManagerImpl) GetAllWebhookEventConfigForHost(req *git.WebhookEventConfigRequest) ([]*git.WebhookEventConfig, error) {
+	gitHostId := req.GitHostId
+	gitHostName := req.GitHostName
+	var webhookEventsFromDb []*sql.GitHostWebhookEvent
+	var err error
 	impl.logger.Debugw("Getting All webhook event config ", "gitHostId", gitHostId)
-
-	webhookEventsFromDb, err := impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
-
-	if err != nil {
-		impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
-		return nil, err
+	if gitHostName != "" {
+		webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostName(gitHostName)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events", "gitHostName", gitHostName, "err", err)
+			return nil, err
+		}
+		if webhookEventsFromDb == nil || len(webhookEventsFromDb) == 0 {
+			webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+			if err != nil {
+				impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
+				return nil, err
+			}
+		}
+	} else {
+		webhookEventsFromDb, err = impl.webhookEventRepository.GetAllGitHostWebhookEventByGitHostId(gitHostId)
+		if err != nil {
+			impl.logger.Errorw("error in getting webhook events", "gitHostId", gitHostId, "err", err)
+			return nil, err
+		}
 	}
 
 	// build events
+	return impl.convertSqlBeansToWebhookEventConfig(webhookEventsFromDb)
+
+}
+
+func (impl RepoManagerImpl) convertSqlBeansToWebhookEventConfig(webhookEventsFromDb []*sql.GitHostWebhookEvent) ([]*git.WebhookEventConfig, error) {
 	var webhookEvents []*git.WebhookEventConfig
 	for _, webhookEventFromDb := range webhookEventsFromDb {
 		webhookEvent := impl.webhookEventBeanConverter.ConvertFromWebhookEventSqlBean(webhookEventFromDb)
