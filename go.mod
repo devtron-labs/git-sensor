@@ -6,7 +6,7 @@ toolchain go1.22.4
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.0.25-0.20240809073131-5cefb0e8a93a
+	github.com/devtron-labs/common-lib v0.16.1-0.20240909135009-9ab705e1a141
 	github.com/devtron-labs/protos v0.0.3-0.20240809072909-83171af34169
 	github.com/gammazero/workerpool v1.1.3
 	github.com/go-git/go-git/v5 v5.11.0
@@ -38,6 +38,7 @@ require (
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/docker/cli v24.0.6+incompatible // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/gliderlabs/ssh v0.3.6 // indirect
@@ -64,6 +65,7 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
