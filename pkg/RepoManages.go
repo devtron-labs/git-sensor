@@ -183,7 +183,9 @@ func (impl RepoManagerImpl) InactivateWebhookDataMappingForPipelineMaterials(old
 func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, materials []*sql.CiPipelineMaterial) error {
 	var materialCommits []*sql.CiPipelineMaterial
 	for _, pipelineMaterial := range materials {
-
+		if pipelineMaterial.Type == sql.SOURCE_TYPE_WEBHOOK {
+			continue
+		}
 		//some points are missing so fetch
 		pipelineMaterial, err := impl.ciPipelineMaterialRepository.FindById(pipelineMaterial.Id)
 		if err != nil {
