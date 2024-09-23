@@ -202,7 +202,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
-		commits, _, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
+		commits, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if gitCtx.Err() != nil {
 			impl.logger.Errorw("context error in getting commits", "err", gitCtx.Err())
@@ -231,11 +231,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 				pipelineMaterial.ErrorMsg = ""
 			} else {
 				pipelineMaterial.Errored = true
-				if errMsg != "" {
-					pipelineMaterial.ErrorMsg = errMsg
-				} else {
-					pipelineMaterial.ErrorMsg = err.Error()
-				}
+				pipelineMaterial.ErrorMsg = err.Error()
 				pipelineMaterial.LastSeenHash = ""
 			}
 		}
@@ -716,7 +712,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, _, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
+	commits, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
 
 	if commits == nil {
 		return nil, err
@@ -766,7 +762,7 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 	var repository *git.GitRepository
-	commits, _, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
+	commits, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
 		if strings.Contains(errMsg, git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
 			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
