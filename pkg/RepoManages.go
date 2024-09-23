@@ -202,12 +202,20 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
-		commits, _, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
+		commits, _, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if gitCtx.Err() != nil {
 			impl.logger.Errorw("context error in getting commits", "err", gitCtx.Err())
 			return gitCtx.Err()
-		} else if err == nil {
+		} else if err != nil {
+			pipelineMaterial.Errored = true
+			if errMsg != "" {
+				pipelineMaterial.ErrorMsg = errMsg
+			} else {
+				pipelineMaterial.ErrorMsg = err.Error()
+			}
+			pipelineMaterial.LastSeenHash = ""
+		} else {
 			impl.logger.Infow("commits found", "commit", commits)
 			b, err := json.Marshal(commits)
 			if err == nil {
@@ -223,13 +231,13 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 				pipelineMaterial.ErrorMsg = ""
 			} else {
 				pipelineMaterial.Errored = true
-				pipelineMaterial.ErrorMsg = err.Error()
+				if errMsg != "" {
+					pipelineMaterial.ErrorMsg = errMsg
+				} else {
+					pipelineMaterial.ErrorMsg = err.Error()
+				}
 				pipelineMaterial.LastSeenHash = ""
 			}
-		} else {
-			pipelineMaterial.Errored = true
-			pipelineMaterial.ErrorMsg = err.Error()
-			pipelineMaterial.LastSeenHash = ""
 		}
 		materialCommits = append(materialCommits, pipelineMaterial)
 	}
