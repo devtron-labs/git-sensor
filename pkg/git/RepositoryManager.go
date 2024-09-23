@@ -268,7 +268,7 @@ func (impl *RepositoryManagerImpl) ChangesSinceByRepository(gitCtx GitContext, r
 		ToCommitHash:   to,
 	})
 	if err != nil {
-		impl.logger.Errorw("error in getting iterator", "branch", branch, "err", err)
+		impl.logger.Errorw("error in getting iterator", "branch", branch, "cliOutput", cliOutput, errMsg, "errMsg", "err", err)
 		return nil, cliOutput, errMsg, err
 	}
 	itrCounter := 0
