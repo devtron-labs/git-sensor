@@ -87,21 +87,21 @@ func (app *App) Start() {
 		os.Exit(2)
 	}
 
-	go func() {
-		// Start REST server
-		err = app.initRestServer(app.StartupConfig.RestPort)
-		if err != nil {
-			app.Logger.Errorw("error starting rest server", "err", err)
-			os.Exit(2)
-		}
-	}()
-
-	// Start gRPC server
-	err = app.initGrpcServer(app.StartupConfig.GrpcPort)
+	//go func() {
+	// Start REST server
+	err = app.initRestServer(app.StartupConfig.RestPort)
 	if err != nil {
-		app.Logger.Errorw("error starting grpc server", "err", err)
+		app.Logger.Errorw("error starting rest server", "err", err)
 		os.Exit(2)
 	}
+	//}()
+
+	//// Start gRPC server
+	//err = app.initGrpcServer(app.StartupConfig.GrpcPort)
+	//if err != nil {
+	//	app.Logger.Errorw("error starting grpc server", "err", err)
+	//	os.Exit(2)
+	//}
 }
 
 func (app *App) initRestServer(port int) error {

@@ -19,7 +19,7 @@ package bean
 import "fmt"
 
 type StartupConfig struct {
-	RestPort int `env:"SERVER_REST_PORT" envDefault:"8080"`
+	RestPort int `env:"SERVER_REST_PORT" envDefault:"7070"`
 	GrpcPort int `env:"SERVER_GRPC_PORT" envDefault:"8081"`
 }
 
