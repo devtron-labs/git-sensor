@@ -119,23 +119,26 @@ func (impl *GoGitSDKManagerImpl) OpenRepoPlain(checkoutPath string) (*GitReposit
 	return &GitRepository{Repository: r}, err
 }
 
-func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GoGitSDKManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) (string, error) {
 	//-----------------
 
 	err := os.MkdirAll(rootDir, 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	repo, err := git.PlainInit(rootDir, isBare)
 	if err != nil {
-		return err
+		return "", err
 	}
 	_, err = repo.CreateRemote(&config.RemoteConfig{
 		Name: git.DefaultRemoteName,
 		URLs: []string{remoteUrl},
 	})
-	return err
+	if err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 func (impl *GoGitSDKManagerImpl) GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error) {

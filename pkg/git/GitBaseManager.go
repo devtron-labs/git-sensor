@@ -45,7 +45,7 @@ type GitManager interface {
 	// OpenRepoPlain opens a new git repo at the given path
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
-	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
+	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) (string, error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface

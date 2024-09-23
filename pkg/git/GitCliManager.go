@@ -44,17 +44,19 @@ const (
 	LOCK_REF_MESSAGE            = "cannot lock ref"
 )
 
-func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) (string, error) {
 	//-----------------
 
-	err := os.MkdirAll(rootDir, 0755)
+	var err error
+	var errMsg string
+	err = os.MkdirAll(rootDir, 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = impl.GitInit(gitCtx, rootDir)
+	errMsg, err = impl.GitInit(gitCtx, rootDir)
 	if err != nil {
-		return err
+		return errMsg, err
 	}
 	return impl.GitCreateRemote(gitCtx, rootDir, remoteUrl)
 
@@ -102,18 +104,18 @@ func openGitRepo(path string) error {
 	}
 	return nil
 }
-func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) error {
+func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) (string, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "init")
 	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "init")
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return err
+	return errMsg, err
 }
 
-func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) error {
+func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) (string, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
-	return err
+	return errMsg, err
 }
 
 func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) (commits []GitCommit, cliOutput string, errMsg string, err error) {

@@ -38,11 +38,11 @@ import (
 type RepositoryManager interface {
 	// Fetch Fetches latest commit for  repo. Creates a new repo if it doesn't already exist
 	// and returns the reference to the repo
-	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error)
+	Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, errMsg string, err error)
 	// Add adds and initializes a new git repo , cleans the directory if not empty and fetches latest commits
-	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error
-	InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error)
-	FetchRepo(gitCtx GitContext, location string) error
+	Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (errMsg string, err error)
+	InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, string, error)
+	FetchRepo(gitCtx GitContext, location string) (errMsg string, err error)
 	GetCheckoutLocationFromGitUrl(material *sql.GitMaterial, cloningMode string) (location string, httpMatched bool, shMatched bool, err error)
 	GetCheckoutLocation(gitCtx GitContext, material *sql.GitMaterial, url, checkoutPath string) string
 	TrimLastGitCommit(gitCommits []*GitCommitBase, count int) []*GitCommitBase
@@ -55,7 +55,7 @@ type RepositoryManager interface {
 	// GetCommitForTag retrieves the commit metadata for given tag
 	GetCommitForTag(gitCtx GitContext, checkoutPath, tag string) (*GitCommitBase, error)
 	// CreateSshFileIfNotExistsAndConfigureSshCommand creates ssh file with creds and configures it at the location
-	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error)
+	CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (privateKeyPath string, errMsg string, err error)
 }
 
 type RepositoryManagerImpl struct {
@@ -106,63 +106,64 @@ func (impl *RepositoryManagerImpl) GetCheckoutLocation(gitCtx GitContext, materi
 	return checkoutPath
 }
 
-func (impl *RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) error {
-	_, err := impl.InitRepoAndGetSshPrivateKeyPath(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
+func (impl *RepositoryManagerImpl) Add(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
+	_, errMsg, err := impl.InitRepoAndGetSshPrivateKeyPath(gitCtx, gitProviderId, location, url, authMode, sshPrivateKeyContent)
 	if err != nil {
-		return err
+		return errMsg, err
 	}
 	return impl.FetchRepo(gitCtx, location)
 }
 
-func (impl *RepositoryManagerImpl) InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, error) {
+func (impl *RepositoryManagerImpl) InitRepoAndGetSshPrivateKeyPath(gitCtx GitContext, gitProviderId int, location, url string, authMode sql.AuthMode, sshPrivateKeyContent string) (string, string, error) {
 	var err error
+	var errMsg string
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("add", start, err)
 	}()
-	err = impl.CleanupAndInitRepo(gitCtx, location, url)
+	errMsg, err = impl.CleanupAndInitRepo(gitCtx, location, url)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	var sshPrivateKeyPath string
 	// check ssh
 	if authMode == sql.AUTH_MODE_SSH {
-		sshPrivateKeyPath, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
+		sshPrivateKeyPath, errMsg, err = impl.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProviderId, sshPrivateKeyContent)
 		if err != nil {
 			impl.logger.Errorw("error while creating ssh file for shallow clone", "checkoutPath", location, "sshPrivateKeyPath", sshPrivateKeyPath, "err", err)
-			return "", err
+			return "", errMsg, err
 		}
 	}
 
-	return sshPrivateKeyPath, nil
+	return sshPrivateKeyPath, "", nil
 }
 
-func (impl *RepositoryManagerImpl) CleanupAndInitRepo(gitCtx GitContext, location string, url string) error {
+func (impl *RepositoryManagerImpl) CleanupAndInitRepo(gitCtx GitContext, location string, url string) (string, error) {
 	err := os.RemoveAll(location)
 	if err != nil {
 		impl.logger.Errorw("error in cleaning checkout path", "err", err)
-		return err
+		return "", err
 	}
 	if !impl.IsSpaceAvailableOnDisk() {
 		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return err
+		return "", err
 	}
-	err = impl.gitManager.Init(gitCtx, location, url, true)
+	errMsg, err := impl.gitManager.Init(gitCtx, location, url, true)
 	if err != nil {
 		impl.logger.Errorw("err in git init", "err", err)
-		return err
+		return errMsg, err
 	}
-	return nil
+	return "", nil
 }
 
-func (impl *RepositoryManagerImpl) FetchRepo(gitCtx GitContext, location string) error {
-	opt, errorMsg, err := impl.gitManager.Fetch(gitCtx, location)
+func (impl *RepositoryManagerImpl) FetchRepo(gitCtx GitContext, location string) (string, error) {
+	opt, errMsg, err := impl.gitManager.Fetch(gitCtx, location)
 	if err != nil {
-		impl.logger.Errorw("error in fetching repo", "errorMsg", errorMsg, "err", err)
-		return err
+		impl.logger.Errorw("error in fetching repo", "errorMsg", errMsg, "err", err)
+		return errMsg, err
 	}
 	impl.logger.Debugw("opt msg", "opt", opt)
-	return nil
+	return "", nil
 }
 
 func (impl *RepositoryManagerImpl) Clean(dir string) error {
@@ -175,7 +176,7 @@ func (impl *RepositoryManagerImpl) Clean(dir string) error {
 	return err
 }
 
-func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, err error) {
+func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location string) (updated bool, repo *GitRepository, errMsg string, err error) {
 	start := time.Now()
 	defer func() {
 		util.TriggerGitOperationMetrics("fetch", start, err)
@@ -183,27 +184,27 @@ func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location
 	middleware.GitMaterialPollCounter.WithLabelValues().Inc()
 	if !impl.IsSpaceAvailableOnDisk() {
 		err = errors.New("git-sensor PVC - disk full, please increase space")
-		return false, nil, err
+		return false, nil, "", err
 	}
-	r, err := impl.openNewRepo(gitCtx, location, url)
+	r, errMsg, err := impl.openNewRepo(gitCtx, location, url)
 	if err != nil {
-		return false, r, err
+		return false, r, errMsg, err
 	}
-	res, errorMsg, err := impl.gitManager.Fetch(gitCtx, location)
+	res, errMsg, err := impl.gitManager.Fetch(gitCtx, location)
 
 	if err == nil && len(res) > 0 {
 		impl.logger.Infow("repository updated", "location", url)
 		//updated
 		middleware.GitPullDuration.WithLabelValues("true", "true").Observe(time.Since(start).Seconds())
-		return true, r, nil
+		return true, r, "", nil
 	} else if err == nil && len(res) == 0 {
 		impl.logger.Debugw("no update for ", "path", url)
 		middleware.GitPullDuration.WithLabelValues("true", "false").Observe(time.Since(start).Seconds())
-		return false, r, nil
+		return false, r, "", nil
 	} else {
-		impl.logger.Errorw("error in updating repository", "err", err, "location", url, "error msg", errorMsg)
+		impl.logger.Errorw("error in updating repository", "err", err, "location", url, "error msg", errMsg)
 		middleware.GitPullDuration.WithLabelValues("false", "false").Observe(time.Since(start).Seconds())
-		return false, r, err
+		return false, r, "", err
 	}
 
 }
@@ -345,7 +346,7 @@ func (impl *RepositoryManagerImpl) TrimLastGitCommit(gitCommits []*GitCommitBase
 	return gitCommits
 }
 
-func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, error) {
+func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx GitContext, location string, gitProviderId int, sshPrivateKeyContent string) (string, string, error) {
 	// add private key
 	var err error
 	var sshPrivateKeyPath string
@@ -356,38 +357,39 @@ func (impl *RepositoryManagerImpl) CreateSshFileIfNotExistsAndConfigureSshComman
 	sshPrivateKeyPath, err = GetOrCreateSshPrivateKeyOnDisk(gitProviderId, sshPrivateKeyContent)
 	if err != nil {
 		impl.logger.Errorw("error in creating ssh private key", "err", err)
-		return sshPrivateKeyPath, err
+		return sshPrivateKeyPath, "", err
 	}
 
 	//git config core.sshCommand
 	_, errorMsg, err := impl.gitManager.ConfigureSshCommand(gitCtx, location, sshPrivateKeyPath)
 	if err != nil {
 		impl.logger.Errorw("error in configuring ssh command while adding repo", "errorMsg", errorMsg, "err", err)
-		return sshPrivateKeyPath, err
+		return sshPrivateKeyPath, errorMsg, err
 	}
 
-	return sshPrivateKeyPath, nil
+	return sshPrivateKeyPath, "", nil
 }
 
-func (impl *RepositoryManagerImpl) openNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, error) {
+func (impl *RepositoryManagerImpl) openNewRepo(gitCtx GitContext, location string, url string) (*GitRepository, string, error) {
 
+	var errMsg string
 	r, err := impl.gitManager.OpenRepoPlain(location)
 	if err != nil {
 		err = os.RemoveAll(location)
 		if err != nil {
 			impl.logger.Errorw("error in cleaning checkout path: %s", err)
-			return r, err
+			return r, "", err
 		}
-		err = impl.gitManager.Init(gitCtx, location, url, true)
+		errMsg, err = impl.gitManager.Init(gitCtx, location, url, true)
 		if err != nil {
 			impl.logger.Errorw("err in git init: %s", err)
-			return r, err
+			return r, errMsg, err
 		}
 		r, err = impl.gitManager.OpenRepoPlain(location)
 		if err != nil {
 			impl.logger.Errorw("err in git init: %s", err)
-			return r, err
+			return r, "", err
 		}
 	}
-	return r, nil
+	return r, "", nil
 }

@@ -167,12 +167,16 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 		impl.logger.Errorw("error in fetching material ", "material", materialReq, "err", err)
 		return nil, err
 	}
-	err = impl.pollGitMaterialAndNotify(material)
+	errMsg, err := impl.pollGitMaterialAndNotify(material)
 	material.LastFetchTime = time.Now()
 	material.FetchStatus = err == nil
 	if err != nil {
 		material.LastFetchErrorCount = material.LastFetchErrorCount + 1
-		material.FetchErrorMessage = err.Error()
+		if errMsg != "" {
+			material.FetchErrorMessage = errMsg
+		} else {
+			material.FetchErrorMessage = err.Error()
+		}
 	} else {
 		material.LastFetchErrorCount = 0
 		material.FetchErrorMessage = ""
@@ -184,53 +188,53 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 	return material, err
 }
 
-func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) error {
+func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) (string, error) {
 	gitProvider := material.GitProvider
 	userName, password, err := GetUserNamePassword(gitProvider)
 	location := material.CheckoutLocation
 	if err != nil {
 		impl.logger.Errorw("error in determining location", "url", material.Url, "err", err)
-		return err
+		return "", err
 	}
 	gitCtx := BuildGitContext(context.Background()).
 		WithCredentials(userName, password).
 		WithTLSData(gitProvider.CaCert, gitProvider.TlsKey, gitProvider.TlsCert, material.GitProvider.EnableTLSVerification)
 
-	updated, repo, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
+	updated, repo, errMsg, err := impl.FetchAndUpdateMaterial(gitCtx, material, location)
 	if err != nil {
-		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "err", err)
+		impl.logger.Errorw("error in fetching material details ", "repo", material.Url, "errMsg", errMsg, "err", err)
 		// there might be the case if ssh private key gets flush from disk, so creating and single retrying in this case
 		if gitProvider.AuthMode == sql.AUTH_MODE_SSH {
 			if strings.Contains(material.CheckoutLocation, "/.git") {
 				location, _, _, err = impl.repositoryManager.GetCheckoutLocationFromGitUrl(material, gitCtx.CloningMode)
 				if err != nil {
-					impl.logger.Errorw("error in getting clone location ", "material", material, "err", err)
-					return err
+					impl.logger.Errorw("error in getting clone location ", "material", material, "errMsg", errMsg, "err", err)
+					return "", err
 				}
 			}
-			_, err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
+			_, errMsg, err = impl.repositoryManager.CreateSshFileIfNotExistsAndConfigureSshCommand(gitCtx, location, gitProvider.Id, gitProvider.SshPrivateKey)
 			if err != nil {
-				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "err", err)
-				return err
+				impl.logger.Errorw("error in creating/configuring ssh private key on disk ", "repo", material.Url, "gitProviderId", gitProvider.Id, "errMsg", errMsg, "err", err)
+				return errMsg, err
 			} else {
 				impl.logger.Info("Retrying fetching for", "repo", material.Url)
-				updated, repo, err = impl.FetchAndUpdateMaterial(gitCtx, material, location)
+				updated, repo, errMsg, err = impl.FetchAndUpdateMaterial(gitCtx, material, location)
 				if err != nil {
 					impl.logger.Errorw("error in fetching material details in retry", "repo", material.Url, "err", err)
-					return err
+					return errMsg, err
 				}
 			}
 		} else {
-			return err
+			return "", err
 		}
 	}
 	if !updated {
-		return nil
+		return "", nil
 	}
 	materials, err := impl.ciPipelineMaterialRepository.FindByGitMaterialId(material.Id)
 	if err != nil {
 		impl.logger.Errorw("error in calculating head", "err", err, "url", material.Url)
-		return err
+		return "", err
 	}
 	var updatedMaterials []*CiPipelineMaterialBean
 	var updatedMaterialsModel []*sql.CiPipelineMaterial
@@ -305,16 +309,16 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) e
 			impl.logger.Errorw("error in sending notification for materials", "url", material.Url, "update", updatedMaterialsModel)
 		}
 	}
-	return nil
+	return "", nil
 }
 
-func (impl GitWatcherImpl) FetchAndUpdateMaterial(gitCtx GitContext, material *sql.GitMaterial, location string) (bool, *GitRepository, error) {
-	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, material.Url, location)
+func (impl GitWatcherImpl) FetchAndUpdateMaterial(gitCtx GitContext, material *sql.GitMaterial, location string) (bool, *GitRepository, string, error) {
+	updated, repo, errMsg, err := impl.repositoryManager.Fetch(gitCtx, material.Url, location)
 	if err == nil {
 		material.CheckoutLocation = location
 		material.CheckoutStatus = true
 	}
-	return updated, repo, err
+	return updated, repo, errMsg, err
 }
 
 func (impl GitWatcherImpl) NotifyForMaterialUpdate(materials []*CiPipelineMaterialBean, gitMaterial *sql.GitMaterial) error {

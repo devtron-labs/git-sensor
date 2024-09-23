@@ -366,17 +366,21 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 
 	checkoutLocationForFetching := impl.repositoryManager.GetCheckoutLocation(gitCtx, material, gitProvider.Url, checkoutPath)
 
-	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	errMsg, err := impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if gitCtx.Err() != nil {
 		impl.logger.Errorw("context error in git checkout", "err", gitCtx.Err())
 		return material, gitCtx.Err()
-	} else if err == nil {
-		material.CheckoutLocation = checkoutLocationForFetching
-		material.CheckoutStatus = true
-	} else {
+	} else if err != nil {
 		material.CheckoutStatus = false
 		material.CheckoutMsgAny = err.Error()
-		material.FetchErrorMessage = err.Error()
+		if errMsg != "" {
+			material.FetchErrorMessage = errMsg
+		} else {
+			material.FetchErrorMessage = err.Error()
+		}
+	} else {
+		material.CheckoutLocation = checkoutLocationForFetching
+		material.CheckoutStatus = true
 	}
 	err = impl.materialRepository.Update(material)
 	if err != nil {
@@ -668,19 +672,24 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 
 	gitCtx = gitCtx.WithCredentials(userName, password).
 		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
-	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	updated, repo, errMsg, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
 	}
-	if err == nil {
-		gitMaterial.CheckoutStatus = true
-	} else {
+	if err != nil {
 		gitMaterial.CheckoutStatus = false
 		gitMaterial.CheckoutMsgAny = err.Error()
-		gitMaterial.FetchErrorMessage = err.Error()
+		if errMsg != "" {
+			gitMaterial.FetchErrorMessage = errMsg
+		} else {
+			gitMaterial.FetchErrorMessage = err.Error()
+		}
 
 		impl.logger.Errorw("error in fetching the repository ", "gitMaterial", gitMaterial, "err", err)
 		return nil, err
+	} else {
+		gitMaterial.CheckoutStatus = true
+
 	}
 
 	err = impl.materialRepository.Update(gitMaterial)
