@@ -766,9 +766,9 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 	var repository *git.GitRepository
-	commits, cliOutput, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
+	commits, _, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
-		if strings.Contains(cliOutput, git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
+		if strings.Contains(errMsg, git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
 			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
 			return nil, nil
 		}
