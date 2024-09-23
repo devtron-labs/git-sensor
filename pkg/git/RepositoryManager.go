@@ -123,7 +123,7 @@ func (impl *RepositoryManagerImpl) InitRepoAndGetSshPrivateKeyPath(gitCtx GitCon
 	}()
 	errMsg, err = impl.CleanupAndInitRepo(gitCtx, location, url)
 	if err != nil {
-		return "", "", err
+		return "", errMsg, err
 	}
 	var sshPrivateKeyPath string
 	// check ssh

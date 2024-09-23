@@ -200,13 +200,17 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 	output = strings.TrimSpace(output)
 	if err != nil {
 		impl.logger.Errorw("error in git cli operation", "msg", string(outBytes), "err", err)
+		errMsg = output
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
-			return output, string(outBytes), err
+			return output, errMsg, err
 		}
 		if strings.Contains(output, AUTHENTICATION_FAILED_ERROR) {
 			impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
 			return output, "authentication failed", errors.New("authentication failed")
+		}
+		if exErr.Stderr == nil {
+			return output, errMsg, err
 		}
 		errOutput := string(exErr.Stderr)
 		return output, errOutput, err
