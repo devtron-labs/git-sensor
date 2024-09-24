@@ -120,7 +120,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	}
 	defer commonLibGitManager.DeleteTlsFiles(tlsPathInfo)
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
-	if strings.Contains(output, LOCK_REF_MESSAGE) {
+	if strings.Contains(output, util.LOCK_REF_MESSAGE) {
 		impl.logger.Info("error in fetch, pruning local refs and retrying", "rootDir", rootDir)
 		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
 		pruneCmd, pruneCmdCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
@@ -176,7 +176,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 
 func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string, tlsPathInfo *commonLibGitManager.TlsPathInfo) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
+		fmt.Sprintf("GIT_ASKPASS=%s", util.GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
@@ -205,9 +205,10 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 		if !ok {
 			return output, errMsg, err
 		}
-		if strings.Contains(output, AUTHENTICATION_FAILED_ERROR) {
-			impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
-			return output, "authentication failed", errors.New("authentication failed")
+		customErrMsg := util.GetErrMsgFromCliMessage(output)
+		if customErrMsg != "" {
+			impl.logger.Errorw(customErrMsg, "msg", string(outBytes), "err", err.Error())
+			return output, customErrMsg, errors.New(customErrMsg)
 		}
 		if exErr.Stderr == nil {
 			return output, errMsg, err

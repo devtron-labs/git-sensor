@@ -18,8 +18,16 @@ package util
 
 import (
 	"github.com/go-pg/pg"
+	"strings"
 )
 
 func IsErrNoRows(err error) bool {
 	return pg.ErrNoRows == err
+}
+
+func GetErrMsgFromCliMessage(cliMessage string) string {
+	if strings.Contains(cliMessage, AUTHENTICATION_FAILED_ERROR) || strings.Contains(cliMessage, DIRECTORY_NOT_EXISTS_ERROR) {
+		return CHECK_REPO_MESSAGE_RESPONSE
+	}
+	return ""
 }
