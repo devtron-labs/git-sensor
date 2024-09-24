@@ -204,7 +204,7 @@ func (impl *RepositoryManagerImpl) Fetch(gitCtx GitContext, url string, location
 	} else {
 		impl.logger.Errorw("error in updating repository", "err", err, "location", url, "error msg", errMsg)
 		middleware.GitPullDuration.WithLabelValues("false", "false").Observe(time.Since(start).Seconds())
-		return false, r, "", err
+		return false, r, errMsg, err
 	}
 
 }
