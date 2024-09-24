@@ -25,6 +25,19 @@ func IsErrNoRows(err error) bool {
 	return pg.ErrNoRows == err
 }
 
+func BuildDisplayErrorMessage(cliMessage string, err error) string {
+	customErrorMessage := GetErrMsgFromCliMessage(cliMessage, err)
+	if customErrorMessage != "" {
+		return customErrorMessage
+	} else {
+		if cliMessage != "" {
+			return cliMessage
+		} else {
+			return err.Error()
+		}
+	}
+}
+
 // This function returns custom error message. If cliMessage is empty then it checks same handling in err.Error()
 func GetErrMsgFromCliMessage(cliMessage string, err error) string {
 	errMsg := strings.TrimSpace(cliMessage)

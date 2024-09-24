@@ -25,6 +25,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/internals/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
+	util2 "github.com/devtron-labs/git-sensor/util"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"strings"
@@ -209,11 +210,7 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 			return gitCtx.Err()
 		} else if err != nil {
 			pipelineMaterial.Errored = true
-			if errMsg != "" {
-				pipelineMaterial.ErrorMsg = errMsg
-			} else {
-				pipelineMaterial.ErrorMsg = err.Error()
-			}
+			pipelineMaterial.ErrorMsg = util2.BuildDisplayErrorMessage(errMsg, err)
 			pipelineMaterial.LastSeenHash = ""
 		} else {
 			impl.logger.Infow("commits found", "commit", commits)
@@ -377,11 +374,7 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 	} else if err != nil {
 		material.CheckoutStatus = false
 		material.CheckoutMsgAny = err.Error()
-		if errMsg != "" {
-			material.FetchErrorMessage = errMsg
-		} else {
-			material.FetchErrorMessage = err.Error()
-		}
+		material.FetchErrorMessage = util2.BuildDisplayErrorMessage(errMsg, err)
 	} else {
 		material.CheckoutLocation = checkoutLocationForFetching
 		material.CheckoutStatus = true
@@ -683,11 +676,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 	if err != nil {
 		gitMaterial.CheckoutStatus = false
 		gitMaterial.CheckoutMsgAny = err.Error()
-		if errMsg != "" {
-			gitMaterial.FetchErrorMessage = errMsg
-		} else {
-			gitMaterial.FetchErrorMessage = err.Error()
-		}
+		gitMaterial.FetchErrorMessage = util2.BuildDisplayErrorMessage(errMsg, err)
 
 		impl.logger.Errorw("error in fetching the repository ", "gitMaterial", gitMaterial, "err", err)
 		return nil, err

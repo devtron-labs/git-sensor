@@ -28,6 +28,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internals"
 	"github.com/devtron-labs/git-sensor/internals/middleware"
 	"github.com/devtron-labs/git-sensor/internals/sql"
+	util2 "github.com/devtron-labs/git-sensor/util"
 	"github.com/gammazero/workerpool"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -172,11 +173,7 @@ func (impl GitWatcherImpl) pollAndUpdateGitMaterial(materialReq *sql.GitMaterial
 	material.FetchStatus = err == nil
 	if err != nil {
 		material.LastFetchErrorCount = material.LastFetchErrorCount + 1
-		if errMsg != "" {
-			material.FetchErrorMessage = errMsg
-		} else {
-			material.FetchErrorMessage = err.Error()
-		}
+		material.FetchErrorMessage = util2.BuildDisplayErrorMessage(errMsg, err)
 	} else {
 		material.LastFetchErrorCount = 0
 		material.FetchErrorMessage = ""
@@ -256,11 +253,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) (
 		commits, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, material.Value, lastSeenHash, "", fetchCount, checkoutLocation, false)
 		if err != nil {
 			material.Errored = true
-			if errMsg != "" {
-				material.ErrorMsg = errMsg
-			} else {
-				material.ErrorMsg = err.Error()
-			}
+			material.ErrorMsg = util2.BuildDisplayErrorMessage(errMsg, err)
 
 			erroredMaterialsModels = append(erroredMaterialsModels, material)
 		} else if len(commits) > 0 {
