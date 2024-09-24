@@ -47,7 +47,7 @@ func GetErrMsgFromCliMessage(cliMessage string, err error) string {
 		}
 		errMsg = err.Error()
 	}
-	if strings.Contains(cliMessage, AUTHENTICATION_FAILED_ERROR) || strings.Contains(cliMessage, DIRECTORY_NOT_EXISTS_ERROR) {
+	if strings.Contains(errMsg, AUTHENTICATION_FAILED_ERROR) || strings.Contains(errMsg, DIRECTORY_NOT_EXISTS_ERROR) {
 		return CHECK_REPO_MESSAGE_RESPONSE
 	}
 	return ""
