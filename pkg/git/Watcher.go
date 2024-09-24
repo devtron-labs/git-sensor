@@ -222,7 +222,7 @@ func (impl GitWatcherImpl) pollGitMaterialAndNotify(material *sql.GitMaterial) (
 				}
 			}
 		} else {
-			return "", err
+			return errMsg, err
 		}
 	}
 	if !updated {
