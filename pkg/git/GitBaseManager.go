@@ -205,7 +205,7 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 		if !ok {
 			return output, errMsg, err
 		}
-		customErrMsg := util.GetErrMsgFromCliMessage(output)
+		customErrMsg := util.GetErrMsgFromCliMessage(output, err)
 		if customErrMsg != "" {
 			impl.logger.Errorw(customErrMsg, "msg", string(outBytes), "err", err.Error())
 			return output, customErrMsg, errors.New(customErrMsg)

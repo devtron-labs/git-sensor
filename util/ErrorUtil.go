@@ -25,7 +25,15 @@ func IsErrNoRows(err error) bool {
 	return pg.ErrNoRows == err
 }
 
-func GetErrMsgFromCliMessage(cliMessage string) string {
+// This function returns custom error message. If cliMessage is empty then it checks same handling in err.Error()
+func GetErrMsgFromCliMessage(cliMessage string, err error) string {
+	errMsg := strings.TrimSpace(cliMessage)
+	if errMsg == "" {
+		if err == nil {
+			return ""
+		}
+		errMsg = err.Error()
+	}
 	if strings.Contains(cliMessage, AUTHENTICATION_FAILED_ERROR) || strings.Contains(cliMessage, DIRECTORY_NOT_EXISTS_ERROR) {
 		return CHECK_REPO_MESSAGE_RESPONSE
 	}

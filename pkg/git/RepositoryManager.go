@@ -377,17 +377,17 @@ func (impl *RepositoryManagerImpl) openNewRepo(gitCtx GitContext, location strin
 	if err != nil {
 		err = os.RemoveAll(location)
 		if err != nil {
-			impl.logger.Errorw("error in cleaning checkout path: %s", err)
+			impl.logger.Errorw("error in cleaning checkout path: %s", "err", err)
 			return r, "", err
 		}
 		errMsg, err = impl.gitManager.Init(gitCtx, location, url, true)
 		if err != nil {
-			impl.logger.Errorw("err in git init: %s", err)
+			impl.logger.Errorw("err in git init: %s", "err", err)
 			return r, errMsg, err
 		}
 		r, err = impl.gitManager.OpenRepoPlain(location)
 		if err != nil {
-			impl.logger.Errorw("err in git init: %s", err)
+			impl.logger.Errorw("err in git init: %s", "err", err)
 			return r, "", err
 		}
 	}
