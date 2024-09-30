@@ -18,8 +18,37 @@ package util
 
 import (
 	"github.com/go-pg/pg"
+	"strings"
 )
 
 func IsErrNoRows(err error) bool {
 	return pg.ErrNoRows == err
+}
+
+func BuildDisplayErrorMessage(cliMessage string, err error) string {
+	customErrorMessage := GetErrMsgFromCliMessage(cliMessage, err)
+	if customErrorMessage != "" {
+		return customErrorMessage
+	} else {
+		if cliMessage != "" {
+			return cliMessage
+		} else {
+			return err.Error()
+		}
+	}
+}
+
+// This function returns custom error message. If cliMessage is empty then it checks same handling in err.Error()
+func GetErrMsgFromCliMessage(cliMessage string, err error) string {
+	errMsg := strings.TrimSpace(cliMessage)
+	if errMsg == "" {
+		if err == nil {
+			return ""
+		}
+		errMsg = err.Error()
+	}
+	if strings.Contains(errMsg, AUTHENTICATION_FAILED_ERROR) || strings.Contains(errMsg, DIRECTORY_NOT_EXISTS_ERROR) {
+		return CHECK_REPO_MESSAGE_RESPONSE
+	}
+	return ""
 }

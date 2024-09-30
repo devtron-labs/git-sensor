@@ -37,7 +37,7 @@ type GitManager interface {
 	// GetCommitStats retrieves the stats for the given commit vs its parent
 	GetCommitStats(gitCtx GitContext, commit GitCommit, checkoutPath string) (FileStats, error)
 	// GetCommitIterator returns an iterator for the provided git repo and iterator request describing the commits to fetch
-	GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error)
+	GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (commitIterator CommitIterator, cliOutput string, errMsg string, err error)
 	// GetCommitForHash retrieves the commit reference for given tag
 	GetCommitForHash(gitCtx GitContext, checkoutPath, commitHash string) (GitCommit, error)
 	// GetCommitsForTag retrieves the commit reference for given tag
@@ -45,7 +45,7 @@ type GitManager interface {
 	// OpenRepoPlain opens a new git repo at the given path
 	OpenRepoPlain(checkoutPath string) (*GitRepository, error)
 	// Init initializes a git repo
-	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error
+	Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) (string, error)
 }
 
 // GitManagerBase Base methods which will be available to all implementation of the parent interface
@@ -120,7 +120,7 @@ func (impl *GitManagerBaseImpl) Fetch(gitCtx GitContext, rootDir string) (respon
 	}
 	defer commonLibGitManager.DeleteTlsFiles(tlsPathInfo)
 	output, errMsg, err := impl.runCommandWithCred(cmd, gitCtx.Username, gitCtx.Password, tlsPathInfo)
-	if strings.Contains(output, LOCK_REF_MESSAGE) {
+	if strings.Contains(output, util.LOCK_REF_MESSAGE) {
 		impl.logger.Info("error in fetch, pruning local refs and retrying", "rootDir", rootDir)
 		// running git remote prune origin and retrying fetch. gitHub issue - https://github.com/devtron-labs/devtron/issues/4605
 		pruneCmd, pruneCmdCancel := impl.createCmdWithContext(gitCtx, "git", "-C", rootDir, "remote", "prune", "origin")
@@ -176,7 +176,7 @@ func (impl *GitManagerBaseImpl) LogMergeBase(gitCtx GitContext, rootDir, from st
 
 func (impl *GitManagerBaseImpl) runCommandWithCred(cmd *exec.Cmd, userName, password string, tlsPathInfo *commonLibGitManager.TlsPathInfo) (response, errMsg string, err error) {
 	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("GIT_ASKPASS=%s", GIT_ASK_PASS),
+		fmt.Sprintf("GIT_ASKPASS=%s", util.GIT_ASK_PASS),
 		fmt.Sprintf("GIT_USERNAME=%s", userName),
 		fmt.Sprintf("GIT_PASSWORD=%s", password),
 	)
@@ -200,13 +200,18 @@ func (impl *GitManagerBaseImpl) runCommand(cmd *exec.Cmd) (response, errMsg stri
 	output = strings.TrimSpace(output)
 	if err != nil {
 		impl.logger.Errorw("error in git cli operation", "msg", string(outBytes), "err", err)
+		errMsg = output
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
-			return output, string(outBytes), err
+			return output, errMsg, err
 		}
-		if strings.Contains(output, AUTHENTICATION_FAILED_ERROR) {
-			impl.logger.Errorw("authentication failed", "msg", string(outBytes), "err", err.Error())
-			return output, "authentication failed", errors.New("authentication failed")
+		customErrMsg := util.GetErrMsgFromCliMessage(output, err)
+		if customErrMsg != "" {
+			impl.logger.Errorw(customErrMsg, "msg", string(outBytes), "err", err.Error())
+			return output, customErrMsg, errors.New(customErrMsg)
+		}
+		if exErr.Stderr == nil {
+			return output, errMsg, err
 		}
 		errOutput := string(exErr.Stderr)
 		return output, errOutput, err

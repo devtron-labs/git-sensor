@@ -25,6 +25,7 @@ import (
 	"github.com/devtron-labs/git-sensor/internals/sql"
 	"github.com/devtron-labs/git-sensor/internals/util"
 	"github.com/devtron-labs/git-sensor/pkg/git"
+	util2 "github.com/devtron-labs/git-sensor/util"
 	_ "github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"strings"
@@ -202,12 +203,16 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 
 		fetchCount := impl.configuration.GitHistoryCount
 		var repository *git.GitRepository
-		commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
+		commits, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, pipelineMaterial.Value, "", "", fetchCount, material.CheckoutLocation, true)
 		//commits, err := impl.FetchChanges(pipelineMaterial.Id, "", "", 0)
 		if gitCtx.Err() != nil {
 			impl.logger.Errorw("context error in getting commits", "err", gitCtx.Err())
 			return gitCtx.Err()
-		} else if err == nil {
+		} else if err != nil {
+			pipelineMaterial.Errored = true
+			pipelineMaterial.ErrorMsg = util2.BuildDisplayErrorMessage(errMsg, err)
+			pipelineMaterial.LastSeenHash = ""
+		} else {
 			impl.logger.Infow("commits found", "commit", commits)
 			b, err := json.Marshal(commits)
 			if err == nil {
@@ -226,10 +231,6 @@ func (impl RepoManagerImpl) updatePipelineMaterialCommit(gitCtx git.GitContext, 
 				pipelineMaterial.ErrorMsg = err.Error()
 				pipelineMaterial.LastSeenHash = ""
 			}
-		} else {
-			pipelineMaterial.Errored = true
-			pipelineMaterial.ErrorMsg = err.Error()
-			pipelineMaterial.LastSeenHash = ""
 		}
 		materialCommits = append(materialCommits, pipelineMaterial)
 	}
@@ -366,17 +367,17 @@ func (impl RepoManagerImpl) checkoutMaterial(gitCtx git.GitContext, material *sq
 
 	checkoutLocationForFetching := impl.repositoryManager.GetCheckoutLocation(gitCtx, material, gitProvider.Url, checkoutPath)
 
-	err = impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
+	errMsg, err := impl.repositoryManager.Add(gitCtx, material.GitProviderId, checkoutPath, material.Url, gitProvider.AuthMode, gitProvider.SshPrivateKey)
 	if gitCtx.Err() != nil {
 		impl.logger.Errorw("context error in git checkout", "err", gitCtx.Err())
 		return material, gitCtx.Err()
-	} else if err == nil {
-		material.CheckoutLocation = checkoutLocationForFetching
-		material.CheckoutStatus = true
-	} else {
+	} else if err != nil {
 		material.CheckoutStatus = false
 		material.CheckoutMsgAny = err.Error()
-		material.FetchErrorMessage = err.Error()
+		material.FetchErrorMessage = util2.BuildDisplayErrorMessage(errMsg, err)
+	} else {
+		material.CheckoutLocation = checkoutLocationForFetching
+		material.CheckoutStatus = true
 	}
 	err = impl.materialRepository.Update(material)
 	if err != nil {
@@ -668,19 +669,20 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 
 	gitCtx = gitCtx.WithCredentials(userName, password).
 		WithTLSData(gitMaterial.GitProvider.CaCert, gitMaterial.GitProvider.TlsKey, gitMaterial.GitProvider.TlsCert, gitMaterial.GitProvider.EnableTLSVerification)
-	updated, repo, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
+	updated, repo, errMsg, err := impl.repositoryManager.Fetch(gitCtx, gitMaterial.Url, gitMaterial.CheckoutLocation)
 	if !updated {
 		impl.logger.Warn("repository is up to date")
 	}
-	if err == nil {
-		gitMaterial.CheckoutStatus = true
-	} else {
+	if err != nil {
 		gitMaterial.CheckoutStatus = false
 		gitMaterial.CheckoutMsgAny = err.Error()
-		gitMaterial.FetchErrorMessage = err.Error()
+		gitMaterial.FetchErrorMessage = util2.BuildDisplayErrorMessage(errMsg, err)
 
 		impl.logger.Errorw("error in fetching the repository ", "gitMaterial", gitMaterial, "err", err)
 		return nil, err
+	} else {
+		gitMaterial.CheckoutStatus = true
+
 	}
 
 	err = impl.materialRepository.Update(gitMaterial)
@@ -699,7 +701,7 @@ func (impl RepoManagerImpl) GetLatestCommitForBranch(gitCtx git.GitContext, pipe
 		return nil, err
 	}
 
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
+	commits, _, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repo, branchName, "", "", 1, gitMaterial.CheckoutLocation, false)
 
 	if commits == nil {
 		return nil, err
@@ -749,9 +751,9 @@ func (impl RepoManagerImpl) GetCommitMetadataForPipelineMaterial(gitCtx git.GitC
 		impl.locker.ReturnLocker(gitMaterial.Id)
 	}()
 	var repository *git.GitRepository
-	commits, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
+	commits, errMsg, err := impl.repositoryManager.ChangesSinceByRepository(gitCtx, repository, branchName, "", gitHash, 1, gitMaterial.CheckoutLocation, true)
 	if err != nil {
-		if strings.Contains(err.Error(), git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
+		if strings.Contains(errMsg, git.NO_COMMIT_CUSTOM_ERROR_MESSAGE) {
 			impl.logger.Warnw("No commit found for given hash", "hash", gitHash, "branchName", branchName)
 			return nil, nil
 		}

@@ -17,7 +17,6 @@
 package git
 
 import (
-	"errors"
 	"go.uber.org/zap"
 	"gopkg.in/src-d/go-billy.v4/osfs"
 	"os"
@@ -39,23 +38,19 @@ func NewGitCliManagerImpl(baseManager GitManagerBase, logger *zap.SugaredLogger)
 	}
 }
 
-const (
-	GIT_ASK_PASS                = "/git-ask-pass.sh"
-	AUTHENTICATION_FAILED_ERROR = "Authentication failed"
-	LOCK_REF_MESSAGE            = "cannot lock ref"
-)
-
-func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) error {
+func (impl *GitCliManagerImpl) Init(gitCtx GitContext, rootDir string, remoteUrl string, isBare bool) (string, error) {
 	//-----------------
 
-	err := os.MkdirAll(rootDir, 0755)
+	var err error
+	var errMsg string
+	err = os.MkdirAll(rootDir, 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = impl.GitInit(gitCtx, rootDir)
+	errMsg, err = impl.GitInit(gitCtx, rootDir)
 	if err != nil {
-		return err
+		return errMsg, err
 	}
 	return impl.GitCreateRemote(gitCtx, rootDir, remoteUrl)
 
@@ -80,16 +75,16 @@ func (impl *GitCliManagerImpl) GetCommitForHash(gitCtx GitContext, checkoutPath,
 
 	return impl.GitShow(gitCtx, checkoutPath, commitHash)
 }
-func (impl *GitCliManagerImpl) GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (CommitIterator, error) {
+func (impl *GitCliManagerImpl) GetCommitIterator(gitCtx GitContext, repository *GitRepository, iteratorRequest IteratorRequest) (commitIterator CommitIterator, cliOutput string, errMsg string, err error) {
 
-	commits, err := impl.GetCommits(gitCtx, iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
+	commits, cliOutput, errMsg, err := impl.GetCommits(gitCtx, iteratorRequest.BranchRef, iteratorRequest.Branch, repository.rootDir, iteratorRequest.CommitCount, iteratorRequest.FromCommitHash, iteratorRequest.ToCommitHash)
 	if err != nil {
 		impl.logger.Errorw("error in fetching commits for", "err", err, "path", repository.rootDir)
-		return nil, err
+		return nil, cliOutput, errMsg, err
 	}
 	return &CommitCliIterator{
 		commits: commits,
-	}, nil
+	}, "", "", nil
 }
 
 func openGitRepo(path string) error {
@@ -103,39 +98,36 @@ func openGitRepo(path string) error {
 	}
 	return nil
 }
-func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) error {
+func (impl *GitCliManagerImpl) GitInit(gitCtx GitContext, rootDir string) (string, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "init")
 	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "init")
 	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
-	return err
+	return errMsg, err
 }
 
-func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) error {
+func (impl *GitCliManagerImpl) GitCreateRemote(gitCtx GitContext, rootDir string, url string) (string, error) {
 	impl.logger.Debugw("git", "-C", rootDir, "remote", "add", "origin", url)
 	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", "-C", rootDir, "remote", "add", "origin", url)
 	impl.logger.Debugw("url", url, "opt", output, "errMsg", errMsg, "error", err)
-	return err
+	return errMsg, err
 }
 
-func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) ([]GitCommit, error) {
+func (impl *GitCliManagerImpl) GetCommits(gitCtx GitContext, branchRef string, branch string, rootDir string, numCommits int, from string, to string) (commits []GitCommit, cliOutput string, errMsg string, err error) {
 	baseCmdArgs := []string{"-C", rootDir, "log"}
 	rangeCmdArgs := []string{branchRef}
 	extraCmdArgs := []string{"-n", strconv.Itoa(numCommits), "--date=iso-strict", GITFORMAT}
 	cmdArgs := impl.getCommandForLogRange(branchRef, from, to, rangeCmdArgs, baseCmdArgs, extraCmdArgs)
 	impl.logger.Debugw("git", cmdArgs)
-	output, errMsg, err := impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", cmdArgs...)
-	impl.logger.Debugw("root", rootDir, "opt", output, "errMsg", errMsg, "error", err)
+	cliOutput, errMsg, err = impl.GitManagerBase.ExecuteCustomCommand(gitCtx, "git", cmdArgs...)
+	impl.logger.Debugw("root", rootDir, "cliOutput", cliOutput, "errMsg", errMsg, "error", err)
 	if err != nil {
-		if strings.Contains(output, NO_COMMIT_GIT_ERROR_MESSAGE) {
-			return nil, errors.New(NO_COMMIT_CUSTOM_ERROR_MESSAGE)
-		}
-		return nil, err
+		return nil, cliOutput, errMsg, err
 	}
-	commits, err := impl.processGitLogOutput(output)
+	commits, err = impl.processGitLogOutput(cliOutput)
 	if err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
-	return commits, nil
+	return commits, "", "", nil
 }
 
 func (impl *GitCliManagerImpl) getCommandForLogRange(branchRef string, from string, to string, rangeCmdArgs []string, baseCmdArgs []string, extraCmdArgs []string) []string {
