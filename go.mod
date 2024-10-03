@@ -6,7 +6,7 @@ toolchain go1.22.4
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.16.1-0.20240911071031-2625327bc7b4
+	github.com/devtron-labs/common-lib v0.19.0
 	github.com/devtron-labs/protos v0.0.3-0.20240809072909-83171af34169
 	github.com/gammazero/workerpool v1.1.3
 	github.com/go-git/go-git/v5 v5.11.0
@@ -72,7 +72,7 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
