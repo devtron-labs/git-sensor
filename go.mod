@@ -6,7 +6,7 @@ toolchain go1.22.4
 
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
-	github.com/devtron-labs/common-lib v0.19.0
+	github.com/devtron-labs/common-lib v0.19.2-0.20241016122325-26d34674552e
 	github.com/devtron-labs/protos v0.0.3-0.20240809072909-83171af34169
 	github.com/gammazero/workerpool v1.1.3
 	github.com/go-git/go-git/v5 v5.11.0
